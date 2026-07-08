@@ -1,0 +1,53 @@
+*.iml
+.gradle
+/local.properties
+/.idea/
+.idea/caches
+.idea/libraries
+.idea/modules.xml
+.idea/workspace.xml
+.idea/navEditor.xml
+.idea/assetWizardSettings.xml
+.idea/appInsightsSettings.xml
+.idea/deploymentTargetSelector.xml
+.idea/gradle.xml
+.idea/misc.xml
+.idea/vcs.xml
+.idea/planningMode.xml
+.idea/runConfigurations.xml
+.idea/studiobot.xml
+.idea/codeStyles/
+.idea/inspectionProfiles/
+.DS_Store
+/build
+**/build/
+/captures
+**/captures/
+.externalNativeBuild
+.cxx
+local.properties
+
+# Android Studio
+*.hprof
+
+# Built variants
+app/release/
+app/debug/
+*.apk
+
+# Keystore files
+*.jks
+*.keystore
+/sign/
+
+# Google Services
+# app/google-services.json
+
+# Navigation editor temp files
+.navigation/
+
+# Log files
+*.log
+
+# Temp files
+java_pid*.hprof

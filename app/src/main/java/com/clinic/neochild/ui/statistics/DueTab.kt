@@ -22,44 +22,18 @@ import androidx.compose.ui.unit.dp
 import com.clinic.neochild.data.model.Patient
 import com.clinic.neochild.data.model.Vaccination
 import com.clinic.neochild.ui.theme.NeoChildTheme
-import com.clinic.neochild.utils.PatientUtils
-import com.clinic.neochild.utils.ReminderEngine
 import java.util.*
 
 @Composable
 fun DueTab(
     patients: List<Patient>, 
-    vaccinations: List<Vaccination>,
+    filteredVaccinations: List<Vaccination>,
+    overdueCount: Int,
     initialFilter: String = "Today",
     onFilterChanged: (String) -> Unit = {},
     onUpdateVaccination: (Vaccination) -> Unit = {}
 ) {
     val filters = remember { listOf("Overdue", "Previous Month", "Today", "This Week", "Upcoming") }
-
-    val unsatisfied = remember(vaccinations) { ReminderEngine.getUnsatisfiedRequirements(vaccinations) }
-    val pendingVaccinations = remember(unsatisfied, vaccinations) {
-        unsatisfied.mapNotNull { req ->
-            vaccinations.find { it.id == req.originalVisitId }?.copy(
-                nxtVaccineNames = listOf(req.vaccineName),
-                nextDueDate = PatientUtils.formatDate(req.dueDate)
-            )
-        }.distinctBy { it.patientId + it.nextDueDate + it.nxtVaccineNames.joinToString() }
-    }
-
-    val filteredVaccinations = remember(pendingVaccinations, initialFilter) { 
-        PatientUtils.filterVaccinationsByPeriod(pendingVaccinations, initialFilter) 
-    }
-
-    val overdueCount = remember(pendingVaccinations) {
-        val calendar = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
-        }
-        val todayStart = calendar.time
-        pendingVaccinations.count { 
-            val date = PatientUtils.parseDate(it.nextDueDate)
-            date != null && date.before(todayStart)
-        }
-    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
@@ -91,7 +65,7 @@ fun DueTab(
         } else {
             items(
                 items = filteredVaccinations, 
-                key = { it.id + it.nxtVaccineNames.joinToString() }
+                key = { it.id + it.nextDueDate }
             ) { v ->
                 val patient = remember(v.patientId, patients) { patients.find { it.id == v.patientId } }
                 DuePatientCard(
@@ -241,7 +215,8 @@ private fun DueTabPreview() {
     NeoChildTheme {
         DueTab(
             patients = listOf(Patient("1", "John Doe", "1234567890", "", "2020-01-01", "Male", "", "")),
-            vaccinations = listOf(Vaccination("1", "1", listOf("BCG"), listOf("HepB"), "1 Jan 2024", "1 Feb 2024", 500.0, 500.0, 0.0, 500.0, false, false, false))
+            filteredVaccinations = listOf(Vaccination("1", "1", listOf("BCG"), listOf("HepB"), "1 Jan 2024", "1 Feb 2024", 500.0, 500.0, 0.0, 500.0, false, false, false)),
+            overdueCount = 1
         )
     }
 }

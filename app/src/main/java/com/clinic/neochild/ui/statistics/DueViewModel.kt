@@ -42,14 +42,15 @@ class DueViewModel @Inject constructor(
         // Use the new ReminderEngine for more accurate tracking
         val unsatisfied = ReminderEngine.getUnsatisfiedRequirements(vaccinations)
         
-        // Convert requirements back to Vaccination objects for the UI to display
-        // Map unsatisfied requirements to their original vaccination records
-        val pending = unsatisfied.mapNotNull { req -> 
-            vaccinations.find { it.id == req.originalVisitId }?.copy(
-                nxtVaccineNames = listOf(req.vaccineName),
-                nextDueDate = PatientUtils.formatDate(req.dueDate)
-            )
-        }.distinctBy { it.patientId + it.nextDueDate + it.nxtVaccineNames.joinToString() }
+        // Group unsatisfied requirements by patient and due date to avoid duplicate entries for the same visit
+        val pending = unsatisfied.groupBy { it.patientId + PatientUtils.formatDate(it.dueDate) }
+            .mapNotNull { (_, reqs) ->
+                val first = reqs.first()
+                vaccinations.find { it.id == first.originalVisitId }?.copy(
+                    nxtVaccineNames = reqs.map { it.vaccineName },
+                    nextDueDate = PatientUtils.formatDate(first.dueDate)
+                )
+            }
 
         val filtered = PatientUtils.filterVaccinationsByPeriod(pending, filter)
         

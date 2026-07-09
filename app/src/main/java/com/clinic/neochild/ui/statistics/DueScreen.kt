@@ -45,7 +45,8 @@ fun DueScreen(
                 } else {
                     DueTab(
                         patients = uiState.patients, 
-                        vaccinations = uiState.vaccinations,
+                        filteredVaccinations = uiState.filteredVaccinations,
+                        overdueCount = uiState.overdueCount,
                         initialFilter = uiState.selectedFilter,
                         onFilterChanged = viewModel::updateFilter,
                         onUpdateVaccination = viewModel::markAsDone

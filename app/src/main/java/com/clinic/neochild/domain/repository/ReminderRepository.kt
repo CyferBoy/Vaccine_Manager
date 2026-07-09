@@ -11,5 +11,6 @@ interface ReminderRepository {
     suspend fun insertReminder(reminder: ReminderEntity): Long
     suspend fun updateReminder(reminder: ReminderEntity)
     suspend fun markCompleted(id: Long)
+    suspend fun markPatientRemindersCompleted(patientId: String)
     suspend fun deleteOldReminders(days: Int)
 }

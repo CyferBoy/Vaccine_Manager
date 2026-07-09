@@ -49,7 +49,9 @@ fun DueScreen(
                         overdueCount = uiState.overdueCount,
                         initialFilter = uiState.selectedFilter,
                         onFilterChanged = viewModel::updateFilter,
-                        onUpdateVaccination = viewModel::markAsDone
+                        onUpdateVaccination = viewModel::markAsDone,
+                        onReschedule = viewModel::rescheduleVaccination,
+                        onVaccinatedElsewhere = viewModel::markVaccinatedElsewhere
                     )
                 }
             }

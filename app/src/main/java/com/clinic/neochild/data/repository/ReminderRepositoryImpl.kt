@@ -37,6 +37,10 @@ class ReminderRepositoryImpl @Inject constructor(
         reminderDao.markCompleted(id)
     }
 
+    override suspend fun markPatientRemindersCompleted(patientId: String) {
+        reminderDao.markPatientRemindersCompleted(patientId)
+    }
+
     override suspend fun deleteOldReminders(days: Int) {
         val timestamp = System.currentTimeMillis() - (days * 24 * 60 * 60 * 1000L)
         reminderDao.deleteOldCompletedReminders(timestamp)

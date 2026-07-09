@@ -3,11 +3,14 @@ package com.clinic.neochild.ui.statistics
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -21,9 +24,12 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.clinic.neochild.data.model.Patient
 import com.clinic.neochild.data.model.Vaccination
+import com.clinic.neochild.data.model.VaccinationSource
 import com.clinic.neochild.ui.theme.NeoChildTheme
+import java.text.SimpleDateFormat
 import java.util.*
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DueTab(
     patients: List<Patient>, 
@@ -31,9 +37,53 @@ fun DueTab(
     overdueCount: Int,
     initialFilter: String = "Today",
     onFilterChanged: (String) -> Unit = {},
-    onUpdateVaccination: (Vaccination) -> Unit = {}
+    onUpdateVaccination: (Vaccination) -> Unit = {},
+    onReschedule: (String, String, String) -> Unit = { _, _, _ -> },
+    onVaccinatedElsewhere: (String, VaccinationSource, String, String) -> Unit = { _, _, _, _ -> }
 ) {
     val filters = remember { listOf("Overdue", "Previous Month", "Today", "This Week", "Upcoming") }
+    var selectedVaccination by remember { mutableStateOf<Vaccination?>(null) }
+    var showManageSheet by remember { mutableStateOf(false) }
+    var showReschedulePicker by remember { mutableStateOf(false) }
+    var showElsewhereSheet by remember { mutableStateOf(false) }
+
+    if (showManageSheet && selectedVaccination != null) {
+        ManageDueBottomSheet(
+            onDismiss = { showManageSheet = false },
+            onMarkAsDone = { 
+                onUpdateVaccination(selectedVaccination!!)
+                showManageSheet = false 
+            },
+            onReschedule = { 
+                showManageSheet = false
+                showReschedulePicker = true 
+            },
+            onVaccinatedElsewhere = { 
+                showManageSheet = false
+                showElsewhereSheet = true 
+            }
+        )
+    }
+
+    if (showReschedulePicker && selectedVaccination != null) {
+        RescheduleDialog(
+            onDismiss = { showReschedulePicker = false },
+            onConfirm = { newDate, reason ->
+                onReschedule(selectedVaccination!!.id, newDate, reason)
+                showReschedulePicker = false
+            }
+        )
+    }
+
+    if (showElsewhereSheet && selectedVaccination != null) {
+        VaccinatedElsewhereBottomSheet(
+            onDismiss = { showElsewhereSheet = false },
+            onSave = { source, date, notes ->
+                onVaccinatedElsewhere(selectedVaccination!!.id, source, date, notes)
+                showElsewhereSheet = false
+            }
+        )
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
@@ -71,7 +121,10 @@ fun DueTab(
                 DuePatientCard(
                     vaccination = v, 
                     patient = patient,
-                    onStatusChange = { isDone -> onUpdateVaccination(v.copy(isDone = isDone)) },
+                    onLongPress = { 
+                        selectedVaccination = v
+                        showManageSheet = true 
+                    },
                     modifier = Modifier.animateItem()
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -142,10 +195,9 @@ private fun EmptyDueState(selectedFilter: String) {
 private fun DuePatientCard(
     vaccination: Vaccination, 
     patient: Patient?,
-    onStatusChange: (Boolean) -> Unit,
+    onLongPress: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var showMenu by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
     Card(
@@ -153,57 +205,236 @@ private fun DuePatientCard(
             .fillMaxWidth()
             .combinedClickable(
                 onClick = { /* Could navigate to details */ },
-                onLongClick = { showMenu = true }
+                onLongClick = onLongPress
             ),
         shape = RoundedCornerShape(12.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Box {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(patient?.name ?: "Unknown Patient", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(patient?.name ?: "Unknown Patient", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = "Next: ${vaccination.nxtVaccineNames.joinToString(", ")}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
                         Text(
-                            text = "Next: ${vaccination.nxtVaccineNames.joinToString(", ")}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text = vaccination.nextDueDate,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
                     
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Text(
-                                text = vaccination.nextDueDate,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
-                        
-                        if (patient != null && patient.phone.isNotBlank()) {
-                            IconButton(onClick = {
-                                val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${patient.phone}"))
-                                context.startActivity(intent)
-                            }) {
-                                Icon(Icons.Default.Call, contentDescription = "Call", tint = MaterialTheme.colorScheme.primary)
-                            }
+                    if (patient != null && patient.phone.isNotBlank()) {
+                        IconButton(onClick = {
+                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${patient.phone}"))
+                            context.startActivity(intent)
+                        }) {
+                            Icon(Icons.Default.Call, contentDescription = "Call", tint = MaterialTheme.colorScheme.primary)
                         }
                     }
                 }
             }
+        }
+    }
+}
 
-            DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                DropdownMenuItem(
-                    text = { Text("Mark as Done") },
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ManageDueBottomSheet(
+    onDismiss: () -> Unit,
+    onMarkAsDone: () -> Unit,
+    onReschedule: () -> Unit,
+    onVaccinatedElsewhere: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 32.dp)
+        ) {
+            Text(
+                text = "Manage Due Vaccination",
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(16.dp)
+            )
+            
+            ListItem(
+                headlineContent = { Text("Mark as Done") },
+                leadingContent = { Icon(Icons.Default.Check, contentDescription = null) },
+                modifier = Modifier.clickable { onMarkAsDone() }
+            )
+            ListItem(
+                headlineContent = { Text("Reschedule") },
+                leadingContent = { Icon(Icons.Default.Event, contentDescription = null) },
+                modifier = Modifier.clickable { onReschedule() }
+            )
+            ListItem(
+                headlineContent = { Text("Vaccinated Elsewhere") },
+                leadingContent = { Icon(Icons.Default.Public, contentDescription = null) },
+                modifier = Modifier.clickable { onVaccinatedElsewhere() }
+            )
+            ListItem(
+                headlineContent = { Text("Cancel") },
+                leadingContent = { Icon(Icons.Default.Close, contentDescription = null) },
+                modifier = Modifier.clickable { onDismiss() }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RescheduleDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (String, String) -> Unit
+) {
+    var reason by remember { mutableStateOf("") }
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = System.currentTimeMillis()
+    )
+    
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val date = datePickerState.selectedDateMillis?.let {
+                        SimpleDateFormat("d MMM yyyy", Locale.ENGLISH).format(Date(it))
+                    } ?: ""
+                    onConfirm(date, reason)
+                }
+            ) {
+                Text("Confirm")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    ) {
+        Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+            DatePicker(state = datePickerState)
+            OutlinedTextField(
+                value = reason,
+                onValueChange = { reason = it },
+                label = { Text("Reason (Optional)") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun VaccinatedElsewhereBottomSheet(
+    onDismiss: () -> Unit,
+    onSave: (VaccinationSource, String, String) -> Unit
+) {
+    var source by remember { mutableStateOf(VaccinationSource.GOVERNMENT) }
+    var notes by remember { mutableStateOf("") }
+    var showDatePicker by remember { mutableStateOf(false) }
+    var selectedDate by remember { mutableStateOf(SimpleDateFormat("d MMM yyyy", Locale.ENGLISH).format(Date())) }
+
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = System.currentTimeMillis()
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(
                     onClick = {
-                        onStatusChange(true)
-                        showMenu = false
-                    },
-                    leadingIcon = { Icon(Icons.Default.Check, contentDescription = null) }
-                )
+                        datePickerState.selectedDateMillis?.let {
+                            selectedDate = SimpleDateFormat("d MMM yyyy", Locale.ENGLISH).format(Date(it))
+                        }
+                        showDatePicker = false
+                    }
+                ) {
+                    Text("OK")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .padding(bottom = 32.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            Text(
+                text = "Vaccinated Elsewhere",
+                style = MaterialTheme.typography.titleLarge
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            Text("Where was the vaccine given?", style = MaterialTheme.typography.titleMedium)
+            
+            VaccinationSource.entries.filter { it != VaccinationSource.CLINIC }.forEach { entry ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { source = entry }
+                ) {
+                    RadioButton(selected = source == entry, onClick = { source = entry })
+                    Text(
+                        text = entry.name.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() },
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            OutlinedButton(
+                onClick = { showDatePicker = true },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.CalendarToday, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Vaccination Date: $selectedDate")
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            OutlinedTextField(
+                value = notes,
+                onValueChange = { notes = it },
+                label = { Text("Optional Notes") },
+                modifier = Modifier.fillMaxWidth()
+            )
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            Button(
+                onClick = { onSave(source, selectedDate, notes) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Save")
             }
         }
     }
@@ -216,7 +447,10 @@ private fun DueTabPreview() {
         DueTab(
             patients = listOf(Patient("1", "John Doe", "1234567890", "", "2020-01-01", "Male", "", "")),
             filteredVaccinations = listOf(Vaccination("1", "1", listOf("BCG"), listOf("HepB"), "1 Jan 2024", "1 Feb 2024", 500.0, 500.0, 0.0, 500.0, false, false, false)),
-            overdueCount = 1
+            overdueCount = 1,
+            onUpdateVaccination = {},
+            onReschedule = { _, _, _ -> },
+            onVaccinatedElsewhere = { _, _, _, _ -> }
         )
     }
 }

@@ -24,6 +24,9 @@ interface ReminderDao {
     @Query("UPDATE reminders SET completed = 1 WHERE id = :id")
     suspend fun markCompleted(id: Long)
 
+    @Query("UPDATE reminders SET completed = 1 WHERE patientId = :patientId AND completed = 0")
+    suspend fun markPatientRemindersCompleted(patientId: String)
+
     @Query("DELETE FROM reminders WHERE completed = 1 AND updatedAt < :timestamp")
     suspend fun deleteOldCompletedReminders(timestamp: Long)
 }

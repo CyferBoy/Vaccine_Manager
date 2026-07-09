@@ -23,6 +23,9 @@ data class VaccinationEntity(
     val withFees: Boolean,
     val doctorsAcc: Boolean,
     val isDone: Boolean,
+    val source: String = "CLINIC",
+    val notes: String = "",
+    val rescheduleReason: String = "",
     val isSynced: Boolean = true,
     val isDeleted: Boolean = false
 )
@@ -40,7 +43,10 @@ fun VaccinationEntity.toVaccination() = Vaccination(
     totalPaid = totalPaid,
     withFees = withFees,
     doctorsAcc = doctorsAcc,
-    isDone = isDone
+    isDone = isDone,
+    source = source,
+    notes = notes,
+    rescheduleReason = rescheduleReason
 )
 
 fun Vaccination.toEntity(isSynced: Boolean = true) = VaccinationEntity(
@@ -57,5 +63,8 @@ fun Vaccination.toEntity(isSynced: Boolean = true) = VaccinationEntity(
     withFees = withFees,
     doctorsAcc = doctorsAcc,
     isDone = isDone,
+    source = source,
+    notes = notes,
+    rescheduleReason = rescheduleReason,
     isSynced = isSynced
 )

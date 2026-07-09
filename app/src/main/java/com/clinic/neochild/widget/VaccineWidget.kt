@@ -30,6 +30,7 @@ import com.clinic.neochild.data.model.Patient
 import com.clinic.neochild.data.model.Vaccination
 import com.clinic.neochild.utils.Constants
 import com.clinic.neochild.utils.PatientUtils
+import com.clinic.neochild.utils.ReminderEngine
 import kotlinx.coroutines.flow.first
 import java.text.SimpleDateFormat
 import java.util.*
@@ -54,18 +55,20 @@ class VaccineWidget : GlanceAppWidget() {
         }
         val today = todayCalendar.time
 
-        // Use centralized logic from PatientUtils
-        val pendingVaccinations = PatientUtils.getPendingVaccinations(vaccinations)
+        // Use the new Requirement-Based Reminder Engine
+        val unsatisfied = ReminderEngine.getUnsatisfiedRequirements(vaccinations)
         
-        val allRelevant = PatientUtils.filterVaccinationsByPeriod(pendingVaccinations, "Overdue") +
-                         PatientUtils.filterVaccinationsByPeriod(pendingVaccinations, "Today") +
-                         PatientUtils.filterVaccinationsByPeriod(pendingVaccinations, "This Week") +
-                         PatientUtils.filterVaccinationsByPeriod(pendingVaccinations, "Upcoming")
-
-        // De-duplicate and sort strictly by due date
-        val filteredVaccinations = allRelevant.distinctBy { it.id }
+        // Convert requirements to Vaccination objects for display
+        val filteredVaccinations = unsatisfied.groupBy { it.patientId + PatientUtils.formatDate(it.dueDate) }
+            .mapNotNull { (_, reqs) ->
+                val first = reqs.first()
+                vaccinations.find { it.id == first.originalVisitId }?.copy(
+                    nxtVaccineNames = reqs.map { it.vaccineName },
+                    nextDueDate = PatientUtils.formatDate(first.dueDate)
+                )
+            }
             .sortedBy { PatientUtils.parseDate(it.nextDueDate) }
-            .take(15) // Limit to 15 items to keep widget performance/size reasonable
+            .take(20) // Increased limit to 20 items
 
         provideContent {
             val prefs = currentState<Preferences>()

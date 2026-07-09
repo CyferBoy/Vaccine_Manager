@@ -102,6 +102,13 @@ object PatientUtils {
     }
 
     /**
+     * Formats a Date object to the standard app display format.
+     */
+    fun formatDate(date: Date): String {
+        return SimpleDateFormat(Constants.DATE_FORMAT, Locale.ENGLISH).format(date)
+    }
+
+    /**
      * Standardizes any date string to the current app format (e.g. 9 May 2026).
      */
     fun formatDateForDisplay(dateStr: String): String {

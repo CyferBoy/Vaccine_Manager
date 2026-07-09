@@ -85,7 +85,7 @@ class ReminderWorker @AssistedInject constructor(
                             vaccinationId = oldestReq.originalVisitId,
                             vaccineName = vaccineList,
                             type = ReminderType.DUE_TODAY,
-                            dueDate = PatientUtils.formatDateForDisplay(oldestReq.dueDate.toString())
+                            dueDate = PatientUtils.formatDate(oldestReq.dueDate)
                         )
                     }
                     // Tomorrow
@@ -97,7 +97,7 @@ class ReminderWorker @AssistedInject constructor(
                                 vaccinationId = oldestReq.originalVisitId,
                                 vaccineName = vaccineList,
                                 type = ReminderType.TOMORROW,
-                                dueDate = PatientUtils.formatDateForDisplay(oldestReq.dueDate.toString())
+                                dueDate = PatientUtils.formatDate(oldestReq.dueDate)
                             )
                         }
                     }
@@ -112,7 +112,7 @@ class ReminderWorker @AssistedInject constructor(
                                 vaccinationId = oldestReq.originalVisitId,
                                 vaccineName = vaccineList,
                                 type = ReminderType.OVERDUE,
-                                dueDate = PatientUtils.formatDateForDisplay(oldestReq.dueDate.toString()),
+                                dueDate = PatientUtils.formatDate(oldestReq.dueDate),
                                 extraInfo = "Delayed by $days days"
                             )
                         }

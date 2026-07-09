@@ -41,7 +41,7 @@ fun DueTab(
         unsatisfied.mapNotNull { req ->
             vaccinations.find { it.id == req.originalVisitId }?.copy(
                 nxtVaccineNames = listOf(req.vaccineName),
-                nextDueDate = PatientUtils.formatDateForDisplay(req.dueDate.toString())
+                nextDueDate = PatientUtils.formatDate(req.dueDate)
             )
         }.distinctBy { it.patientId + it.nextDueDate + it.nxtVaccineNames.joinToString() }
     }

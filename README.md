@@ -1,11 +1,17 @@
-# NeoChild Clinic - Vaccine Manager (v1.0)
+# NeoChild Clinic - Vaccine Manager (v1.1)
 
 NeoChild Clinic is a modern Android application designed for pediatric clinics to manage patient records, vaccination schedules, and consultations efficiently.
 
-## Version 1.0 Info
-- **Version Name:** 1.0
-- **Version Code:** 1
-- **Release Status:** Initial Release
+## Recent Updates (v1.1)
+- **Advanced Reminder Engine:** Implemented a "Requirement-Based Satisfaction" model. Reminders are now tracked per vaccine rather than per visit, ensuring catch-up vaccinations are never missed even if visits are out of order.
+- **Automated Staff Notifications:** Integrated a battery-efficient WorkManager system that alerts staff about:
+    - Vaccinations due today or tomorrow.
+    - Overdue patients (with configurable frequency).
+    - Low stock and out-of-stock inventory alerts.
+    - Upcoming vaccine expiry warnings.
+- **Notification Settings:** New settings screen for clinic staff to customize reminder times, stock thresholds, and overdue alert intervals.
+- **Interactive Notifications:** Support for "Mark Vaccinated" and "Dismiss" actions directly from the notification shade.
+- **Enhanced Security:** Database version 3 with optimized Room-Firestore sync.
 
 ## Features
 

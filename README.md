@@ -4,6 +4,9 @@ NeoChild Clinic is a modern Android application designed for pediatric clinics t
 
 ## Recent Updates (v1.1)
 - **Advanced Reminder Engine:** Implemented a "Requirement-Based Satisfaction" model. Reminders are now tracked per vaccine rather than per visit, ensuring catch-up vaccinations are never missed even if visits are out of order.
+- **Improved Workflow:** Added "Mark as Done" action to vaccination history via long-press, allowing staff to quickly clear requirements without creating new visits.
+- **Real-time Widget Sync:** The home screen widget and "Due" tab now update immediately when vaccinations are marked as completed, ensuring the interface is always accurate.
+- **Smart Due Filtering:** Completed vaccinations are now automatically filtered out of the "Due" list and widget for a cleaner, action-oriented interface.
 - **Automated Staff Notifications:** Integrated a battery-efficient WorkManager system that alerts staff about:
     - Vaccinations due today or tomorrow.
     - Overdue patients (with configurable frequency).

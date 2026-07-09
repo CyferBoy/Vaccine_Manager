@@ -9,20 +9,19 @@ import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.clinic.neochild.data.model.Patient
-import com.clinic.neochild.ui.components.AppBackground
-import com.clinic.neochild.ui.components.DateDropdownPicker
-import com.clinic.neochild.ui.components.StandardAutoCompleteField
-import com.clinic.neochild.ui.components.StandardButton
-import com.clinic.neochild.ui.components.StandardTextField
+import com.clinic.neochild.ui.components.*
+import com.clinic.neochild.ui.theme.NeoChildTheme
 import com.clinic.neochild.ui.viewmodel.PatientViewModel
 import com.clinic.neochild.utils.Constants
 import com.clinic.neochild.utils.PatientUtils.calculateDetailedAge
@@ -31,27 +30,27 @@ import com.google.firebase.firestore.FirebaseFirestore
 import java.text.SimpleDateFormat
 import java.util.*
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddPatientScreen(
     patientId: String? = null,
     onBack: () -> Unit = {},
     onNavigateToDetails: (String) -> Unit = {},
-    viewModel: PatientViewModel = viewModel(),
+    viewModel: PatientViewModel = hiltViewModel(),
 ) {
-    var name by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("") }
-    var alternatePhone by remember { mutableStateOf("") }
-    var dob by remember { mutableStateOf("") }
-    var gender by remember { mutableStateOf("Male") }
-    var address by remember { mutableStateOf("") }
+    // Form State - using rememberSaveable
+    var name by rememberSaveable { mutableStateOf("") }
+    var phone by rememberSaveable { mutableStateOf("") }
+    var alternatePhone by rememberSaveable { mutableStateOf("") }
+    var dob by rememberSaveable { mutableStateOf("") }
+    var gender by rememberSaveable { mutableStateOf("Male") }
+    var address by rememberSaveable { mutableStateOf("") }
     
     // For age selection
-    var ageValue by remember { mutableStateOf("0") }
-    var ageUnit by remember { mutableStateOf("Years") }
+    var ageValue by rememberSaveable { mutableStateOf("0") }
+    var ageUnit by rememberSaveable { mutableStateOf("Years") }
     
-    var isLoading by remember { mutableStateOf(value = false) }
-    var isEditMode by remember { mutableStateOf(false) }
+    var isLoading by rememberSaveable { mutableStateOf(false) }
+    var isEditMode by rememberSaveable { mutableStateOf(false) }
 
     val context = LocalContext.current
     val db = FirebaseFirestore.getInstance()
@@ -72,7 +71,6 @@ fun AddPatientScreen(
                         gender = doc.getString("gender") ?: "Male"
                         address = doc.getString("address") ?: ""
                         
-                        // Calculate age for selectors
                         val detailedAge = calculateDetailedAge(dobVal)
                         ageValue = detailedAge.first.toString()
                         ageUnit = detailedAge.second
@@ -83,6 +81,101 @@ fun AddPatientScreen(
         }
     }
 
+    AddPatientContent(
+        isEditMode = isEditMode,
+        onBack = onBack,
+        name = name,
+        onNameChange = { name = it },
+        phone = phone,
+        onPhoneChange = { phone = it },
+        alternatePhone = alternatePhone,
+        onAlternatePhoneChange = { alternatePhone = it },
+        dob = dob,
+        onDobChange = { selectedDob ->
+            dob = selectedDob
+            val detailedAge = calculateDetailedAge(selectedDob)
+            ageValue = detailedAge.first.toString()
+            ageUnit = detailedAge.second
+        },
+        ageValue = ageValue,
+        onAgeValueChange = { newVal ->
+            ageValue = newVal
+            val cal = Calendar.getInstance()
+            val value = newVal.toIntOrNull() ?: 0
+            when (ageUnit) {
+                "Years" -> cal.add(Calendar.YEAR, -value)
+                "Months" -> cal.add(Calendar.MONTH, -value)
+                "Weeks" -> cal.add(Calendar.WEEK_OF_YEAR, -value)
+            }
+            dob = SimpleDateFormat(Constants.DATE_FORMAT, Locale.ENGLISH).format(cal.time)
+        },
+        ageUnit = ageUnit,
+        onAgeUnitChange = { newUnit ->
+            ageUnit = newUnit
+            val cal = Calendar.getInstance()
+            val value = ageValue.toIntOrNull() ?: 0
+            when (newUnit) {
+                "Years" -> cal.add(Calendar.YEAR, -value)
+                "Months" -> cal.add(Calendar.MONTH, -value)
+                "Weeks" -> cal.add(Calendar.WEEK_OF_YEAR, -value)
+            }
+            dob = SimpleDateFormat(Constants.DATE_FORMAT, Locale.ENGLISH).format(cal.time)
+        },
+        gender = gender,
+        onGenderChange = { gender = it },
+        address = address,
+        onAddressChange = { address = it },
+        isLoading = isLoading,
+        onSave = {
+            if (name.isBlank() || dob.isBlank()) {
+                Toast.makeText(context, "Please fill all required fields", Toast.LENGTH_SHORT).show()
+            } else {
+                isLoading = true
+                val patient = Patient(
+                    id = patientId ?: UUID.randomUUID().toString(),
+                    name = name,
+                    phone = phone,
+                    alternatePhone = alternatePhone,
+                    dob = dob,
+                    gender = gender,
+                    address = address,
+                    registrationDate = SimpleDateFormat(Constants.DATE_FORMAT, Locale.ENGLISH).format(Date())
+                )
+
+                viewModel.savePatient(patient) {
+                    isLoading = false
+                    Toast.makeText(context, if (isEditMode) "Patient Updated" else "Patient Added", Toast.LENGTH_SHORT).show()
+                    if (isEditMode) onBack() else onNavigateToDetails(patient.id)
+                }
+            }
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AddPatientContent(
+    isEditMode: Boolean,
+    onBack: () -> Unit,
+    name: String,
+    onNameChange: (String) -> Unit,
+    phone: String,
+    onPhoneChange: (String) -> Unit,
+    alternatePhone: String,
+    onAlternatePhoneChange: (String) -> Unit,
+    dob: String,
+    onDobChange: (String) -> Unit,
+    ageValue: String,
+    onAgeValueChange: (String) -> Unit,
+    ageUnit: String,
+    onAgeUnitChange: (String) -> Unit,
+    gender: String,
+    onGenderChange: (String) -> Unit,
+    address: String,
+    onAddressChange: (String) -> Unit,
+    isLoading: Boolean,
+    onSave: () -> Unit
+) {
     AppBackground {
         Scaffold(
             containerColor = Color.Transparent,
@@ -108,30 +201,28 @@ fun AddPatientScreen(
                     .padding(paddingValues)
                     .imePadding()
                     .padding(16.dp)
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 StandardTextField(
                     value = name,
-                    onValueChange = { name = it },
+                    onValueChange = onNameChange,
                     label = "Full Name*",
                     placeholder = "Enter patient's name"
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Row(modifier = Modifier.fillMaxWidth()) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     StandardTextField(
                         value = phone,
-                        onValueChange = { phone = it },
+                        onValueChange = onPhoneChange,
                         label = "Phone Number",
                         placeholder = "e.g., 9876543210",
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                         modifier = Modifier.weight(1f)
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
                     StandardTextField(
                         value = alternatePhone,
-                        onValueChange = { alternatePhone = it },
+                        onValueChange = onAlternatePhoneChange,
                         label = "Alternate Phone",
                         placeholder = "(Optional)",
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
@@ -139,150 +230,31 @@ fun AddPatientScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Text(
-                    text = "Date of Birth*",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
-                )
-                
-                DateDropdownPicker(
-                    label = "",
-                    currentDate = dob,
-                    onDateSelected = { 
-                        dob = it 
-                        // Update age selectors when DOB is picked
-                        val detailedAge = calculateDetailedAge(it)
-                        ageValue = detailedAge.first.toString()
-                        ageUnit = detailedAge.second
-                    },
-                    modifier = Modifier.fillMaxWidth()
+                DateSelectionSection(
+                    dob = dob,
+                    onDobChange = onDobChange,
+                    ageValue = ageValue,
+                    onAgeValueChange = onAgeValueChange,
+                    ageUnit = ageUnit,
+                    onAgeUnitChange = onAgeUnitChange
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // OR Select Age
-                Text(
-                    text = "Or Set Age",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
+                GenderSelectionSection(
+                    selectedGender = gender,
+                    onGenderChange = onGenderChange
                 )
-
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    StandardTextField(
-                        value = ageValue,
-                        onValueChange = { 
-                            ageValue = it 
-                            // Update DOB based on age selection
-                            val cal = Calendar.getInstance()
-                            val value = it.toIntOrNull() ?: 0
-                            when (ageUnit) {
-                                "Years" -> cal.add(Calendar.YEAR, -value)
-                                "Months" -> cal.add(Calendar.MONTH, -value)
-                                "Weeks" -> cal.add(Calendar.WEEK_OF_YEAR, -value)
-                            }
-                            dob = SimpleDateFormat(Constants.DATE_FORMAT, Locale.ENGLISH).format(cal.time)
-                        },
-                        label = "Age",
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    
-                    var expandedUnit by remember { mutableStateOf(false) }
-                    StandardAutoCompleteField(
-                        value = ageUnit,
-                        onValueChange = { },
-                        label = "Unit",
-                        expanded = expandedUnit,
-                        onExpandedChange = { expandedUnit = it },
-                        modifier = Modifier.weight(1f),
-                        enabled = true,
-                        dropdownContent = {
-                            listOf("Years", "Months", "Weeks").forEach { unit ->
-                                DropdownMenuItem(
-                                    text = { Text(unit) },
-                                    onClick = {
-                                        ageUnit = unit
-                                        expandedUnit = false
-                                        // Trigger update
-                                        val cal = Calendar.getInstance()
-                                        val value = ageValue.toIntOrNull() ?: 0
-                                        when (unit) {
-                                            "Years" -> cal.add(Calendar.YEAR, -value)
-                                            "Months" -> cal.add(Calendar.MONTH, -value)
-                                            "Weeks" -> cal.add(Calendar.WEEK_OF_YEAR, -value)
-                                        }
-                                        dob = SimpleDateFormat(Constants.DATE_FORMAT, Locale.ENGLISH).format(cal.time)
-                                    }
-                                )
-                            }
-                        }
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Text(
-                    text = "Gender*",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
-                )
-                
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("Male", "Female", "Other").forEach { g ->
-                        FilterChip(
-                            selected = gender == g,
-                            onClick = { gender = g },
-                            label = { Text(g) },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
 
                 StandardTextField(
                     value = address,
-                    onValueChange = { address = it },
+                    onValueChange = onAddressChange,
                     label = "Address (Optional)",
                     placeholder = "Enter patient's address"
                 )
 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 StandardButton(
-                    onClick = {
-                        if (name.isBlank() || dob.isBlank()) {
-                            Toast.makeText(context, "Please fill all required fields", Toast.LENGTH_SHORT).show()
-                            return@StandardButton
-                        }
-
-                        isLoading = true
-                        val patient = Patient(
-                            id = patientId ?: UUID.randomUUID().toString(),
-                            name = name,
-                            phone = phone,
-                            alternatePhone = alternatePhone,
-                            dob = dob,
-                            gender = gender,
-                            address = address,
-                            registrationDate = SimpleDateFormat(Constants.DATE_FORMAT, Locale.ENGLISH).format(Date())
-                        )
-
-                        viewModel.savePatient(patient) {
-                            isLoading = false
-                            Toast.makeText(context, if (isEditMode) "Patient Updated" else "Patient Added", Toast.LENGTH_SHORT).show()
-                            if (isEditMode) onBack() else onNavigateToDetails(patient.id)
-                        }
-                    },
+                    onClick = onSave,
                     modifier = Modifier.fillMaxWidth(),
                     isLoading = isLoading
                 ) {
@@ -290,5 +262,127 @@ fun AddPatientScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun DateSelectionSection(
+    dob: String,
+    onDobChange: (String) -> Unit,
+    ageValue: String,
+    onAgeValueChange: (String) -> Unit,
+    ageUnit: String,
+    onAgeUnitChange: (String) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = "Date of Birth*",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(start = 4.dp)
+        )
+        
+        DateDropdownPicker(
+            label = "",
+            currentDate = dob,
+            onDateSelected = onDobChange,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Text(
+            text = "Or Set Age",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+        )
+
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            StandardTextField(
+                value = ageValue,
+                onValueChange = onAgeValueChange,
+                label = "Age",
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.weight(1f)
+            )
+            
+            var expandedUnit by rememberSaveable { mutableStateOf(false) }
+            StandardAutoCompleteField(
+                value = ageUnit,
+                onValueChange = { },
+                label = "Unit",
+                expanded = expandedUnit,
+                onExpandedChange = { expandedUnit = it },
+                modifier = Modifier.weight(1f),
+                dropdownContent = {
+                    listOf("Years", "Months", "Weeks").forEach { unit ->
+                        DropdownMenuItem(
+                            text = { Text(unit) },
+                            onClick = {
+                                onAgeUnitChange(unit)
+                                expandedUnit = false
+                            }
+                        )
+                    }
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun GenderSelectionSection(
+    selectedGender: String,
+    onGenderChange: (String) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = "Gender*",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(start = 4.dp)
+        )
+        
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("Male", "Female", "Other").forEach { g ->
+                FilterChip(
+                    selected = selectedGender == g,
+                    onClick = { onGenderChange(g) },
+                    label = { Text(g) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun AddPatientPreview() {
+    NeoChildTheme {
+        AddPatientContent(
+            isEditMode = false,
+            onBack = {},
+            name = "John Doe",
+            onNameChange = {},
+            phone = "1234567890",
+            onPhoneChange = {},
+            alternatePhone = "",
+            onAlternatePhoneChange = {},
+            dob = "1 Jan 2020",
+            onDobChange = {},
+            ageValue = "4",
+            onAgeValueChange = {},
+            ageUnit = "Years",
+            onAgeUnitChange = {},
+            gender = "Male",
+            onGenderChange = {},
+            address = "Sahibganj",
+            onAddressChange = {},
+            isLoading = false,
+            onSave = {}
+        )
     }
 }

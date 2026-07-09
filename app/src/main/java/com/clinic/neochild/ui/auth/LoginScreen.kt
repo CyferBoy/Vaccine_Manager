@@ -6,30 +6,54 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.clinic.neochild.R
 import com.clinic.neochild.ui.components.AppBackground
 import com.clinic.neochild.ui.components.StandardButton
 import com.clinic.neochild.ui.components.StandardTextField
+import com.clinic.neochild.ui.theme.NeoChildTheme
 
 @Composable
 fun LoginScreen(
     onLoginSuccess: () -> Unit,
-    viewModel: AuthViewModel = viewModel()
+    viewModel: AuthViewModel = hiltViewModel()
 ) {
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
+    var email by rememberSaveable { mutableStateOf("") }
+    var password by rememberSaveable { mutableStateOf("") }
     
     val isLoading by viewModel.isLoading
     val error by viewModel.error
 
+    LoginContent(
+        email = email,
+        onEmailChange = { email = it },
+        password = password,
+        onPasswordChange = { password = it },
+        isLoading = isLoading,
+        error = error,
+        onLoginClick = { viewModel.login(email, password, onLoginSuccess) }
+    )
+}
+
+@Composable
+private fun LoginContent(
+    email: String,
+    onEmailChange: (String) -> Unit,
+    password: String,
+    onPasswordChange: (String) -> Unit,
+    isLoading: Boolean,
+    error: String?,
+    onLoginClick: () -> Unit
+) {
     AppBackground {
         Column(
             modifier = Modifier
@@ -50,14 +74,14 @@ fun LoginScreen(
             
             Text(
                 text = "Welcome Back",
-                fontSize = 28.sp,
+                style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
             
             Text(
                 text = "Sign in to continue",
-                fontSize = 16.sp,
+                style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             
@@ -65,7 +89,7 @@ fun LoginScreen(
             
             StandardTextField(
                 value = email,
-                onValueChange = { email = it },
+                onValueChange = onEmailChange,
                 label = "Email",
                 placeholder = "Enter your email"
             )
@@ -74,7 +98,7 @@ fun LoginScreen(
             
             StandardTextField(
                 value = password,
-                onValueChange = { password = it },
+                onValueChange = onPasswordChange,
                 label = "Password",
                 placeholder = "Enter your password",
                 visualTransformation = PasswordVisualTransformation()
@@ -82,17 +106,37 @@ fun LoginScreen(
             
             if (error != null) {
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(text = error!!, color = MaterialTheme.colorScheme.error, fontSize = 14.sp)
+                Text(
+                    text = error,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
             
             Spacer(modifier = Modifier.height(32.dp))
             
             StandardButton(
-                onClick = { viewModel.login(email, password, onLoginSuccess) },
+                onClick = onLoginClick,
                 isLoading = isLoading
             ) {
-                Text("Login", fontSize = 18.sp)
+                Text("Login", style = MaterialTheme.typography.titleMedium)
             }
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun LoginScreenPreview() {
+    NeoChildTheme {
+        LoginContent(
+            email = "admin@example.com",
+            onEmailChange = {},
+            password = "password",
+            onPasswordChange = {},
+            isLoading = false,
+            error = null,
+            onLoginClick = {}
+        )
     }
 }

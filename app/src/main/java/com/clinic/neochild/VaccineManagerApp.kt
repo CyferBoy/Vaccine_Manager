@@ -5,15 +5,31 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
 import android.util.Log
+import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.*
+import com.clinic.neochild.notification.ReminderScheduler
 import com.clinic.neochild.sync.SyncWorker
 import com.google.firebase.Firebase
 import com.google.firebase.appcheck.appCheck
 import com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory
 import com.google.firebase.initialize
+import dagger.hilt.android.HiltAndroidApp
 import java.util.concurrent.TimeUnit
+import javax.inject.Inject
 
-class NeoChildApp : Application() {
+@HiltAndroidApp
+class NeoChildApp : Application(), Configuration.Provider {
+
+    @Inject
+    lateinit var workerFactory: HiltWorkerFactory
+
+    @Inject
+    lateinit var reminderScheduler: ReminderScheduler
+
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder()
+            .setWorkerFactory(workerFactory)
+            .build()
 
     override fun onCreate() {
         super.onCreate()
@@ -23,6 +39,7 @@ class NeoChildApp : Application() {
         // Manually load SQLCipher native library (Required for version 4.6.1+ and 16KB support)
         System.loadLibrary("sqlcipher")
         setupSync()
+        reminderScheduler.schedulePeriodicReminders()
         createNotificationChannel()
     }
 

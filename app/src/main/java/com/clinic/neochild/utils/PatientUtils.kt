@@ -1,5 +1,6 @@
 package com.clinic.neochild.utils
 
+import com.clinic.neochild.data.model.Vaccination
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -120,12 +121,12 @@ object PatientUtils {
     }
 
     /**
-     * Logic: A vaccination is "actually pending" if:
+     * Legacy Logic: A vaccination is "actually pending" if:
      * 1. isDone is false
      * 2. There is NO other vaccination record for the same patient that was given AFTER this record's dateGiven.
      *    (If a patient visits and a record is added, it supercedes all previous reminders/pending items).
      */
-    fun getPendingVaccinations(allVaccinations: List<com.clinic.neochild.data.model.Vaccination>): List<com.clinic.neochild.data.model.Vaccination> {
+    fun getPendingVaccinations(allVaccinations: List<Vaccination>): List<Vaccination> {
         return allVaccinations.filter { v ->
             if (v.isDone) return@filter false
             if (v.nextDueDate.isBlank()) return@filter false
@@ -144,12 +145,13 @@ object PatientUtils {
     }
 
     /**
-     * Filters pending vaccinations based on a string filter (e.g., "Overdue", "Today").
+     * Legacy Logic: Filters pending vaccinations based on a string filter (e.g., "Overdue", "Today").
+     * Note: This is now partially superseded by ReminderEngine but kept for UI compatibility.
      */
     fun filterVaccinationsByPeriod(
-        pendingVaccinations: List<com.clinic.neochild.data.model.Vaccination>,
+        pendingVaccinations: List<Vaccination>,
         filter: String,
-    ): List<com.clinic.neochild.data.model.Vaccination> {
+    ): List<Vaccination> {
         val calendar = Calendar.getInstance()
         calendar[Calendar.HOUR_OF_DAY] = 0
         calendar[Calendar.MINUTE] = 0

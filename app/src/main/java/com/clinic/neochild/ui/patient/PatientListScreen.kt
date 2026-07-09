@@ -12,320 +12,117 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.CallMerge
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.clinic.neochild.data.model.Patient
 import com.clinic.neochild.ui.components.*
-import com.clinic.neochild.ui.viewmodel.PatientViewModel
-import com.clinic.neochild.utils.FirestoreMappers
+import com.clinic.neochild.ui.theme.NeoChildTheme
 import com.clinic.neochild.utils.PatientUtils.calculateAgeLabel
-import com.google.firebase.firestore.FirebaseFirestore
 
-enum class PatientSortOption { NAME_AZ, NEWEST }
-
-/**
- * Screen displaying the list of all patients.
- * Allows searching, sorting, and long-pressing to edit or delete.
- */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun PatientListScreen(
     onBack: () -> Unit = {},
     onAddPatient: () -> Unit = {},
     onPatientClick: (String) -> Unit = {},
     onEditPatient: (String) -> Unit = {},
-    viewModel: PatientViewModel = viewModel(),
+    viewModel: PatientListViewModel = hiltViewModel(),
 ) {
-
-    var allPatients by remember { mutableStateOf<List<Patient>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
-    
-    val patientsWithMissingPrice by viewModel.patientsWithMissingPrice.collectAsState()
-    
-    var searchQuery by remember { mutableStateOf("") }
-    var isSearchActive by remember { mutableStateOf(value = false) }
-    var patientToDelete by remember { mutableStateOf<Patient?>(null) }
-    var currentSort by remember { mutableStateOf(PatientSortOption.NAME_AZ) }
-    var menuExpandedPatientId by remember { mutableStateOf<String?>(null) }
-    var showMergeConfirmation by remember { mutableStateOf(false) }
-    var selectedPatients by remember { mutableStateOf<Set<Patient>>(emptySet()) }
-    var showManualMergeDialog by remember { mutableStateOf(false) }
-    var mergeMasterPatient by remember { mutableStateOf<Patient?>(null) }
-    var isLoadingManualMerge by remember { mutableStateOf(false) }
-    var isMergeSelectionMode by remember { mutableStateOf(false) }
-
-    val db = FirebaseFirestore.getInstance()
+    val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    
+    var patientToDelete by remember { mutableStateOf<Patient?>(null) }
+    var showManualMergeDialog by rememberSaveable { mutableStateOf(false) }
 
-    DisposableEffect(Unit) {
-        val listener = db.collection("patients")
-            .addSnapshotListener { snapshot, e ->
-                if (e != null) {
-                    isLoading = false
-                    return@addSnapshotListener
-                }
-                allPatients = snapshot?.documents?.mapNotNull { FirestoreMappers.toPatient(it) } ?: emptyList()
-                isLoading = false
-            }
-        onDispose {
-            listener.remove()
+    // Error handling
+    LaunchedEffect(uiState.error) {
+        uiState.error?.let {
+            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+            viewModel.clearError()
         }
     }
 
-    fun mergeDuplicatePatients() {
-        db.collection("patients").get().addOnSuccessListener { patientsResult ->
-            val allPatientsList = patientsResult.documents.mapNotNull { FirestoreMappers.toPatient(it) }
-            
-            // Group by name and phone (trimmed and lowercased)
-            val groups = allPatientsList.groupBy { 
-                it.name.trim().lowercase() + "|" + it.phone.trim()
-            }.filter { it.value.size > 1 }
-
-            if (groups.isEmpty()) {
-                Toast.makeText(context, "No duplicates found", Toast.LENGTH_SHORT).show()
-                return@addOnSuccessListener
-            }
-
-            var completedGroups = 0
-            val totalGroups = groups.size
-
-            groups.forEach { (_, duplicateList) ->
-                val master = duplicateList[0]
-                val duplicates = duplicateList.drop(1)
-
-                var processedDuplicates = 0
-                duplicates.forEach { duplicate ->
-                    // Update vaccinations for each duplicate
-                    db.collection("vaccinations")
-                        .whereEqualTo("patientId", duplicate.id)
-                        .get()
-                        .addOnSuccessListener { vaccinationsResult ->
-                            val batch = db.batch()
-                            vaccinationsResult.documents.forEach { vacDoc ->
-                                batch.update(vacDoc.reference, "patientId", master.id)
-                            }
-                            
-                            batch.commit().addOnSuccessListener {
-                                // Delete the duplicate patient
-                                db.collection("patients").document(duplicate.id).delete()
-                                    .addOnSuccessListener {
-                                        processedDuplicates++
-                                        if (processedDuplicates == duplicates.size) {
-                                            completedGroups++
-                                            if (completedGroups == totalGroups) {
-                                                Toast.makeText(context, "Merged $totalGroups groups of duplicates", Toast.LENGTH_LONG).show()
-                                                viewModel.refresh()
-                                            }
-                                        }
-                                    }
-                            }
-                        }
-                        .addOnFailureListener {
-                            processedDuplicates++
-                            if (processedDuplicates == duplicates.size) {
-                                completedGroups++
-                                if (completedGroups == totalGroups) {
-                                    viewModel.refresh()
-                                }
-                            }
-                        }
-                }
-            }
-        }.addOnFailureListener {
-            Toast.makeText(context, "Merge failed: ${it.message}", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    fun manualMergePatients(master: Patient, secondary: Patient) {
-        isLoadingManualMerge = true
-        // 1. Move all vaccinations from secondary to master
-        db.collection("vaccinations")
-            .whereEqualTo("patientId", secondary.id)
-            .get()
-            .addOnSuccessListener { vaccinationsResult ->
-                val batch = db.batch()
-                vaccinationsResult.documents.forEach { vacDoc ->
-                    batch.update(vacDoc.reference, "patientId", master.id)
-                }
-                
-                batch.commit().addOnSuccessListener {
-                    // 2. Delete the secondary patient
-                    db.collection("patients").document(secondary.id).delete()
-                        .addOnSuccessListener {
-                            isLoadingManualMerge = false
-                            showManualMergeDialog = false
-                            selectedPatients = emptySet()
-                            Toast.makeText(context, "Successfully merged into ${master.name}", Toast.LENGTH_LONG).show()
-                            viewModel.refresh()
-                        }
-                        .addOnFailureListener { e ->
-                            isLoadingManualMerge = false
-                            Toast.makeText(context, "Failed to delete patient: ${e.message}", Toast.LENGTH_SHORT).show()
-                        }
-                }.addOnFailureListener { e ->
-                    isLoadingManualMerge = false
-                    Toast.makeText(context, "Failed to update vaccinations: ${e.message}", Toast.LENGTH_SHORT).show()
-                }
-            }
-            .addOnFailureListener { e ->
-                isLoadingManualMerge = false
-                Toast.makeText(context, "Failed to fetch vaccinations: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
-    }
-
-    val filteredPatients = remember(allPatients, searchQuery, currentSort) {
-        val base = if (searchQuery.isBlank()) allPatients
-        else allPatients.asSequence().filter { it.name.contains(searchQuery, ignoreCase = true) || it.phone.contains(searchQuery) }.toList()
-        
-        when (currentSort) {
-            PatientSortOption.NAME_AZ -> base.sortedBy { it.name.lowercase() }
-            PatientSortOption.NEWEST -> base.asReversed() // Assuming original order from Firestore is somewhat chronological or ID based
-        }
-    }
-
-    val phoneGroupColors = remember(allPatients) {
-        val groupColors = listOf(
-            Color(0xFF4CAF50), // Green
-            Color(0xFF2196F3), // Blue
-            Color(0xFFFF9800), // Orange
-            Color(0xFF9C27B0), // Purple
-            Color(0xFF00BCD4), // Cyan
-            Color(0xFFE91E63), // Pink
-            Color(0xFF795548), // Brown
-            Color(0xFFCDDC39)  // Lime
-        )
-        
-        val phoneCounts = allPatients.filter { it.phone.isNotBlank() }
-            .groupBy { it.phone.trim() }
-            .filter { it.value.size > 1 }
-        
-        phoneCounts.keys.toList().withIndex().associate { (index, phone) ->
-            phone to groupColors[index % groupColors.size]
-        }
-    }
-
-    // Merge Confirmation Dialog
-    if (showMergeConfirmation) {
-        AlertDialog(
-            onDismissRequest = { showMergeConfirmation = false },
-            title = { Text("Merge Duplicates") },
-            text = { Text("This will merge all patient records with the same name and phone number. This action cannot be undone. Proceed?") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showMergeConfirmation = false
-                        mergeDuplicatePatients()
-                    }
-                ) {
-                    Text("Merge")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showMergeConfirmation = false }) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
-
-    // Standardized Delete Confirmation Dialog
     DeleteConfirmationDialog(
         show = patientToDelete != null,
         onDismiss = { patientToDelete = null },
         onConfirm = {
-            val id = patientToDelete?.id ?: ""
+            patientToDelete?.let { viewModel.deletePatient(it.id) }
             patientToDelete = null
-            viewModel.deletePatient(id)
         },
         title = "Delete Patient",
         message = "Are you sure you want to delete ${patientToDelete?.name}? This will remove all their records."
     )
 
-    if (showManualMergeDialog && (selectedPatients.size == 2)) {
-        val patients = selectedPatients.toList()
-        AlertDialog(
-            onDismissRequest = { if (!isLoadingManualMerge) showManualMergeDialog = false },
-            title = { Text("Manual Merge") },
-            text = {
-                Column {
-                    Text("Select the patient profile you want to KEEP. The other will be deleted and its vaccinations moved.")
-                    Spacer(modifier = Modifier.height(16.dp))
-                    patients.forEach { p ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .combinedClickable { mergeMasterPatient = p }
-                                .padding(8.dp)
-                        ) {
-                            RadioButton(selected = mergeMasterPatient == p, onClick = { mergeMasterPatient = p })
-                            Text(p.name + " (${p.id})")
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                StandardButton(
-                    onClick = {
-                        val master = mergeMasterPatient
-                        val secondary = patients.find { it != master }
-                        if (master != null && secondary != null) {
-                            manualMergePatients(master, secondary)
-                        }
-                    },
-                    enabled = mergeMasterPatient != null,
-                    isLoading = isLoadingManualMerge
-                ) {
-                    Text("Confirm Merge")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showManualMergeDialog = false }, enabled = !isLoadingManualMerge) {
-                    Text("Cancel")
-                }
+    if (showManualMergeDialog && uiState.selectedPatients.size == 2) {
+        ManualMergeDialog(
+            selectedPatients = uiState.selectedPatients.toList(),
+            isMerging = uiState.isMerging,
+            onDismiss = { showManualMergeDialog = false },
+            onConfirm = { master ->
+                viewModel.mergeSelectedPatients(master)
+                showManualMergeDialog = false
             }
         )
     }
 
+    PatientListContent(
+        uiState = uiState,
+        onBack = {
+            if (uiState.isMergeSelectionMode) viewModel.clearSelection()
+            else onBack()
+        },
+        onAddPatient = onAddPatient,
+        onSearchQueryChange = viewModel::updateSearchQuery,
+        onMergeClick = { showManualMergeDialog = true },
+        onPatientClick = { patient ->
+            if (uiState.isMergeSelectionMode) viewModel.toggleSelection(patient)
+            else onPatientClick(patient.id)
+        },
+        onPatientLongClick = { patient ->
+            if (!uiState.isMergeSelectionMode) viewModel.enterMergeMode(patient)
+        },
+        onEditPatient = onEditPatient,
+        onDeletePatient = { patientToDelete = it },
+        onToggleSelection = viewModel::toggleSelection
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PatientListContent(
+    uiState: PatientListUiState,
+    onBack: () -> Unit,
+    onAddPatient: () -> Unit,
+    onSearchQueryChange: (String) -> Unit,
+    onMergeClick: () -> Unit,
+    onPatientClick: (Patient) -> Unit,
+    onPatientLongClick: (Patient) -> Unit,
+    onEditPatient: (String) -> Unit,
+    onDeletePatient: (Patient) -> Unit,
+    onToggleSelection: (Patient) -> Unit
+) {
     AppBackground {
         Scaffold(
             containerColor = Color.Transparent,
-            contentColor = MaterialTheme.colorScheme.onBackground,
             topBar = {
-                // Reusable search and navigation top bar
-                SearchTopAppBar(
-                    title = if (isMergeSelectionMode) "Select 2 to Merge" else if (selectedPatients.isNotEmpty()) "${selectedPatients.size} Selected" else "Patients",
-                    searchQuery = searchQuery,
-                    onSearchQueryChange = { searchQuery = it },
-                    isSearchActive = isSearchActive,
-                    onSearchActiveChange = { isSearchActive = it },
-                    onBack = {
-                        if (isMergeSelectionMode || selectedPatients.isNotEmpty()) {
-                            selectedPatients = emptySet()
-                            isMergeSelectionMode = false
-                        } else onBack()
-                    },
-                    actions = {
-                        if (selectedPatients.size == 2) {
-                            IconButton(onClick = { 
-                                mergeMasterPatient = null
-                                showManualMergeDialog = true 
-                            }) {
-                                Icon(Icons.AutoMirrored.Filled.CallMerge, contentDescription = "Merge Selected", tint = Color.Yellow)
-                            }
-                        }
-                    }
+                PatientListTopBar(
+                    uiState = uiState,
+                    onSearchQueryChange = onSearchQueryChange,
+                    onBack = onBack,
+                    onMergeClick = onMergeClick
                 )
             },
             floatingActionButton = {
-                if (selectedPatients.isEmpty()) {
+                if (!uiState.isMergeSelectionMode) {
                     FloatingActionButton(
                         onClick = onAddPatient,
                         containerColor = MaterialTheme.colorScheme.primary,
@@ -336,11 +133,11 @@ fun PatientListScreen(
                 }
             }
         ) { paddingValues ->
-            if (isLoading) {
+            if (uiState.isLoading) {
                 Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
-            } else if (filteredPatients.isEmpty()) {
+            } else if (uiState.patients.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
                     Text("No patients found", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -353,132 +150,220 @@ fun PatientListScreen(
                     contentPadding = PaddingValues(bottom = 88.dp, top = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(filteredPatients) { patient ->
-                        val isSelected = selectedPatients.contains(patient)
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .combinedClickable(
-                                    onClick = { 
-                                        if (isMergeSelectionMode || selectedPatients.isNotEmpty()) {
-                                            selectedPatients = if (isSelected) selectedPatients - patient else selectedPatients + patient
-                                            // Auto-exit mode if we reach 2? Or just let the user click the top icon.
-                                        } else {
-                                            onPatientClick(patient.id)
-                                        }
-                                    },
-                                    onLongClick = { 
-                                        if (!isMergeSelectionMode && selectedPatients.isEmpty()) {
-                                            menuExpandedPatientId = patient.id
-                                        }
-                                    }
-                                ),
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer
-                                             else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
-                            contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
-                                           else MaterialTheme.colorScheme.onSurfaceVariant
-                        ),
-                            border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .padding(12.dp)
-                                    .fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                if (isMergeSelectionMode || selectedPatients.isNotEmpty()) {
-                                    Checkbox(
-                                        checked = isSelected,
-                                        onCheckedChange = { 
-                                            selectedPatients = if (isSelected) selectedPatients - patient else selectedPatients + patient
-                                        }
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                }
-                                Surface(
-                                    modifier = Modifier.size(48.dp),
-                                    shape = CircleShape,
-                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Text(
-                                            text = patient.name.firstOrNull()?.uppercase() ?: "?",
-                                            style = MaterialTheme.typography.titleLarge,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onPrimaryContainer
-                                        )
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.width(16.dp))
-
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = patient.name,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        val age = if (patient.dob.isNotBlank()) calculateAgeLabel(patient.dob) else null
-                                        if (age != null) {
-                                            Text(
-                                                text = age,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.primary
-                                            )
-                                            Text(
-                                                text = " • ",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                                            )
-                                        }
-                                        Text(
-                                            text = patient.gender.ifEmpty { "Unknown" },
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-
-                                if (patientsWithMissingPrice.contains(patient.id) && selectedPatients.isEmpty()) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(8.dp)
-                                            .background(Color.Red, CircleShape)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                }
-
-                                val groupColor = phoneGroupColors[patient.phone.trim()]
-                                if (groupColor != null && selectedPatients.isEmpty()) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(10.dp)
-                                            .background(groupColor, CircleShape)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                }
-                                
-                                if (selectedPatients.isEmpty()) {
-                                    Box {
-                                        ActionDropdownMenu(
-                                            expanded = menuExpandedPatientId == patient.id,
-                                            onDismiss = { menuExpandedPatientId = null },
-                                            onEdit = { onEditPatient(patient.id) },
-                                            onDelete = { patientToDelete = patient },
-                                            onMerge = {
-                                                selectedPatients = setOf(patient)
-                                                isMergeSelectionMode = true
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-                        }
+                    items(uiState.patients, key = { it.id }) { patient ->
+                        PatientCard(
+                            patient = patient,
+                            isSelected = uiState.selectedPatients.contains(patient),
+                            isMergeMode = uiState.isMergeSelectionMode,
+                            hasMissingPrice = uiState.patientsWithMissingPrice.contains(patient.id),
+                            onClick = { onPatientClick(patient) },
+                            onLongClick = { onPatientLongClick(patient) },
+                            onEdit = { onEditPatient(patient.id) },
+                            onDelete = { onDeletePatient(patient) },
+                            onToggleSelection = { onToggleSelection(patient) },
+                            modifier = Modifier.animateItem()
+                        )
                     }
                 }
             }
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PatientListTopBar(
+    uiState: PatientListUiState,
+    onSearchQueryChange: (String) -> Unit,
+    onBack: () -> Unit,
+    onMergeClick: () -> Unit
+) {
+    var isSearchActive by rememberSaveable { mutableStateOf(false) }
+
+    SearchTopAppBar(
+        title = if (uiState.isMergeSelectionMode) "${uiState.selectedPatients.size} Selected" else "Patients",
+        searchQuery = uiState.searchQuery,
+        onSearchQueryChange = onSearchQueryChange,
+        isSearchActive = isSearchActive,
+        onSearchActiveChange = { isSearchActive = it },
+        onBack = onBack,
+        actions = {
+            if (uiState.selectedPatients.size == 2) {
+                IconButton(onClick = onMergeClick) {
+                    Icon(Icons.AutoMirrored.Filled.CallMerge, contentDescription = "Merge Selected", tint = Color.Yellow)
+                }
+            }
+        }
+    )
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun PatientCard(
+    patient: Patient,
+    isSelected: Boolean,
+    isMergeMode: Boolean,
+    hasMissingPrice: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onToggleSelection: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var menuExpanded by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            ),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer
+                             else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+            contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
+                           else MaterialTheme.colorScheme.onSurfaceVariant
+        ),
+        border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp).fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (isMergeMode) {
+                Checkbox(checked = isSelected, onCheckedChange = { onToggleSelection() })
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+            
+            PatientAvatar(name = patient.name, isSelected = isSelected)
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = patient.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                PatientInfoSubtitle(dob = patient.dob, gender = patient.gender)
+            }
+
+            if (hasMissingPrice && !isMergeMode) {
+                Box(modifier = Modifier.size(8.dp).background(Color.Red, CircleShape))
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+
+            if (!isMergeMode) {
+                Box {
+                    IconButton(onClick = { menuExpanded = true }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "Actions")
+                    }
+                    ActionDropdownMenu(
+                        expanded = menuExpanded,
+                        onDismiss = { menuExpanded = false },
+                        onEdit = onEdit,
+                        onDelete = onDelete,
+                        onMerge = onLongClick
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PatientAvatar(name: String, isSelected: Boolean) {
+    Surface(
+        modifier = Modifier.size(48.dp),
+        shape = CircleShape,
+        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                text = name.firstOrNull()?.uppercase() ?: "?",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onPrimaryContainer
+            )
+        }
+    }
+}
+
+@Composable
+private fun PatientInfoSubtitle(dob: String, gender: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        val ageLabel = remember(dob) { if (dob.isNotBlank()) calculateAgeLabel(dob) else null }
+        if (ageLabel != null) {
+            Text(text = ageLabel, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+            Text(text = " • ", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+        }
+        Text(text = gender.ifEmpty { "Unknown" }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ManualMergeDialog(
+    selectedPatients: List<Patient>,
+    isMerging: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (Patient) -> Unit
+) {
+    var mergeMasterPatient by remember { mutableStateOf<Patient?>(null) }
+
+    AlertDialog(
+        onDismissRequest = { if (!isMerging) onDismiss() },
+        title = { Text("Manual Merge") },
+        text = {
+            Column {
+                Text("Select the patient profile you want to KEEP. The other will be deleted and its vaccinations moved.")
+                Spacer(modifier = Modifier.height(16.dp))
+                selectedPatients.forEach { p ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().combinedClickable { mergeMasterPatient = p }.padding(8.dp)
+                    ) {
+                        RadioButton(selected = mergeMasterPatient == p, onClick = { mergeMasterPatient = p })
+                        Text("${p.name} (${p.id})")
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            StandardButton(
+                onClick = { mergeMasterPatient?.let { onConfirm(it) } },
+                enabled = mergeMasterPatient != null && !isMerging,
+                isLoading = isMerging
+            ) {
+                Text("Confirm Merge")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !isMerging) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun PatientListPreview() {
+    NeoChildTheme {
+        PatientListContent(
+            uiState = PatientListUiState(
+                patients = listOf(
+                    Patient("1", "John Doe", "1234567890", "", "2020-01-01", "Male", "Address", "2024-01-01"),
+                    Patient("2", "Jane Smith", "0987654321", "", "2021-05-15", "Female", "", "2024-02-10")
+                )
+            ),
+            onBack = {},
+            onAddPatient = {},
+            onSearchQueryChange = {},
+            onMergeClick = {},
+            onPatientClick = {},
+            onPatientLongClick = {},
+            onEditPatient = {},
+            onDeletePatient = {},
+            onToggleSelection = {}
+        )
     }
 }

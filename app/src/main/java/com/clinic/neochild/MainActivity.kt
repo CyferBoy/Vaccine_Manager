@@ -3,6 +3,7 @@ package com.clinic.neochild
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -19,13 +20,32 @@ import com.clinic.neochild.ui.theme.NeoChildTheme
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.messaging.FirebaseMessaging
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    
+    @Inject
+    lateinit var auth: FirebaseAuth
+    
+    @Inject
+    lateinit var firestore: FirebaseFirestore
+    
+    @Inject
+    lateinit var messaging: FirebaseMessaging
+
+    private var lastActiveTime: Long = System.currentTimeMillis()
+    private val SESSION_TIMEOUT = 15 * 60 * 1000 // 15 minutes auto-lock
+    
     private var openDueTab by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         handleIntent(intent)
+        
+        // SECURITY: Prevent screenshots and recording of patient data
+        window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
         
         enableEdgeToEdge()
         setContent {
@@ -62,15 +82,32 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        checkSession()
+    }
+
+    override fun onUserInteraction() {
+        super.onUserInteraction()
+        lastActiveTime = System.currentTimeMillis()
+    }
+
+    private fun checkSession() {
+        val currentTime = System.currentTimeMillis()
+        if (auth.currentUser != null && (currentTime - lastActiveTime > SESSION_TIMEOUT)) {
+            auth.signOut()
+        }
+        lastActiveTime = currentTime
+    }
+
     private fun fetchAndStoreFcmToken() {
-        val currentUser = FirebaseAuth.getInstance().currentUser ?: return
-        FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
-            val db = FirebaseFirestore.getInstance()
-            db.collection("users").document(currentUser.uid)
+        val currentUser = auth.currentUser ?: return
+        messaging.token.addOnSuccessListener { token ->
+            firestore.collection("users").document(currentUser.uid)
                 .update("fcmToken", token)
                 .addOnFailureListener {
                     val data = hashMapOf("fcmToken" to token, "email" to currentUser.email)
-                    db.collection("users").document(currentUser.uid).set(data)
+                    firestore.collection("users").document(currentUser.uid).set(data)
                 }
         }
     }

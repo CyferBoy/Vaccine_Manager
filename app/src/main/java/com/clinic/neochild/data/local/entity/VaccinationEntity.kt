@@ -1,10 +1,14 @@
 package com.clinic.neochild.data.local.entity
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.clinic.neochild.data.model.Vaccination
 
-@Entity(tableName = "vaccinations")
+@Entity(
+    tableName = "vaccinations",
+    indices = [Index(value = ["patientId"]), Index(value = ["isSynced"]), Index(value = ["isDeleted"])]
+)
 data class VaccinationEntity(
     @PrimaryKey val id: String,
     val patientId: String,

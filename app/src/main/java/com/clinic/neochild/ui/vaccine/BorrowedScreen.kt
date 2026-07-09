@@ -5,73 +5,90 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.clinic.neochild.data.model.BorrowedVaccine
 import com.clinic.neochild.data.model.Vaccine
 import com.clinic.neochild.ui.components.StandardAutoCompleteField
 import com.clinic.neochild.ui.components.StandardButton
 import com.clinic.neochild.ui.components.StandardTextField
-import com.clinic.neochild.utils.FirestoreMappers
+import com.clinic.neochild.ui.theme.NeoChildTheme
 import com.clinic.neochild.utils.PatientUtils.formatDateForDisplay
-import com.google.firebase.firestore.FirebaseFirestore
 import java.text.SimpleDateFormat
 import java.util.*
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BorrowedScreen(onBack: () -> Unit) {
-    var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("By", "From")
-    
-    var borrowedList by remember { mutableStateOf<List<BorrowedVaccine>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
-    var showAddDialog by remember { mutableStateOf(false) }
+fun BorrowedScreen(
+    onBack: () -> Unit,
+    viewModel: BorrowedViewModel = hiltViewModel()
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    var showAddDialog by rememberSaveable { mutableStateOf(false) }
     var editingItem by remember { mutableStateOf<BorrowedVaccine?>(null) }
 
-    val db = FirebaseFirestore.getInstance()
+    val filteredList = remember(uiState.borrowedList, uiState.selectedTab) {
+        val type = if (uiState.selectedTab == 0) "BY" else "FROM"
+        uiState.borrowedList.filter { it.type == type }
+    }
 
-    DisposableEffect(Unit) {
-        val listener = db.collection("borrowed")
-            .addSnapshotListener { snapshot, e ->
-                if (e != null) {
-                    isLoading = false
-                    return@addSnapshotListener
-                }
-                val list = snapshot?.documents?.mapNotNull { FirestoreMappers.toBorrowedVaccine(it) } ?: emptyList()
-                val fifteenDaysAgo = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -15) }.time
-                val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH)
-                
-                borrowedList = list.filter { item ->
-                    if (!item.isReturned || item.returnedDate == null) true
-                    else {
-                        val returnedDate = try { sdf.parse(item.returnedDate) } catch (e: Exception) { null }
-                        returnedDate == null || returnedDate.after(fifteenDaysAgo)
-                    }
-                }.sortedByDescending { it.borrowedDate }
-                isLoading = false
+    BorrowedContent(
+        uiState = uiState,
+        filteredList = filteredList,
+        onBack = onBack,
+        onTabSelected = viewModel::updateTab,
+        onAddClick = {
+            editingItem = null
+            showAddDialog = true
+        },
+        onEditRequest = { item ->
+            editingItem = item
+            showAddDialog = true
+        },
+        onReturnRequest = viewModel::markAsReturned,
+        onDeleteRequest = { viewModel.deleteBorrowedItem(it.id) }
+    )
+
+    if (showAddDialog) {
+        BorrowedEditDialog(
+            item = editingItem,
+            defaultType = if (uiState.selectedTab == 0) "BY" else "FROM",
+            inventory = uiState.inventory,
+            onDismiss = { showAddDialog = false },
+            onSave = {
+                viewModel.saveBorrowedItem(it)
+                showAddDialog = false
             }
-
-        onDispose {
-            listener.remove()
-        }
+        )
     }
+}
 
-    val filteredList = remember(borrowedList, selectedTab) {
-        val type = if (selectedTab == 0) "BY" else "FROM"
-        borrowedList.filter { it.type == type }
-    }
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BorrowedContent(
+    uiState: BorrowedUiState,
+    filteredList: List<BorrowedVaccine>,
+    onBack: () -> Unit,
+    onTabSelected: (Int) -> Unit,
+    onAddClick: () -> Unit,
+    onEditRequest: (BorrowedVaccine) -> Unit,
+    onReturnRequest: (BorrowedVaccine) -> Unit,
+    onDeleteRequest: (BorrowedVaccine) -> Unit
+) {
+    val tabs = remember { listOf("By", "From") }
 
     Scaffold(
         topBar = {
@@ -90,20 +107,20 @@ fun BorrowedScreen(onBack: () -> Unit) {
                     )
                 )
                 TabRow(
-                    selectedTabIndex = selectedTab,
+                    selectedTabIndex = uiState.selectedTab,
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                     indicator = { tabPositions ->
                         TabRowDefaults.SecondaryIndicator(
-                            Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                            Modifier.tabIndicatorOffset(tabPositions[uiState.selectedTab]),
                             color = MaterialTheme.colorScheme.onPrimary
                         )
                     }
                 ) {
                     tabs.forEachIndexed { index, title ->
                         Tab(
-                            selected = selectedTab == index,
-                            onClick = { selectedTab = index },
+                            selected = uiState.selectedTab == index,
+                            onClick = { onTabSelected(index) },
                             text = { Text(title, fontWeight = FontWeight.Bold) }
                         )
                     }
@@ -112,10 +129,7 @@ fun BorrowedScreen(onBack: () -> Unit) {
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { 
-                    editingItem = null
-                    showAddDialog = true 
-                },
+                onClick = onAddClick,
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary
             ) {
@@ -124,11 +138,11 @@ fun BorrowedScreen(onBack: () -> Unit) {
         }
     ) { paddingValues ->
         Box(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
-            if (isLoading) {
+            if (uiState.isLoading && uiState.borrowedList.isEmpty()) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             } else if (filteredList.isEmpty()) {
                 Text(
-                    text = "No records found for \"${tabs[selectedTab]}\".", 
+                    text = "No records found.", 
                     modifier = Modifier.align(Alignment.Center), 
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -137,21 +151,13 @@ fun BorrowedScreen(onBack: () -> Unit) {
                     modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
                     contentPadding = PaddingValues(bottom = 80.dp, top = 16.dp)
                 ) {
-                    items(filteredList) { item ->
+                    items(filteredList, key = { it.id }) { item ->
                         BorrowedItemCard(
                             item = item,
-                            onEdit = { 
-                                editingItem = item
-                                showAddDialog = true
-                            },
-                            onReturn = {
-                                val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH)
-                                val updated = item.copy(isReturned = true, returnedDate = sdf.format(Date()))
-                                db.collection("borrowed").document(item.id).set(updated)
-                            },
-                            onDelete = {
-                                db.collection("borrowed").document(item.id).delete()
-                            }
+                            onEdit = { onEditRequest(item) },
+                            onReturn = { onReturnRequest(item) },
+                            onDelete = { onDeleteRequest(item) },
+                            modifier = Modifier.animateItem()
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                     }
@@ -159,36 +165,21 @@ fun BorrowedScreen(onBack: () -> Unit) {
             }
         }
     }
-
-    if (showAddDialog) {
-        BorrowedEditDialog(
-            item = editingItem,
-            defaultType = if (selectedTab == 0) "BY" else "FROM",
-            onDismiss = { showAddDialog = false },
-            onSave = { updatedItem ->
-                if (updatedItem.id.isEmpty()) {
-                    db.collection("borrowed").add(updatedItem)
-                } else {
-                    db.collection("borrowed").document(updatedItem.id).set(updatedItem)
-                }
-                showAddDialog = false
-            }
-        )
-    }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun BorrowedItemCard(
+private fun BorrowedItemCard(
     item: BorrowedVaccine,
     onEdit: () -> Unit,
     onReturn: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
 
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .combinedClickable(
                 onClick = { },
@@ -232,35 +223,27 @@ fun BorrowedItemCard(
 fun BorrowedEditDialog(
     item: BorrowedVaccine?,
     defaultType: String,
+    inventory: List<Vaccine>,
     onDismiss: () -> Unit,
     onSave: (BorrowedVaccine) -> Unit
 ) {
-    var doctorName by remember { mutableStateOf(item?.doctorName ?: "") }
-    var vaccineName by remember { mutableStateOf(item?.vaccineName ?: "") }
-    var borrowedDate by remember { mutableStateOf(item?.borrowedDate ?: SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH).format(Date())) }
-    var batchNumber by remember { mutableStateOf(item?.batchNumber ?: "") }
-    var expiryDate by remember { mutableStateOf(item?.expiryDate ?: "") }
-    var type by remember { mutableStateOf(item?.type ?: defaultType) }
+    var doctorName by rememberSaveable { mutableStateOf(item?.doctorName ?: "") }
+    var vaccineName by rememberSaveable { mutableStateOf(item?.vaccineName ?: "") }
+    var borrowedDate by rememberSaveable { mutableStateOf(item?.borrowedDate ?: SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH).format(Date())) }
+    var batchNumber by rememberSaveable { mutableStateOf(item?.batchNumber ?: "") }
+    var expiryDate by rememberSaveable { mutableStateOf(item?.expiryDate ?: "") }
+    var type by rememberSaveable { mutableStateOf(item?.type ?: defaultType) }
     
-    var inventory by remember { mutableStateOf<List<Vaccine>>(emptyList()) }
-    val db = FirebaseFirestore.getInstance()
-    
-    LaunchedEffect(Unit) {
-        db.collection("inventory").get().addOnSuccessListener { result ->
-            inventory = result.documents.mapNotNull { FirestoreMappers.toVaccine(it) }
-        }
-    }
+    var expanded by rememberSaveable { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (item == null) "Add Borrowed Vaccine" else "Edit Borrowed Vaccine") },
         text = {
             Column(
-                modifier = Modifier
-                    .verticalScroll(rememberScrollState()),
+                modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Type Selection
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(
                         selected = type == "BY",
@@ -283,8 +266,9 @@ fun BorrowedEditDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
                 
-                var expanded by remember { mutableStateOf(false) }
-                val suggestions = inventory.filter { it.brandName.contains(vaccineName, ignoreCase = true) || it.type.contains(vaccineName, ignoreCase = true) }
+                val suggestions = remember(vaccineName, inventory) {
+                    inventory.filter { it.brandName.contains(vaccineName, ignoreCase = true) || it.type.contains(vaccineName, ignoreCase = true) }
+                }
                 
                 StandardAutoCompleteField(
                     value = vaccineName,
@@ -337,4 +321,21 @@ fun BorrowedEditDialog(
             TextButton(onClick = onDismiss) { Text("Cancel") }
         }
     )
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun BorrowedPreview() {
+    NeoChildTheme {
+        BorrowedContent(
+            uiState = BorrowedUiState(isLoading = false, selectedTab = 0),
+            filteredList = listOf(BorrowedVaccine("1", "Dr. Hassan", "2024-01-01", "BCG", "2025-01-01", "B123", false, null, "BY")),
+            onBack = {},
+            onTabSelected = {},
+            onAddClick = {},
+            onEditRequest = {},
+            onReturnRequest = {},
+            onDeleteRequest = {}
+        )
+    }
 }

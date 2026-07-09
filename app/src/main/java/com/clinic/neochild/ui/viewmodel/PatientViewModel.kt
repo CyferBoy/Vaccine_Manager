@@ -1,36 +1,45 @@
 package com.clinic.neochild.ui.viewmodel
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.clinic.neochild.data.local.AppDatabase
 import com.clinic.neochild.data.model.Patient
 import com.clinic.neochild.data.model.Vaccination
-import com.clinic.neochild.data.repository.PatientRepository
-import com.clinic.neochild.data.repository.VaccinationRepository
+import com.clinic.neochild.domain.usecase.patient.DeletePatientUseCase
+import com.clinic.neochild.domain.usecase.patient.GetPatientsUseCase
+import com.clinic.neochild.domain.usecase.patient.SavePatientUseCase
+import com.clinic.neochild.domain.usecase.sync.RefreshDataUseCase
+import com.clinic.neochild.domain.usecase.vaccination.DeleteVaccinationUseCase
+import com.clinic.neochild.domain.usecase.vaccination.GetVaccinationsUseCase
+import com.clinic.neochild.domain.usecase.vaccination.SaveVaccinationUseCase
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-class PatientViewModel(application: Application) : AndroidViewModel(application) {
-    private val patientRepository: PatientRepository
-    private val vaccinationRepository: VaccinationRepository
+@HiltViewModel
+class PatientViewModel @Inject constructor(
+    private val getPatientsUseCase: GetPatientsUseCase,
+    private val getVaccinationsUseCase: GetVaccinationsUseCase,
+    private val savePatientUseCase: SavePatientUseCase,
+    private val deletePatientUseCase: DeletePatientUseCase,
+    private val saveVaccinationUseCase: SaveVaccinationUseCase,
+    private val deleteVaccinationUseCase: DeleteVaccinationUseCase,
+    private val refreshDataUseCase: RefreshDataUseCase
+) : ViewModel() {
     
     val allPatients: StateFlow<List<Patient>>
     val allVaccinations: StateFlow<List<Vaccination>>
     val patientsWithMissingPrice: StateFlow<Set<String>>
 
     init {
-        val database = AppDatabase.getDatabase(application)
-        patientRepository = PatientRepository(database.patientDao())
-        vaccinationRepository = VaccinationRepository(database.vaccinationDao())
-        
-        allPatients = patientRepository.allPatients.stateIn(
+        // State Streams
+        allPatients = getPatientsUseCase().stateIn(
             scope = viewModelScope,
             started = SharingStarted.Eagerly,
             initialValue = emptyList()
         )
 
-        allVaccinations = vaccinationRepository.allVaccinations.stateIn(
+        allVaccinations = getVaccinationsUseCase().stateIn(
             scope = viewModelScope,
             started = SharingStarted.Eagerly,
             initialValue = emptyList()
@@ -49,33 +58,36 @@ class PatientViewModel(application: Application) : AndroidViewModel(application)
 
     fun refresh() {
         viewModelScope.launch {
-            patientRepository.refreshPatients()
-            vaccinationRepository.refreshVaccinations()
+            refreshDataUseCase()
         }
     }
 
     fun deletePatient(id: String) {
         viewModelScope.launch {
-            patientRepository.deletePatient(id)
+            deletePatientUseCase(id)
         }
     }
 
     fun savePatient(patient: Patient, onComplete: () -> Unit) {
         viewModelScope.launch {
-            patientRepository.addPatient(patient)
-            onComplete()
+            try {
+                savePatientUseCase(patient)
+                onComplete()
+            } catch (e: Exception) {
+                // Handle validation or save error
+            }
         }
     }
 
     fun deleteVaccination(id: String) {
         viewModelScope.launch {
-            vaccinationRepository.deleteVaccination(id)
+            deleteVaccinationUseCase(id)
         }
     }
 
     fun saveVaccination(vaccination: Vaccination, onComplete: () -> Unit) {
         viewModelScope.launch {
-            vaccinationRepository.addVaccination(vaccination)
+            saveVaccinationUseCase(vaccination)
             onComplete()
         }
     }

@@ -12,9 +12,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.clinic.neochild.data.model.Patient
+import com.clinic.neochild.data.model.Vaccination
 import com.clinic.neochild.ui.components.AppBackground
+import com.clinic.neochild.ui.theme.NeoChildTheme
 import com.clinic.neochild.ui.viewmodel.PatientViewModel
 import com.clinic.neochild.utils.PatientUtils
 import java.util.*
@@ -24,15 +28,17 @@ import java.util.*
 fun MonthlyFinanceDetailsScreen(
     monthKey: String,
     onBack: () -> Unit,
-    viewModel: PatientViewModel = viewModel()
+    viewModel: PatientViewModel = hiltViewModel()
 ) {
     val allPatients by viewModel.allPatients.collectAsState()
     val allVaccinations by viewModel.allVaccinations.collectAsState()
 
-    val monthNames = listOf("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
-    val monthIdx = monthKey.substringAfter("-").toInt()
-    val year = monthKey.substringBefore("-")
-    val title = "${monthNames[monthIdx]} $year"
+    val title = remember(monthKey) {
+        val monthNames = listOf("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
+        val monthIdx = monthKey.substringAfter("-").toInt()
+        val year = monthKey.substringBefore("-")
+        "${monthNames[monthIdx]} $year"
+    }
 
     val filteredVaccinations = remember(allVaccinations, monthKey) {
         allVaccinations.filter { v ->
@@ -44,9 +50,34 @@ fun MonthlyFinanceDetailsScreen(
         }.sortedByDescending { PatientUtils.parseDate(it.dateGiven) }
     }
 
-    val totalCash = remember(filteredVaccinations) { filteredVaccinations.sumOf { it.cashAmount } }
-    val totalOnline = remember(filteredVaccinations) { filteredVaccinations.sumOf { it.onlineAmount } }
+    val totals = remember(filteredVaccinations) {
+        val cash = filteredVaccinations.sumOf { it.cashAmount }
+        val online = filteredVaccinations.sumOf { it.onlineAmount }
+        cash to online
+    }
 
+    MonthlyFinanceDetailsContent(
+        title = title,
+        onBack = onBack,
+        isLoading = allVaccinations.isEmpty() || allPatients.isEmpty(),
+        vaccinations = filteredVaccinations,
+        patients = allPatients,
+        totalCash = totals.first,
+        totalOnline = totals.second
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MonthlyFinanceDetailsContent(
+    title: String,
+    onBack: () -> Unit,
+    isLoading: Boolean,
+    vaccinations: List<Vaccination>,
+    patients: List<Patient>,
+    totalCash: Double,
+    totalOnline: Double
+) {
     AppBackground {
         Scaffold(
             containerColor = Color.Transparent,
@@ -66,11 +97,11 @@ fun MonthlyFinanceDetailsScreen(
                 )
             }
         ) { paddingValues ->
-            if (allVaccinations.isEmpty() || allPatients.isEmpty()) {
+            if (isLoading && vaccinations.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
-            } else if (filteredVaccinations.isEmpty()) {
+            } else if (vaccinations.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
                     Text("No records found for this month")
                 }
@@ -80,100 +111,94 @@ fun MonthlyFinanceDetailsScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    item {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Card(
-                                modifier = Modifier.weight(1f),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = if (isSystemInDarkTheme()) Color(0xFF1B372D) else Color(0xFFE8F5E9),
-                                    contentColor = if (isSystemInDarkTheme()) Color(0xFF8FF7BF) else Color(0xFF2E7D32)
-                                )
-                            ) {
-                                Column(modifier = Modifier.padding(16.dp)) {
-                                    Text("Cash", style = MaterialTheme.typography.labelMedium)
-                                    Text("₹${totalCash.toInt()}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                            Card(
-                                modifier = Modifier.weight(1f),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = if (isSystemInDarkTheme()) Color(0xFF003355) else Color(0xFFE3F2FD),
-                                    contentColor = if (isSystemInDarkTheme()) Color(0xFFC2E8FF) else Color(0xFF1565C0)
-                                )
-                            ) {
-                                Column(modifier = Modifier.padding(16.dp)) {
-                                    Text("Online", style = MaterialTheme.typography.labelMedium)
-                                    Text("₹${totalOnline.toInt()}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-                    }
+                    item { FinanceSummaryCards(totalCash, totalOnline) }
 
-                    items(filteredVaccinations) { v ->
-                        val patient = allPatients.find { it.id == v.patientId }
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                            )
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = patient?.name ?: "Unknown Patient",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    Text(
-                                        text = "₹${v.totalPaid.toInt()}",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                                
-                                Spacer(modifier = Modifier.height(4.dp))
-                                
-                                Text(
-                                    text = v.vaccineNames.joinToString(", ") { PatientUtils.cleanVaccineName(it) },
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                                
-                                Spacer(modifier = Modifier.height(8.dp))
-                                
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(
-                                        text = "Date: ${PatientUtils.formatDateForDisplay(v.dateGiven)}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    val mode = when {
-                                        v.cashAmount > 0 && v.onlineAmount > 0 -> "Cash + Online"
-                                        v.cashAmount > 0 -> "Cash"
-                                        v.onlineAmount > 0 -> "Online"
-                                        else -> "N/A"
-                                    }
-                                    Text(
-                                        text = "Mode: $mode",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                        }
+                    items(vaccinations, key = { it.id }) { v ->
+                        val patient = remember(v.patientId, patients) { patients.find { it.id == v.patientId } }
+                        FinanceRecordCard(v, patient)
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun FinanceSummaryCards(cash: Double, online: Double) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        SummaryCard(
+            label = "Cash",
+            amount = cash,
+            containerColor = if (isSystemInDarkTheme()) Color(0xFF1B372D) else Color(0xFFE8F5E9),
+            contentColor = if (isSystemInDarkTheme()) Color(0xFF8FF7BF) else Color(0xFF2E7D32),
+            modifier = Modifier.weight(1f)
+        )
+        SummaryCard(
+            label = "Online",
+            amount = online,
+            containerColor = if (isSystemInDarkTheme()) Color(0xFF003355) else Color(0xFFE3F2FD),
+            contentColor = if (isSystemInDarkTheme()) Color(0xFFC2E8FF) else Color(0xFF1565C0),
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+private fun SummaryCard(label: String, amount: Double, containerColor: Color, contentColor: Color, modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = containerColor, contentColor = contentColor)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(label, style = MaterialTheme.typography.labelMedium)
+            Text("₹${amount.toInt()}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+private fun FinanceRecordCard(vaccination: Vaccination, patient: Patient?) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text(text = patient?.name ?: "Unknown Patient", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text(text = "₹${vaccination.totalPaid.toInt()}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(text = vaccination.vaccineNames.joinToString(", ") { PatientUtils.cleanVaccineName(it) }, style = MaterialTheme.typography.bodyMedium)
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(text = "Date: ${PatientUtils.formatDateForDisplay(vaccination.dateGiven)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                val mode = when {
+                    vaccination.cashAmount > 0 && vaccination.onlineAmount > 0 -> "Cash + Online"
+                    vaccination.cashAmount > 0 -> "Cash"
+                    vaccination.onlineAmount > 0 -> "Online"
+                    else -> "N/A"
+                }
+                Text(text = "Mode: $mode", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun MonthlyFinancePreview() {
+    NeoChildTheme {
+        MonthlyFinanceDetailsContent(
+            title = "January 2024",
+            onBack = {},
+            isLoading = false,
+            vaccinations = emptyList(),
+            patients = emptyList(),
+            totalCash = 5000.0,
+            totalOnline = 3000.0
+        )
     }
 }

@@ -13,8 +13,17 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class MyFirebaseMessagingService : FirebaseMessagingService() {
+
+    @Inject
+    lateinit var auth: FirebaseAuth
+
+    @Inject
+    lateinit var firestore: FirebaseFirestore
 
     override fun onMessageReceived(remoteMessage: RemoteMessage) {
         super.onMessageReceived(remoteMessage)
@@ -30,15 +39,14 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
     }
 
     private fun updateTokenInFirestore(token: String) {
-        val currentUser = FirebaseAuth.getInstance().currentUser ?: return
-        val db = FirebaseFirestore.getInstance()
+        val currentUser = auth.currentUser ?: return
         
-        db.collection("users").document(currentUser.uid)
+        firestore.collection("users").document(currentUser.uid)
             .update("fcmToken", token)
             .addOnFailureListener {
                 // If document doesn't exist, create it
                 val data = hashMapOf("fcmToken" to token, "email" to currentUser.email)
-                db.collection("users").document(currentUser.uid).set(data)
+                firestore.collection("users").document(currentUser.uid).set(data)
             }
     }
 

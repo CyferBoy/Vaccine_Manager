@@ -1,7 +1,7 @@
 package com.clinic.neochild.navigation
 
 import androidx.compose.runtime.Composable
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
@@ -12,6 +12,7 @@ import com.clinic.neochild.ui.dashboard.DashboardScreen
 import com.clinic.neochild.ui.patient.AddPatientScreen
 import com.clinic.neochild.ui.patient.PatientDetailsScreen
 import com.clinic.neochild.ui.patient.PatientListScreen
+import com.clinic.neochild.ui.settings.NotificationSettingsScreen
 import com.clinic.neochild.ui.statistics.DueScreen
 import com.clinic.neochild.ui.statistics.MonthlyFinanceDetailsScreen
 import com.clinic.neochild.ui.statistics.StatisticsScreen
@@ -26,7 +27,7 @@ fun AppNavigation(
     navController: androidx.navigation.NavHostController = rememberNavController()
 ) {
 
-    val authViewModel: AuthViewModel = viewModel()
+    val authViewModel: AuthViewModel = hiltViewModel()
     val startDest = if (authViewModel.currentUser != null) Routes.DASHBOARD else Routes.LOGIN
 
     NavHost(
@@ -69,12 +70,19 @@ fun AppNavigation(
                 onManageStaff = {
                     navController.navigate(Routes.MANAGE_STAFF)
                 },
+                onSettings = {
+                    navController.navigate(Routes.SETTINGS)
+                },
                 onLogout = {
                     navController.navigate(Routes.LOGIN) {
                         popUpTo(Routes.DASHBOARD) { inclusive = true }
                     }
                 }
             )
+        }
+
+        composable(Routes.SETTINGS) {
+            NotificationSettingsScreen(onBack = { navController.popBackStack() })
         }
 
         composable(Routes.MANAGE_STAFF) {

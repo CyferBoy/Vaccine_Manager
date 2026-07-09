@@ -1,6 +1,8 @@
 package com.clinic.neochild.ui.vaccine
 
 import android.widget.Toast
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -12,85 +14,62 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
+import kotlinx.coroutines.launch
+import com.clinic.neochild.data.model.Patient
 import com.clinic.neochild.data.model.Vaccination
 import com.clinic.neochild.data.model.Vaccine
-import com.clinic.neochild.ui.components.AppBackground
-import com.clinic.neochild.ui.components.DateDropdownPicker
-import com.clinic.neochild.ui.components.StandardAutoCompleteField
-import com.clinic.neochild.ui.components.StandardButton
-import com.clinic.neochild.ui.components.StandardTextField
+import com.clinic.neochild.ui.components.*
+import com.clinic.neochild.ui.theme.NeoChildTheme
 import com.clinic.neochild.ui.viewmodel.PatientViewModel
 import com.clinic.neochild.utils.Constants
-import com.clinic.neochild.utils.FirestoreMappers
-import com.clinic.neochild.utils.PatientUtils.formatDateForDisplay
-import com.google.firebase.firestore.FirebaseFirestore
+import com.clinic.neochild.utils.ReceiptManager
 import java.text.SimpleDateFormat
 import java.util.*
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddVaccinationScreen(
     initialPatientId: String = "", 
     vaccinationId: String? = null,
     onBack: () -> Unit = {},
-    viewModel: PatientViewModel = viewModel()
+    patientViewModel: PatientViewModel = hiltViewModel(),
+    viewModel: AddVaccinationViewModel = hiltViewModel()
 ) {
+    val uiState by viewModel.uiState.collectAsState()
+    val allPatients by patientViewModel.allPatients.collectAsState()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
-    var patientId by remember { mutableStateOf(initialPatientId) }
-    var selectedBrand by remember { mutableStateOf("") }
+    // Form State - using rememberSaveable for robustness
+    var patientId by rememberSaveable { mutableStateOf(initialPatientId) }
     var selectedVaccines by remember { mutableStateOf<List<String>>(emptyList()) }
     var selectedVaccineIds by remember { mutableStateOf<List<String>>(emptyList()) }
     var batchNumbers by remember { mutableStateOf<List<String>>(emptyList()) }
     var expiryDates by remember { mutableStateOf<List<String>>(emptyList()) }
+    var nextBrandSearch by rememberSaveable { mutableStateOf("") }
     
-    var nextBrandSearch by remember { mutableStateOf("") }
+    val today = remember { SimpleDateFormat(Constants.DATE_FORMAT, Locale.ENGLISH).format(Date()) }
+    var dateGiven by rememberSaveable { mutableStateOf(today) }
+    var nextDueDate by rememberSaveable { mutableStateOf("") }
     
-    val today = SimpleDateFormat(Constants.DATE_FORMAT, Locale.ENGLISH).format(Date())
-    var dateGiven by remember { mutableStateOf(today) }
-    var nextDueDate by remember { mutableStateOf("") }
-    
-    var cost by remember { mutableStateOf("") }
-    var cashAmount by remember { mutableStateOf("") }
-    var onlineAmount by remember { mutableStateOf("") }
-    var withFees by remember { mutableStateOf(false) }
-    var doctorsAcc by remember { mutableStateOf(false) }
-    
-    var isLoading by remember { mutableStateOf(false) }
-    var inventory by remember { mutableStateOf<List<Vaccine>>(emptyList()) }
-    
-    var expandedBrand by remember { mutableStateOf(false) }
+    var cost by rememberSaveable { mutableStateOf("") }
+    var cashAmount by rememberSaveable { mutableStateOf("") }
+    var onlineAmount by rememberSaveable { mutableStateOf("") }
+    var withFees by rememberSaveable { mutableStateOf(false) }
+    var doctorsAcc by rememberSaveable { mutableStateOf(false) }
 
-    val context = LocalContext.current
-    val db = FirebaseFirestore.getInstance()
-    
-    LaunchedEffect(vaccinationId) {
-        if (vaccinationId != null) {
-            isLoading = true
-            db.collection("vaccinations").document(vaccinationId).get()
-                .addOnSuccessListener { doc ->
-                    if (doc.exists()) {
-                        patientId = doc.getString("patientId") ?: ""
-                        @Suppress("UNCHECKED_CAST")
-                        selectedVaccines = doc.get("vaccineNames") as? List<String> ?: listOf(doc.getString("vaccineName") ?: "")
-                        batchNumbers = (doc.get("batchNumbers") as? List<String>) ?: listOf(doc.getString("batchNumber") ?: "")
-                        expiryDates = (doc.get("expiryDates") as? List<String>) ?: listOf(doc.getString("expiryDate") ?: "")
-                        nextBrandSearch = (doc.get("nxtVaccineNames") as? List<String> ?: listOf(doc.getString("nxtVaccineName") ?: "").filter { it.isNotEmpty() }).joinToString(", ")
-                    }
-                    isLoading = false
-                }
-                .addOnFailureListener { isLoading = false }
-        }
+    val totalPaid = remember(cashAmount, onlineAmount) {
+        (cashAmount.toDoubleOrNull() ?: 0.0) + (onlineAmount.toDoubleOrNull() ?: 0.0)
     }
-
-    val totalPaid = (cashAmount.toDoubleOrNull() ?: 0.0) + (onlineAmount.toDoubleOrNull() ?: 0.0)
 
     LaunchedEffect(totalPaid) {
         if (totalPaid > 0) {
@@ -98,42 +77,125 @@ fun AddVaccinationScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
-        db.collection("inventory").get().addOnSuccessListener { result ->
-            inventory = result.documents.mapNotNull { doc ->
-                FirestoreMappers.toVaccine(doc)
+    AddVaccinationContent(
+        isEdit = vaccinationId != null,
+        onBack = onBack,
+        patientId = patientId,
+        onPatientIdChange = { if (initialPatientId.isEmpty()) patientId = it },
+        isPatientIdEnabled = initialPatientId.isEmpty(),
+        inventory = uiState.inventory,
+        selectedVaccines = selectedVaccines,
+        onVaccineSelected = { v ->
+            if (!selectedVaccines.contains(v.brandName)) {
+                selectedVaccines = selectedVaccines + v.brandName
+                batchNumbers = batchNumbers + v.batchNumber
+                expiryDates = expiryDates + v.expiryDate
+                selectedVaccineIds = selectedVaccineIds + v.id
+            }
+        },
+        onCustomVaccineAdded = { name ->
+            if (!selectedVaccines.contains(name)) {
+                selectedVaccines = selectedVaccines + name
+                batchNumbers = batchNumbers + ""
+                expiryDates = expiryDates + ""
+            }
+        },
+        onRemoveVaccine = { index ->
+            selectedVaccines = selectedVaccines.toMutableList().apply { removeAt(index) }
+            batchNumbers = batchNumbers.toMutableList().apply { removeAt(index) }
+            expiryDates = expiryDates.toMutableList().apply { removeAt(index) }
+        },
+        nextBrandSearch = nextBrandSearch,
+        onNextBrandChange = { nextBrandSearch = it },
+        dateGiven = dateGiven,
+        onDateGivenChange = { dateGiven = it },
+        nextDueDate = nextDueDate,
+        onNextDueDateChange = { nextDueDate = it },
+        cashAmount = cashAmount,
+        onCashChange = { cashAmount = it },
+        onlineAmount = onlineAmount,
+        onOnlineChange = { onlineAmount = it },
+        totalPaid = totalPaid,
+        cost = cost,
+        onCostChange = { cost = it },
+        withFees = withFees,
+        onFeesToggle = { withFees = it },
+        doctorsAcc = doctorsAcc,
+        onAccToggle = { doctorsAcc = it },
+        isLoading = uiState.isLoading,
+        onSave = {
+            if (validateForm(context, patientId, selectedVaccines)) {
+                val vaccination = createVaccination(vaccinationId, patientId, selectedVaccines, nextBrandSearch, dateGiven, nextDueDate, cost, cashAmount, onlineAmount, totalPaid, withFees, doctorsAcc, batchNumbers, expiryDates)
+                viewModel.saveVaccination(vaccination, vaccinationId == null, selectedVaccineIds, onBack)
+            }
+        },
+        onSaveAndDownload = {
+            val patient = allPatients.find { it.id == patientId }
+            if (validateForm(context, patientId, selectedVaccines) && patient != null) {
+                val vaccination = createVaccination(vaccinationId, patientId, selectedVaccines, nextBrandSearch, dateGiven, nextDueDate, cost, cashAmount, onlineAmount, totalPaid, withFees, doctorsAcc, batchNumbers, expiryDates)
+                viewModel.saveVaccination(vaccination, true, selectedVaccineIds) {
+                    scope.launch {
+                        ReceiptManager.downloadReceipt(context, patient, vaccination)
+                        onBack()
+                    }
+                }
+            } else if (patient == null) {
+                Toast.makeText(context, "Patient not found", Toast.LENGTH_SHORT).show()
             }
         }
-    }
+    )
+}
 
-    val availableBrands = remember(selectedBrand, inventory) {
-        inventory.asSequence().filter { 
-            it.brandName.contains(selectedBrand, ignoreCase = true) ||
-            it.type.contains(selectedBrand, ignoreCase = true)
-        }.toList()
-    }
-
-    val suggestedTypes = remember(selectedBrand) {
-        if (selectedBrand.isBlank()) emptyList()
-        else Constants.COMMON_VACCINES.asSequence().filter { it.contains(selectedBrand, ignoreCase = true) }.toList()
-    }
-
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AddVaccinationContent(
+    isEdit: Boolean,
+    onBack: () -> Unit,
+    patientId: String,
+    onPatientIdChange: (String) -> Unit,
+    isPatientIdEnabled: Boolean,
+    inventory: List<Vaccine>,
+    selectedVaccines: List<String>,
+    onVaccineSelected: (Vaccine) -> Unit,
+    onCustomVaccineAdded: (String) -> Unit,
+    onRemoveVaccine: (Int) -> Unit,
+    nextBrandSearch: String,
+    onNextBrandChange: (String) -> Unit,
+    dateGiven: String,
+    onDateGivenChange: (String) -> Unit,
+    nextDueDate: String,
+    onNextDueDateChange: (String) -> Unit,
+    cashAmount: String,
+    onCashChange: (String) -> Unit,
+    onlineAmount: String,
+    onOnlineChange: (String) -> Unit,
+    totalPaid: Double,
+    cost: String,
+    onCostChange: (String) -> Unit,
+    withFees: Boolean,
+    onFeesToggle: (Boolean) -> Unit,
+    doctorsAcc: Boolean,
+    onAccToggle: (Boolean) -> Unit,
+    isLoading: Boolean,
+    onSave: () -> Unit,
+    onSaveAndDownload: () -> Unit
+) {
     AppBackground {
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
                 TopAppBar(
-                    title = { Text(if (vaccinationId == null) "Add Vaccination" else "Edit Vaccination") },
+                    title = { Text(if (isEdit) "Edit Vaccination" else "Add Vaccination") },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onPrimary)
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary, // Solid header color
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
-                )
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                        navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    )
                 )
             },
         ) { paddingValues ->
@@ -141,375 +203,239 @@ fun AddVaccinationScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .imePadding() // Ensures content moves above keyboard
+                    .imePadding()
                     .padding(16.dp)
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-
                 StandardTextField(
                     value = patientId,
-                    onValueChange = { patientId = it },
+                    onValueChange = onPatientIdChange,
                     label = "Patient ID*",
-                    placeholder = "Enter patient ID (e.g., P001)",
-                    enabled = initialPatientId.isEmpty()
+                    placeholder = "Enter patient ID",
+                    enabled = isPatientIdEnabled
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Current Vaccine Selection
-                StandardAutoCompleteField(
-                    value = selectedBrand,
-                    onValueChange = { 
-                        selectedBrand = it
-                        expandedBrand = true 
-                    },
-                    label = "Select Vaccine*",
-                    placeholder = "Search by brand or type...",
-                    expanded = expandedBrand && (availableBrands.isNotEmpty() || suggestedTypes.isNotEmpty() || selectedBrand.isNotBlank()),
-                    onExpandedChange = { expandedBrand = it },
-                    dropdownContent = {
-                        if (availableBrands.isNotEmpty()) {
-                            Text("Inventory Items", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(8.dp), color = MaterialTheme.colorScheme.primary)
-                            availableBrands.forEach { v ->
-                                val batchInfo = "Batch: ${v.batchNumber}"
-                                DropdownMenuItem(
-                                    text = { Text("${v.brandName} - $batchInfo (Stock: ${v.stock})") },
-                                    onClick = { 
-                                        selectedBrand = "" 
-                                        if (!selectedVaccines.contains(v.brandName)) {
-                                            selectedVaccines = selectedVaccines + v.brandName
-                                            batchNumbers = batchNumbers + v.batchNumber
-                                            expiryDates = expiryDates + v.expiryDate
-                                        }
-                                        if (!selectedVaccineIds.contains(v.id)) {
-                                            selectedVaccineIds = selectedVaccineIds + v.id
-                                        }
-                                        
-                                        expandedBrand = false 
-                                    }
-                                )
-                            }
-                        }
-                        
-                        if (suggestedTypes.isNotEmpty()) {
-                            if (availableBrands.isNotEmpty()) HorizontalDivider()
-                            Text("Suggestions", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(8.dp), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
-                            suggestedTypes.forEach { type ->
-                                DropdownMenuItem(
-                                    text = { Text(type) },
-                                    onClick = { 
-                                        selectedBrand = "" 
-                                        if (!selectedVaccines.contains(type)) {
-                                            selectedVaccines = selectedVaccines + type
-                                        }
-                                        expandedBrand = false 
-                                    }
-                                )
-                            }
-                        }
-
-                        if (selectedBrand.isNotBlank() && !suggestedTypes.contains(selectedBrand) && !availableBrands.any { it.brandName.equals(selectedBrand, true) }) {
-                            DropdownMenuItem(
-                                text = { Text("Add Custom: \"$selectedBrand\"") },
-                                onClick = { 
-                                    if (!selectedVaccines.contains(selectedBrand)) {
-                                        selectedVaccines = selectedVaccines + selectedBrand
-                                        batchNumbers = batchNumbers + ""
-                                        expiryDates = expiryDates + ""
-                                    }
-                                    selectedBrand = ""
-                                    expandedBrand = false
-                                }
-                            )
-                        }
-                    }
+                VaccineSelectionSection(
+                    inventory = inventory,
+                    selectedVaccines = selectedVaccines,
+                    onVaccineSelected = onVaccineSelected,
+                    onCustomVaccineAdded = onCustomVaccineAdded,
+                    onRemoveVaccine = onRemoveVaccine
                 )
 
-                if (selectedVaccines.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    selectedVaccines.forEach { vaccine ->
-                        Surface(
-                            modifier = Modifier.padding(vertical = 4.dp),
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(text = vaccine, style = MaterialTheme.typography.bodyMedium)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                IconButton(
-                                    onClick = { 
-                                        val index = selectedVaccines.indexOf(vaccine)
-                                        if (index != -1) {
-                                            selectedVaccines = selectedVaccines.toMutableList().apply { removeAt(index) }
-                                            batchNumbers = batchNumbers.toMutableList().apply { removeAt(index) }
-                                            expiryDates = expiryDates.toMutableList().apply { removeAt(index) }
-                                        }
-                                        
-                                        // Remove corresponding ID if we can find it
-                                        val vaccineObj = inventory.find { it.brandName == vaccine }
-                                        if (vaccineObj != null) {
-                                            selectedVaccineIds = selectedVaccineIds - vaccineObj.id
-                                        }
-                                    },
-                                    modifier = Modifier.size(20.dp)
-                                ) {
-                                    Icon(Icons.Default.Close, contentDescription = "Remove", modifier = Modifier.size(16.dp))
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Next Vaccine Name
                 StandardTextField(
                     value = nextBrandSearch,
-                    onValueChange = { nextBrandSearch = it },
+                    onValueChange = onNextBrandChange,
                     label = "Next Vaccine",
-                    placeholder = "Enter next vaccine name (e.g. DPT Booster)"
+                    placeholder = "Enter next vaccine name"
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    DateDropdownPicker(label = "Date Given*", currentDate = dateGiven, onDateSelected = onDateGivenChange, modifier = Modifier.weight(1f))
+                    DateDropdownPicker(label = "Next Due Date", currentDate = nextDueDate, onDateSelected = onNextDueDateChange, modifier = Modifier.weight(1f))
+                }
 
-                DateDropdownPicker(
-                    label = "Date Given*",
-                    currentDate = dateGiven,
-                    onDateSelected = { dateGiven = it },
-                    modifier = Modifier.fillMaxWidth()
+                PaymentSection(
+                    cash = cashAmount,
+                    online = onlineAmount,
+                    total = totalPaid,
+                    cost = cost,
+                    withFees = withFees,
+                    doctorsAcc = doctorsAcc,
+                    onCashChange = onCashChange,
+                    onOnlineChange = onOnlineChange,
+                    onCostChange = onCostChange,
+                    onFeesToggle = onFeesToggle,
+                    onAccToggle = onAccToggle
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                DateDropdownPicker(
-                    label = "Next Due Date",
-                    currentDate = nextDueDate,
-                    onDateSelected = { nextDueDate = it },
-                    modifier = Modifier.fillMaxWidth()
+                ActionButtons(
+                    isLoading = isLoading,
+                    isEdit = isEdit,
+                    onSave = onSave,
+                    onSaveAndDownload = onSaveAndDownload
                 )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Text("Payment Mode", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 16.dp))
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    StandardTextField(
-                        value = cashAmount,
-                        onValueChange = { cashAmount = it },
-                        label = "Cash",
-                        placeholder = "Enter cash amount",
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    StandardTextField(
-                        value = onlineAmount,
-                        onValueChange = { onlineAmount = it },
-                        label = "Online",
-                        placeholder = "Enter online amount",
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    StandardTextField(
-                        value = if (totalPaid % 1.0 == 0.0) totalPaid.toInt().toString() else totalPaid.toString(),
-                        onValueChange = { },
-                        label = "Total",
-                        readOnly = true,
-                        modifier = Modifier.weight(1f)
-                    )
-
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.padding(start = 8.dp, top = 20.dp)
-                    ) {
-                        Checkbox(
-                            checked = withFees,
-                            onCheckedChange = { withFees = it }
-                        )
-                        Text(
-                            text = "With Fees",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    StandardTextField(
-                        value = cost,
-                        onValueChange = { cost = it },
-                        label = "Cost / Price",
-                        placeholder = "Enter total cost (e.g. 500)",
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f)
-                    )
-
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.padding(start = 8.dp, top = 20.dp)
-                    ) {
-                        Checkbox(
-                            checked = doctorsAcc,
-                            onCheckedChange = { doctorsAcc = it }
-                        )
-                        Text(
-                            text = "Doctors Acc",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(32.dp))
-
-                val currentPatient = viewModel.allPatients.collectAsState().value.find { it.id == patientId }
-
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    StandardButton(
-                        onClick = {
-                            if (patientId.isBlank() || selectedVaccines.isEmpty()) {
-                                Toast.makeText(context, "Patient ID and at least one Vaccine are required", Toast.LENGTH_SHORT).show()
-                                return@StandardButton
-                            }
-
-                            isLoading = true
-                            
-                            val vaccination = Vaccination(
-                                id = vaccinationId ?: UUID.randomUUID().toString(),
-                                patientId = patientId,
-                                vaccineNames = selectedVaccines,
-                                nxtVaccineNames = nextBrandSearch.split(",").map { it.trim() }.filter { it.isNotEmpty() },
-                                dateGiven = dateGiven,
-                                nextDueDate = nextDueDate,
-                                cost = cost.toDoubleOrNull() ?: 0.0,
-                                cashAmount = cashAmount.toDoubleOrNull() ?: 0.0,
-                                onlineAmount = onlineAmount.toDoubleOrNull() ?: 0.0,
-                                totalPaid = totalPaid,
-                                withFees = withFees,
-                                doctorsAcc = doctorsAcc,
-                                batchNumbers = batchNumbers,
-                                expiryDates = expiryDates,
-                                batchNumber = batchNumbers.firstOrNull() ?: "",
-                                expiryDate = expiryDates.firstOrNull() ?: ""
-                            )
-
-                            viewModel.saveVaccination(vaccination) {
-                                handlePostSave(vaccination, vaccinationId == null, db, inventory, selectedVaccineIds, patientId)
-                                isLoading = false
-                                Toast.makeText(context, if (vaccinationId == null) "Vaccination Saved" else "Vaccination Updated", Toast.LENGTH_SHORT).show()
-                                onBack()
-                            }
-                        },
-                        modifier = Modifier.weight(1f),
-                        isLoading = isLoading
-                    ) {
-                        Text(if (vaccinationId == null) "Save" else "Update", style = MaterialTheme.typography.titleMedium)
-                    }
-
-                    if (vaccinationId == null) {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        StandardButton(
-                            onClick = {
-                                if (patientId.isBlank() || selectedVaccines.isEmpty()) {
-                                    Toast.makeText(context, "Patient ID and at least one Vaccine are required", Toast.LENGTH_SHORT).show()
-                                    return@StandardButton
-                                }
-                                if (currentPatient == null) {
-                                    Toast.makeText(context, "Patient not found. Cannot print receipt.", Toast.LENGTH_SHORT).show()
-                                    return@StandardButton
-                                }
-
-                                isLoading = true
-                                val vaccination = Vaccination(
-                                    id = UUID.randomUUID().toString(),
-                                    patientId = patientId,
-                                    vaccineNames = selectedVaccines,
-                                    nxtVaccineNames = nextBrandSearch.split(",").map { it.trim() }.filter { it.isNotEmpty() },
-                                    dateGiven = dateGiven,
-                                    nextDueDate = nextDueDate,
-                                    cost = cost.toDoubleOrNull() ?: 0.0,
-                                    cashAmount = cashAmount.toDoubleOrNull() ?: 0.0,
-                                    onlineAmount = onlineAmount.toDoubleOrNull() ?: 0.0,
-                                    totalPaid = totalPaid,
-                                    withFees = withFees,
-                                    doctorsAcc = doctorsAcc,
-                                    batchNumbers = batchNumbers,
-                                    expiryDates = expiryDates,
-                                    batchNumber = batchNumbers.firstOrNull() ?: "",
-                                    expiryDate = expiryDates.firstOrNull() ?: ""
-                                )
-
-                                viewModel.saveVaccination(vaccination) {
-                                    handlePostSave(vaccination, true, db, inventory, selectedVaccineIds, patientId)
-                                    isLoading = false
-                                    com.clinic.neochild.utils.ReceiptManager.downloadReceipt(context, currentPatient, vaccination)
-                                    Toast.makeText(context, "Saved & Downloading Receipt", Toast.LENGTH_SHORT).show()
-                                    onBack()
-                                }
-                            },
-                            modifier = Modifier.weight(1.5f),
-                            containerColor = MaterialTheme.colorScheme.secondary,
-                            isLoading = isLoading
-                        ) {
-                            Icon(Icons.Default.Print, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Save & Download", style = MaterialTheme.typography.titleMedium)
-                        }
-                    }
-                }
             }
         }
     }
 }
 
-private fun handlePostSave(
-    vaccination: Vaccination,
-    isNew: Boolean,
-    db: FirebaseFirestore,
+@Composable
+private fun VaccineSelectionSection(
     inventory: List<Vaccine>,
-    selectedVaccineIds: List<String>,
-    patientId: String
+    selectedVaccines: List<String>,
+    onVaccineSelected: (Vaccine) -> Unit,
+    onCustomVaccineAdded: (String) -> Unit,
+    onRemoveVaccine: (Int) -> Unit
 ) {
-    if (isNew) {
-        // Update stock
-        selectedVaccineIds.forEach { id ->
-            val selectedVaccine = inventory.find { it.id == id }
-            if (selectedVaccine != null && selectedVaccine.stock > 0) {
-                db.collection("inventory").document(id)
-                    .update("stock", selectedVaccine.stock - 1)
-            }
-        }
+    var query by rememberSaveable { mutableStateOf("") }
+    var expanded by rememberSaveable { mutableStateOf(false) }
 
-        // Mark previous "due" records as done for this patient
-        db.collection("vaccinations")
-            .whereEqualTo("patientId", patientId)
-            .whereEqualTo("isDone", false)
-            .get()
-            .addOnSuccessListener { result ->
-                val batch = db.batch()
-                for (document in result) {
-                    if (document.id != vaccination.id) {
-                        batch.update(document.reference, "isDone", true)
+    val filteredInventory = remember(query, inventory) {
+        inventory.filter { it.brandName.contains(query, true) || it.type.contains(query, true) }
+    }
+    val suggestedTypes = remember(query) {
+        Constants.COMMON_VACCINES.filter { it.contains(query, true) }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        StandardAutoCompleteField(
+            value = query,
+            onValueChange = { query = it; expanded = true },
+            label = "Select Vaccine*",
+            placeholder = "Search inventory or suggestions...",
+            expanded = expanded && query.isNotBlank(),
+            onExpandedChange = { expanded = it },
+            dropdownContent = {
+                if (filteredInventory.isNotEmpty()) {
+                    Text("Inventory", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(8.dp), color = MaterialTheme.colorScheme.primary)
+                    filteredInventory.forEach { v ->
+                        DropdownMenuItem(
+                            text = { Text("${v.brandName} (Stock: ${v.stock})") },
+                            onClick = { onVaccineSelected(v); query = ""; expanded = false }
+                        )
                     }
                 }
-                batch.commit()
+                if (suggestedTypes.isNotEmpty()) {
+                    Text("Suggestions", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(8.dp))
+                    suggestedTypes.forEach { type ->
+                        DropdownMenuItem(text = { Text(type) }, onClick = { onCustomVaccineAdded(type); query = ""; expanded = false })
+                    }
+                }
+                if (query.isNotBlank()) {
+                    DropdownMenuItem(text = { Text("Add Custom: \"$query\"") }, onClick = { onCustomVaccineAdded(query); query = ""; expanded = false })
+                }
             }
+        )
+
+        Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            selectedVaccines.forEachIndexed { index, name ->
+                InputChip(
+                    selected = true,
+                    onClick = { },
+                    label = { Text(name) },
+                    trailingIcon = { Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp).clickable { onRemoveVaccine(index) }) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PaymentSection(
+    cash: String, online: String, total: Double, cost: String, withFees: Boolean, doctorsAcc: Boolean,
+    onCashChange: (String) -> Unit, onOnlineChange: (String) -> Unit, onCostChange: (String) -> Unit,
+    onFeesToggle: (Boolean) -> Unit, onAccToggle: (Boolean) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Payment & Cost", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            StandardTextField(value = cash, onValueChange = onCashChange, label = "Cash", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
+            StandardTextField(value = online, onValueChange = onOnlineChange, label = "Online", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            val totalPaidDisplay = remember(total) { if (total % 1.0 == 0.0) total.toInt().toString() else total.toString() }
+            StandardTextField(value = totalPaidDisplay, onValueChange = {}, label = "Total Paid", readOnly = true, modifier = Modifier.weight(1f))
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Checkbox(checked = withFees, onCheckedChange = onFeesToggle)
+                Text("With Fees", style = MaterialTheme.typography.labelSmall)
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            StandardTextField(value = cost, onValueChange = onCostChange, label = "Actual Cost", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Checkbox(checked = doctorsAcc, onCheckedChange = onAccToggle)
+                Text("Dr. Acc", style = MaterialTheme.typography.labelSmall)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActionButtons(isLoading: Boolean, isEdit: Boolean, onSave: () -> Unit, onSaveAndDownload: () -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        StandardButton(onClick = onSave, isLoading = isLoading, modifier = Modifier.weight(1f)) {
+            Text(if (isEdit) "Update" else "Save")
+        }
+        if (!isEdit) {
+            StandardButton(onClick = onSaveAndDownload, isLoading = isLoading, containerColor = MaterialTheme.colorScheme.secondary, modifier = Modifier.weight(1.5f)) {
+                Icon(Icons.Default.Print, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Save & Download")
+            }
+        }
+    }
+}
+
+private fun validateForm(context: android.content.Context, patientId: String, vaccines: List<String>): Boolean {
+    if (patientId.isBlank() || vaccines.isEmpty()) {
+        Toast.makeText(context, "Patient ID and at least one Vaccine are required", Toast.LENGTH_SHORT).show()
+        return false
+    }
+    return true
+}
+
+private fun createVaccination(
+    id: String?, patientId: String, vaccines: List<String>, nextVaccine: String, dateGiven: String, nextDue: String,
+    cost: String, cash: String, online: String, total: Double, withFees: Boolean, doctorsAcc: Boolean,
+    batches: List<String>, expiries: List<String>
+) = Vaccination(
+    id = id ?: UUID.randomUUID().toString(),
+    patientId = patientId,
+    vaccineNames = vaccines,
+    nxtVaccineNames = nextVaccine.split(",").map { it.trim() }.filter { it.isNotEmpty() },
+    dateGiven = dateGiven,
+    nextDueDate = nextDue,
+    cost = cost.toDoubleOrNull() ?: 0.0,
+    cashAmount = cash.toDoubleOrNull() ?: 0.0,
+    onlineAmount = online.toDoubleOrNull() ?: 0.0,
+    totalPaid = total,
+    withFees = withFees,
+    doctorsAcc = doctorsAcc,
+    batchNumbers = batches,
+    expiryDates = expiries,
+    batchNumber = batches.firstOrNull() ?: "",
+    expiryDate = expiries.firstOrNull() ?: ""
+)
+
+@Preview(showBackground = true)
+@Composable
+private fun AddVaccinationPreview() {
+    NeoChildTheme {
+        AddVaccinationContent(
+            isEdit = false,
+            onBack = {},
+            patientId = "P001",
+            onPatientIdChange = {},
+            isPatientIdEnabled = true,
+            inventory = emptyList(),
+            selectedVaccines = listOf("BCG", "HepB"),
+            onVaccineSelected = {},
+            onCustomVaccineAdded = {},
+            onRemoveVaccine = {},
+            nextBrandSearch = "",
+            onNextBrandChange = {},
+            dateGiven = "1 Jan 2024",
+            onDateGivenChange = {},
+            nextDueDate = "1 Feb 2024",
+            onNextDueDateChange = {},
+            cashAmount = "500",
+            onCashChange = {},
+            onlineAmount = "0",
+            onOnlineChange = {},
+            totalPaid = 500.0,
+            cost = "500",
+            onCostChange = {},
+            withFees = false,
+            onFeesToggle = {},
+            doctorsAcc = false,
+            onAccToggle = {},
+            isLoading = false,
+            onSave = {},
+            onSaveAndDownload = {}
+        )
     }
 }

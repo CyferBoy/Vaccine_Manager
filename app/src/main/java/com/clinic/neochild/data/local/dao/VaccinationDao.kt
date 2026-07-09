@@ -26,4 +26,7 @@ interface VaccinationDao {
 
     @Query("UPDATE vaccinations SET isSynced = 1 WHERE id = :id")
     suspend fun markSynced(id: String)
+
+    @Query("SELECT COUNT(*) FROM vaccinations WHERE nextDueDate = :date AND isDone = 0 AND isDeleted = 0")
+    suspend fun getDueCount(date: String): Int
 }

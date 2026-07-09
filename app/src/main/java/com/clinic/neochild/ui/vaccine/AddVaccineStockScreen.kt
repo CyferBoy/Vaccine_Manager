@@ -12,87 +12,182 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.clinic.neochild.data.model.Vaccine
-import com.clinic.neochild.ui.components.AppBackground
-import com.clinic.neochild.ui.components.DateDropdownPicker
-import com.clinic.neochild.ui.components.StandardAutoCompleteField
-import com.clinic.neochild.ui.components.StandardButton
-import com.clinic.neochild.ui.components.StandardTextField
+import com.clinic.neochild.ui.components.*
+import com.clinic.neochild.ui.theme.NeoChildTheme
 import com.clinic.neochild.utils.FirestoreMappers
 import com.clinic.neochild.utils.PatientUtils.formatDateForDisplay
 import com.google.firebase.firestore.FirebaseFirestore
 import java.util.*
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddVaccineStockScreen(vaccineId: String? = null, onBack: () -> Unit = {}) {
-    var vaccineType by remember { mutableStateOf("") }
-    var brandName by remember { mutableStateOf("") }
-    var companyName by remember { mutableStateOf("") }
-    var stock by remember { mutableStateOf("") }
-    var batchNumber by remember { mutableStateOf("") }
-    var expiryDate by remember { mutableStateOf("") }
-    var mrp by remember { mutableStateOf("") }
-    var netRate by remember { mutableStateOf("") }
+fun AddVaccineStockScreen(
+    vaccineId: String? = null, 
+    onBack: () -> Unit = {}
+) {
+    // Form State - using rememberSaveable
+    var vaccineType by rememberSaveable { mutableStateOf("") }
+    var brandName by rememberSaveable { mutableStateOf("") }
+    var companyName by rememberSaveable { mutableStateOf("") }
+    var stock by rememberSaveable { mutableStateOf("") }
+    var batchNumber by rememberSaveable { mutableStateOf("") }
+    var expiryDate by rememberSaveable { mutableStateOf("") }
+    var mrp by rememberSaveable { mutableStateOf("") }
+    var netRate by rememberSaveable { mutableStateOf("") }
     
     var allVaccines by remember { mutableStateOf<List<Vaccine>>(emptyList()) }
-    var typeExpanded by remember { mutableStateOf(false) }
-    var brandExpanded by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(value = false) }
-    var showDeleteDialog by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
+    var showDeleteDialog by rememberSaveable { mutableStateOf(false) }
 
     val context = LocalContext.current
     val db = FirebaseFirestore.getInstance()
     
-    // Fetch all vaccines for dropdowns and lookup
     LaunchedEffect(Unit) {
-        db.collection("inventory").get()
-            .addOnSuccessListener { result ->
-                allVaccines = result.documents.mapNotNull { FirestoreMappers.toVaccine(it) }
-            }
+        db.collection("inventory").get().addOnSuccessListener { result ->
+            allVaccines = result.documents.mapNotNull { FirestoreMappers.toVaccine(it) }
+        }
     }
     
     LaunchedEffect(vaccineId) {
         if (vaccineId != null) {
             isLoading = true
-            db.collection("inventory").document(vaccineId).get()
-                .addOnSuccessListener { doc ->
-                    val v = FirestoreMappers.toVaccine(doc)
-                    if (v != null) {
-                        vaccineType = v.type
-                        brandName = v.brandName
-                        companyName = v.companyName
-                        stock = v.stock.toString()
-                        batchNumber = v.batchNumber
-                        expiryDate = formatDateForDisplay(v.expiryDate)
-                        mrp = v.mrp.toString()
-                        netRate = v.netRate.toString()
-                    }
-                    isLoading = false
+            db.collection("inventory").document(vaccineId).get().addOnSuccessListener { doc ->
+                FirestoreMappers.toVaccine(doc)?.let { v ->
+                    vaccineType = v.type
+                    brandName = v.brandName
+                    companyName = v.companyName
+                    stock = v.stock.toString()
+                    batchNumber = v.batchNumber
+                    expiryDate = formatDateForDisplay(v.expiryDate)
+                    mrp = v.mrp.toString()
+                    netRate = v.netRate.toString()
                 }
-                .addOnFailureListener { isLoading = false }
+                isLoading = false
+            }.addOnFailureListener { isLoading = false }
         }
     }
 
+    AddVaccineStockContent(
+        isEdit = vaccineId != null,
+        onBack = onBack,
+        vaccineType = vaccineType,
+        onTypeChange = { vaccineType = it },
+        brandName = brandName,
+        onBrandChange = { brandName = it },
+        companyName = companyName,
+        onCompanyChange = { companyName = it },
+        stock = stock,
+        onStockChange = { stock = it },
+        batchNumber = batchNumber,
+        onBatchChange = { batchNumber = it },
+        expiryDate = expiryDate,
+        onExpiryChange = { expiryDate = it },
+        mrp = mrp,
+        onMrpChange = { mrp = it },
+        netRate = netRate,
+        onNetRateChange = { netRate = it },
+        allVaccines = allVaccines,
+        isLoading = isLoading,
+        onDeleteRequest = { showDeleteDialog = true },
+        onSave = {
+            if (vaccineType.isBlank() || brandName.isBlank() || stock.isBlank()) {
+                Toast.makeText(context, "Type, Brand and Quantity are required", Toast.LENGTH_SHORT).show()
+                return@AddVaccineStockContent
+            }
+            isLoading = true
+            val stockInt = stock.toIntOrNull() ?: 0
+            val mrpDouble = mrp.toDoubleOrNull() ?: 0.0
+            val netRateDouble = netRate.toDoubleOrNull() ?: 0.0
+            
+            val existingMatch = allVaccines.find { 
+                it.brandName.equals(brandName, true) && it.batchNumber.equals(batchNumber, true) 
+            }
+            
+            val docRef = if (vaccineId != null) db.collection("inventory").document(vaccineId)
+                         else if (existingMatch != null) db.collection("inventory").document(existingMatch.id)
+                         else db.collection("inventory").document()
+
+            val vaccine = Vaccine(docRef.id, vaccineType, brandName, companyName, stockInt, batchNumber, expiryDate, mrpDouble, netRateDouble)
+            docRef.set(vaccine).addOnSuccessListener {
+                isLoading = false
+                Toast.makeText(context, "Inventory updated", Toast.LENGTH_SHORT).show()
+                onBack()
+            }.addOnFailureListener {
+                isLoading = false
+                Toast.makeText(context, "Error: ${it.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    )
+
+    if (showDeleteDialog && vaccineId != null) {
+        DeleteConfirmationDialog(
+            show = true,
+            onDismiss = { showDeleteDialog = false },
+            onConfirm = {
+                showDeleteDialog = false
+                isLoading = true
+                db.collection("inventory").document(vaccineId).delete().addOnSuccessListener {
+                    isLoading = false
+                    Toast.makeText(context, "Batch deleted", Toast.LENGTH_SHORT).show()
+                    onBack()
+                }.addOnFailureListener {
+                    isLoading = false
+                    Toast.makeText(context, "Error: ${it.message}", Toast.LENGTH_SHORT).show()
+                }
+            },
+            title = "Delete Batch",
+            message = "Are you sure you want to delete this batch?"
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AddVaccineStockContent(
+    isEdit: Boolean,
+    onBack: () -> Unit,
+    vaccineType: String,
+    onTypeChange: (String) -> Unit,
+    brandName: String,
+    onBrandChange: (String) -> Unit,
+    companyName: String,
+    onCompanyChange: (String) -> Unit,
+    stock: String,
+    onStockChange: (String) -> Unit,
+    batchNumber: String,
+    onBatchChange: (String) -> Unit,
+    expiryDate: String,
+    onExpiryChange: (String) -> Unit,
+    mrp: String,
+    onMrpChange: (String) -> Unit,
+    netRate: String,
+    onNetRateChange: (String) -> Unit,
+    allVaccines: List<Vaccine>,
+    isLoading: Boolean,
+    onDeleteRequest: () -> Unit,
+    onSave: () -> Unit
+) {
     AppBackground {
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
                 TopAppBar(
-                    title = { Text(if (vaccineId == null) "Add Vaccine" else "Edit Vaccine") },
+                    title = { Text(if (isEdit) "Edit Vaccine" else "Add Vaccine") },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onPrimary)
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primary, // Solid header color
+                        containerColor = MaterialTheme.colorScheme.primary,
                         titleContentColor = MaterialTheme.colorScheme.onPrimary,
                         navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
                     )
@@ -103,248 +198,132 @@ fun AddVaccineStockScreen(vaccineId: String? = null, onBack: () -> Unit = {}) {
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .imePadding() // Ensures content moves above keyboard
+                    .imePadding()
                     .padding(16.dp)
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Vaccine Type Dropdown
-                val types = allVaccines.map { it.type }.distinct().sorted()
-                StandardAutoCompleteField(
-                    value = vaccineType,
-                    onValueChange = { vaccineType = it },
-                    label = "Vaccine Type*",
-                    placeholder = "Select or enter type",
-                    expanded = typeExpanded && types.isNotEmpty(),
-                    onExpandedChange = { typeExpanded = it },
-                    dropdownContent = {
-                        types.forEach { type ->
-                            DropdownMenuItem(
-                                text = { Text(type) },
-                                onClick = {
-                                    vaccineType = type
-                                    typeExpanded = false
-                                }
-                            )
-                        }
-                    }
-                )
+                // Autocomplete fields
+                VaccineTypeSelector(vaccineType, onTypeChange, allVaccines)
+                BrandNameSelector(brandName, vaccineType, onBrandChange, allVaccines) { existing ->
+                    onCompanyChange(existing.companyName)
+                    onMrpChange(existing.mrp.toString())
+                    onNetRateChange(existing.netRate.toString())
+                }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                StandardTextField(value = companyName, onValueChange = onCompanyChange, label = "Company Name")
+                StandardTextField(value = batchNumber, onValueChange = onBatchChange, label = "Batch Number")
+                StandardTextField(value = stock, onValueChange = onStockChange, label = "Quantity*", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    StandardTextField(value = mrp, onValueChange = onMrpChange, label = "MRP", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
+                    StandardTextField(value = netRate, onValueChange = onNetRateChange, label = "Net Rate", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
+                }
 
-                // Brand Name Dropdown
-                val brands = allVaccines
-                    .filter { it.type.equals(vaccineType, ignoreCase = true) }
-                    .map { it.brandName }
-                    .distinct()
-                    .sorted()
-                    
-                StandardAutoCompleteField(
-                    value = brandName,
-                    onValueChange = { brandName = it },
-                    label = "Brand Name*",
-                    placeholder = "Select or enter brand",
-                    expanded = brandExpanded && brands.isNotEmpty(),
-                    onExpandedChange = { brandExpanded = it },
-                    dropdownContent = {
-                        brands.forEach { brand ->
-                            DropdownMenuItem(
-                                text = { Text(brand) },
-                                onClick = {
-                                    brandName = brand
-                                    brandExpanded = false
-                                    // Auto-fill details from existing brand data
-                                    allVaccines.find { it.brandName.equals(brand, ignoreCase = true) }?.let { existing ->
-                                        companyName = existing.companyName
-                                        mrp = existing.mrp.toString()
-                                        netRate = existing.netRate.toString()
-                                    }
-                                }
-                            )
-                        }
-                    }
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                StandardTextField(
-                    value = companyName,
-                    onValueChange = { companyName = it },
-                    label = "Brand Company Name",
-                    placeholder = "e.g. Serum Institute"
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                StandardTextField(
-                    value = batchNumber,
-                    onValueChange = { batchNumber = it },
-                    label = "Batch Number",
-                    placeholder = "e.g. BT12345"
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                StandardTextField(
-                    value = stock,
-                    onValueChange = { stock = it },
-                    label = "Quantity*",
-                    placeholder = "Enter number of doses",
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                StandardTextField(
-                    value = mrp,
-                    onValueChange = { mrp = it },
-                    label = "MRP",
-                    placeholder = "0.00",
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                StandardTextField(
-                    value = netRate,
-                    onValueChange = { netRate = it },
-                    label = "Net Rate",
-                    placeholder = "0.00",
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                )
+                DateDropdownPicker(label = "Expiry Date", currentDate = expiryDate, onDateSelected = onExpiryChange, modifier = Modifier.fillMaxWidth())
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                DateDropdownPicker(
-                    label = "Expiry Date",
-                    currentDate = expiryDate,
-                    onDateSelected = { expiryDate = it },
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(modifier = Modifier.height(32.dp))
-
-                StandardButton(
-                    onClick = {
-                        if (vaccineType.isBlank() || brandName.isBlank() || stock.isBlank()) {
-                            Toast.makeText(context, "Type, Brand and Quantity are required", Toast.LENGTH_SHORT).show()
-                            return@StandardButton
-                        }
-
-                        val stockInt = stock.toIntOrNull() ?: 0
-                        val mrpDouble = mrp.toDoubleOrNull() ?: 0.0
-                        val netRateDouble = netRate.toDoubleOrNull() ?: 0.0
-                        
-                        isLoading = true
-
-                        // Check for existing records with same brand and batch
-                        val existingMatch = allVaccines.find { 
-                            it.brandName.equals(brandName, ignoreCase = true) && 
-                            it.batchNumber.equals(batchNumber, ignoreCase = true) 
-                        }
-
-                        if (vaccineId == null && existingMatch != null) {
-                            // Check if everything is exactly the same
-                            val isIdentical = existingMatch.type.equals(vaccineType, ignoreCase = true) &&
-                                              existingMatch.companyName.equals(companyName, ignoreCase = true) &&
-                                              existingMatch.expiryDate == expiryDate &&
-                                              existingMatch.mrp == mrpDouble &&
-                                              existingMatch.netRate == netRateDouble
-
-                            if (isIdentical) {
-                                isLoading = false
-                                Toast.makeText(context, "Data already exists", Toast.LENGTH_SHORT).show()
-                                return@StandardButton
-                            }
-                        }
-
-                        val docRef = if (vaccineId != null) {
-                            db.collection("inventory").document(vaccineId)
-                        } else if (existingMatch != null) {
-                            // Batch same and something changed -> Update existing record
-                            db.collection("inventory").document(existingMatch.id)
-                        } else {
-                            // New record
-                            db.collection("inventory").document()
-                        }
-                        
-                        val vaccine = Vaccine(
-                            id = docRef.id,
-                            type = vaccineType,
-                            brandName = brandName,
-                            companyName = companyName,
-                            stock = stockInt, 
-                            batchNumber = batchNumber,
-                            expiryDate = expiryDate,
-                            mrp = mrpDouble,
-                            netRate = netRateDouble
-                        )
-
-                        docRef.set(vaccine)
-                            .addOnSuccessListener {
-                                isLoading = false
-                                val msg = if (vaccineId != null) "Vaccine updated" 
-                                          else if (existingMatch != null) "Batch details updated"
-                                          else "Added to inventory"
-                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                                onBack()
-                            }
-                            .addOnFailureListener { e ->
-                                isLoading = false
-                                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
-                            }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    isLoading = isLoading
-                ) {
-                    Text(if (vaccineId == null) "Add to Inventory" else "Update Quantity", style = MaterialTheme.typography.titleMedium)
+                StandardButton(onClick = onSave, isLoading = isLoading) {
+                    Text(if (isEdit) "Update Quantity" else "Add to Inventory")
                 }
 
-                if (vaccineId != null) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    OutlinedButton(
-                        onClick = { showDeleteDialog = true },
-                        modifier = Modifier.fillMaxWidth().height(56.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(Icons.Default.Delete, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Delete Record")
-                    }
+                if (isEdit) {
+                    DeleteButton(onDeleteRequest)
                 }
             }
         }
     }
+}
 
-    if (showDeleteDialog && vaccineId != null) {
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Delete Vaccine Batch") },
-            text = { Text("Are you sure you want to delete this batch ($batchNumber)? This action cannot be undone.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    showDeleteDialog = false
-                    isLoading = true
-                    db.collection("inventory").document(vaccineId).delete()
-                        .addOnSuccessListener {
-                            isLoading = false
-                            Toast.makeText(context, "Batch deleted", Toast.LENGTH_SHORT).show()
-                            onBack()
-                        }
-                        .addOnFailureListener { e ->
-                            isLoading = false
-                            Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
-                        }
-                }) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) {
-                    Text("Cancel")
-                }
+@Composable
+private fun VaccineTypeSelector(value: String, onValueChange: (String) -> Unit, allVaccines: List<Vaccine>) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val types = remember(allVaccines) { allVaccines.map { it.type }.distinct().sorted() }
+    
+    StandardAutoCompleteField(
+        value = value,
+        onValueChange = onValueChange,
+        label = "Vaccine Type*",
+        placeholder = "Select or enter type",
+        expanded = expanded && types.isNotEmpty(),
+        onExpandedChange = { expanded = it },
+        dropdownContent = {
+            types.forEach { type ->
+                DropdownMenuItem(text = { Text(type) }, onClick = { onValueChange(type); expanded = false })
             }
+        }
+    )
+}
+
+@Composable
+private fun BrandNameSelector(value: String, type: String, onValueChange: (String) -> Unit, allVaccines: List<Vaccine>, onAutoFill: (Vaccine) -> Unit) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val brands = remember(type, allVaccines) {
+        allVaccines.filter { it.type.equals(type, true) }.map { it.brandName }.distinct().sorted()
+    }
+    
+    StandardAutoCompleteField(
+        value = value,
+        onValueChange = onValueChange,
+        label = "Brand Name*",
+        placeholder = "Select or enter brand",
+        expanded = expanded && brands.isNotEmpty(),
+        onExpandedChange = { expanded = it },
+        dropdownContent = {
+            brands.forEach { brand ->
+                DropdownMenuItem(text = { Text(brand) }, onClick = {
+                    onValueChange(brand)
+                    expanded = false
+                    allVaccines.find { it.brandName.equals(brand, true) }?.let { onAutoFill(it) }
+                })
+            }
+        }
+    )
+}
+
+@Composable
+private fun DeleteButton(onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().height(56.dp),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Icon(Icons.Default.Delete, contentDescription = null)
+        Spacer(modifier = Modifier.width(8.dp))
+        Text("Delete Record")
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun AddVaccineStockPreview() {
+    NeoChildTheme {
+        AddVaccineStockContent(
+            isEdit = false,
+            onBack = {},
+            vaccineType = "BCG",
+            onTypeChange = {},
+            brandName = "SII BCG",
+            onBrandChange = {},
+            companyName = "SII",
+            onCompanyChange = {},
+            stock = "10",
+            onStockChange = {},
+            batchNumber = "B123",
+            onBatchChange = {},
+            expiryDate = "1 Jan 2025",
+            onExpiryChange = {},
+            mrp = "500",
+            onMrpChange = {},
+            netRate = "400",
+            onNetRateChange = {},
+            allVaccines = emptyList(),
+            isLoading = false,
+            onDeleteRequest = {},
+            onSave = {}
         )
     }
 }

@@ -23,6 +23,8 @@ import com.clinic.neochild.R
 import com.clinic.neochild.data.model.Consultation
 import com.clinic.neochild.data.model.Patient
 import com.clinic.neochild.data.model.Vaccination
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.io.OutputStream
@@ -34,18 +36,38 @@ object ReceiptManager {
     private const val PAGE_WIDTH = 595
     private const val PAGE_HEIGHT = 421
     private const val MARGIN = 30f
+    
+    @Volatile
+    private var logoCache: Bitmap? = null
 
-    fun downloadReceipt(context: Context, patient: Patient, vaccination: Vaccination) {
-        val pdfDocument = PdfDocument()
-        val pageInfo = PdfDocument.PageInfo.Builder(PAGE_WIDTH, PAGE_HEIGHT, 1).create()
-        val page = pdfDocument.startPage(pageInfo)
-        
-        drawReceiptContent(context, page.canvas, patient, vaccination)
-        
-        pdfDocument.finishPage(page)
+    private fun getLogo(context: Context): Bitmap? {
+        if (logoCache == null) {
+            synchronized(this) {
+                if (logoCache == null) {
+                    logoCache = ContextCompat.getDrawable(context, R.drawable.logo)?.toBitmap()
+                }
+            }
+        }
+        return logoCache
+    }
 
-        val fileName = "Receipt_${patient.name.replace(" ", "_")}_${System.currentTimeMillis()}.pdf"
-        writePdfToStorage(context, pdfDocument, fileName, "Receipt downloaded to Downloads folder")
+    suspend fun downloadReceipt(context: Context, patient: Patient, vaccination: Vaccination) {
+        withContext(Dispatchers.Default) {
+            val pdfDocument = PdfDocument()
+            try {
+                val pageInfo = PdfDocument.PageInfo.Builder(PAGE_WIDTH, PAGE_HEIGHT, 1).create()
+                val page = pdfDocument.startPage(pageInfo)
+                
+                drawReceiptContent(context, page.canvas, patient, vaccination)
+                
+                pdfDocument.finishPage(page)
+
+                val fileName = "Receipt_${patient.name.replace(" ", "_")}_${System.currentTimeMillis()}.pdf"
+                writePdfToStorage(context, pdfDocument, fileName, "Receipt downloaded to Downloads folder")
+            } finally {
+                pdfDocument.close()
+            }
+        }
     }
 
     fun printReceipt(context: Context, patient: Patient, vaccination: Vaccination) {
@@ -62,27 +84,33 @@ object ReceiptManager {
         }
     }
 
-    private fun writePdfToStorage(context: Context, pdfDocument: PdfDocument, fileName: String, successMessage: String) {
+    private suspend fun writePdfToStorage(context: Context, pdfDocument: PdfDocument, fileName: String, successMessage: String) {
         try {
-            val outputStream: OutputStream? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val contentValues = ContentValues().apply {
-                    put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-                    put(MediaStore.MediaColumns.MIME_TYPE, "application/pdf")
-                    put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+            val outputStream: OutputStream? = withContext(Dispatchers.IO) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    val contentValues = ContentValues().apply {
+                        put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                        put(MediaStore.MediaColumns.MIME_TYPE, "application/pdf")
+                        put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                    }
+                    val uri: Uri? = context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+                    uri?.let { context.contentResolver.openOutputStream(it) }
+                } else {
+                    val target = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), fileName)
+                    FileOutputStream(target)
                 }
-                val uri: Uri? = context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
-                uri?.let { context.contentResolver.openOutputStream(it) }
-            } else {
-                val target = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), fileName)
-                FileOutputStream(target)
             }
 
             outputStream?.use { 
                 pdfDocument.writeTo(it)
-                Toast.makeText(context, successMessage, Toast.LENGTH_LONG).show()
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, successMessage, Toast.LENGTH_LONG).show()
+                }
             }
         } catch (e: Exception) {
-            Toast.makeText(context, "Failed: ${e.message}", Toast.LENGTH_SHORT).show()
+            withContext(Dispatchers.Main) {
+                Toast.makeText(context, "Failed: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
         } finally {
             pdfDocument.close()
         }
@@ -141,7 +169,7 @@ object ReceiptManager {
 
     private fun drawClinicHeader(context: Context, canvas: Canvas, paint: Paint, yPos: Float): Float {
         var currentY = yPos
-        val logo = ContextCompat.getDrawable(context, R.drawable.logo)?.toBitmap()
+        val logo = getLogo(context)
         if (logo != null) {
             val logoSize = 60f
             val destRect = RectF(MARGIN, currentY, MARGIN + logoSize, currentY + logoSize)

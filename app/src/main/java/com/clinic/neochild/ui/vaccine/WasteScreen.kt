@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -13,56 +12,73 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.clinic.neochild.data.model.Vaccine
 import com.clinic.neochild.data.model.WasteRecord
-import com.clinic.neochild.ui.components.AppBackground
-import com.clinic.neochild.ui.components.DateDropdownPicker
-import com.clinic.neochild.ui.components.StandardAutoCompleteField
-import com.clinic.neochild.ui.components.StandardButton
-import com.clinic.neochild.ui.components.StandardTextField
+import com.clinic.neochild.ui.components.*
+import com.clinic.neochild.ui.theme.NeoChildTheme
 import com.clinic.neochild.utils.Constants
-import com.clinic.neochild.utils.FirestoreMappers
 import com.clinic.neochild.utils.PatientUtils.formatDateForDisplay
-import com.google.firebase.firestore.FirebaseFirestore
 import java.text.SimpleDateFormat
 import java.util.*
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WasteScreen(onBack: () -> Unit) {
-    var wasteRecords by remember { mutableStateOf<List<WasteRecord>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
-    var showAddDialog by remember { mutableStateOf(false) }
+fun WasteScreen(
+    onBack: () -> Unit,
+    viewModel: WasteViewModel = hiltViewModel()
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    var showAddDialog by rememberSaveable { mutableStateOf(false) }
+    val context = LocalContext.current
 
-    val db = FirebaseFirestore.getInstance()
-
-    DisposableEffect(Unit) {
-        val listener = db.collection("waste")
-            .addSnapshotListener { snapshot, e ->
-                if (e != null) {
-                    isLoading = false
-                    return@addSnapshotListener
-                }
-                wasteRecords = snapshot?.documents?.mapNotNull { FirestoreMappers.toWasteRecord(it) }
-                    ?.sortedByDescending { it.dateWasted } ?: emptyList()
-                isLoading = false
-            }
-
-        onDispose {
-            listener.remove()
+    LaunchedEffect(uiState.error) {
+        uiState.error?.let {
+            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            viewModel.clearError()
         }
     }
 
+    WasteContent(
+        uiState = uiState,
+        onBack = onBack,
+        onAddClick = { showAddDialog = true },
+        onDeleteRequest = { viewModel.deleteWaste(it.id) }
+    )
+
+    if (showAddDialog) {
+        AddWasteDialog(
+            inventory = uiState.inventory,
+            isSaving = uiState.isSaving,
+            onDismiss = { showAddDialog = false },
+            onSave = { vaccineId, brand, batch, exp, date, reason ->
+                viewModel.recordWaste(vaccineId, brand, batch, exp, date, reason) {
+                    Toast.makeText(context, "Waste recorded", Toast.LENGTH_SHORT).show()
+                    showAddDialog = false
+                }
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun WasteContent(
+    uiState: WasteUiState,
+    onBack: () -> Unit,
+    onAddClick: () -> Unit,
+    onDeleteRequest: (WasteRecord) -> Unit
+) {
     AppBackground {
         Scaffold(
             containerColor = Color.Transparent,
-            contentColor = MaterialTheme.colorScheme.onBackground,
             topBar = {
                 TopAppBar(
                     title = { Text("Waste Records") },
@@ -80,7 +96,7 @@ fun WasteScreen(onBack: () -> Unit) {
             },
             floatingActionButton = {
                 FloatingActionButton(
-                    onClick = { showAddDialog = true },
+                    onClick = onAddClick,
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary
                 ) {
@@ -89,9 +105,9 @@ fun WasteScreen(onBack: () -> Unit) {
             }
         ) { paddingValues ->
             Box(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
-                if (isLoading && wasteRecords.isEmpty()) {
+                if (uiState.isLoading && uiState.wasteRecords.isEmpty()) {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                } else if (wasteRecords.isEmpty()) {
+                } else if (uiState.wasteRecords.isEmpty()) {
                     Text("No waste records found", modifier = Modifier.align(Alignment.Center), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
                     LazyColumn(
@@ -99,29 +115,20 @@ fun WasteScreen(onBack: () -> Unit) {
                         contentPadding = PaddingValues(bottom = 88.dp, top = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(wasteRecords) { record ->
-                            WasteItemCard(record, onDelete = {
-                                db.collection("waste").document(record.id).delete()
-                            })
+                        items(uiState.wasteRecords, key = { it.id }) { record ->
+                            WasteItemCard(record, onDelete = { onDeleteRequest(record) }, modifier = Modifier.animateItem())
                         }
                     }
                 }
             }
         }
     }
-
-    if (showAddDialog) {
-        AddWasteDialog(
-            onDismiss = { showAddDialog = false },
-            onSave = { /* No longer needed as listener handles it */ }
-        )
-    }
 }
 
 @Composable
-fun WasteItemCard(record: WasteRecord, onDelete: () -> Unit) {
+private fun WasteItemCard(record: WasteRecord, onDelete: () -> Unit, modifier: Modifier = Modifier) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant
@@ -135,7 +142,8 @@ fun WasteItemCard(record: WasteRecord, onDelete: () -> Unit) {
                 Text(record.brandName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text("Batch: ${record.batchNumber}", style = MaterialTheme.typography.bodySmall)
                 Text("Reason: ${record.reason}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("Date: ${formatDateForDisplay(record.dateWasted)}", style = MaterialTheme.typography.bodySmall)
+                val dateDisplay = remember(record.dateWasted) { formatDateForDisplay(record.dateWasted) }
+                Text("Date: $dateDisplay", style = MaterialTheme.typography.bodySmall)
             }
             IconButton(onClick = onDelete) {
                 Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
@@ -144,30 +152,23 @@ fun WasteItemCard(record: WasteRecord, onDelete: () -> Unit) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddWasteDialog(onDismiss: () -> Unit, onSave: () -> Unit) {
-    var selectedBrand by remember { mutableStateOf("") }
-    var selectedVaccineId by remember { mutableStateOf("") }
-    var batchNumber by remember { mutableStateOf("") }
-    var expiryDate by remember { mutableStateOf("") }
+private fun AddWasteDialog(
+    inventory: List<Vaccine>,
+    isSaving: Boolean,
+    onDismiss: () -> Unit,
+    onSave: (String, String, String, String, String, String) -> Unit
+) {
+    var selectedBrand by rememberSaveable { mutableStateOf("") }
+    var selectedVaccineId by rememberSaveable { mutableStateOf("") }
+    var batchNumber by rememberSaveable { mutableStateOf("") }
+    var expiryDate by rememberSaveable { mutableStateOf("") }
     
-    val today = SimpleDateFormat(Constants.DATE_FORMAT, Locale.ENGLISH).format(Date())
-    var dateWasted by remember { mutableStateOf(today) }
-    var reason by remember { mutableStateOf("Administration Waste") }
+    val today = remember { SimpleDateFormat(Constants.DATE_FORMAT, Locale.ENGLISH).format(Date()) }
+    var dateWasted by rememberSaveable { mutableStateOf(today) }
+    var reason by rememberSaveable { mutableStateOf("Administration Waste") }
     
-    var isLoading by remember { mutableStateOf(false) }
-    var inventory by remember { mutableStateOf<List<Vaccine>>(emptyList()) }
-    var expandedBrand by remember { mutableStateOf(false) }
-
-    val context = LocalContext.current
-    val db = FirebaseFirestore.getInstance()
-
-    LaunchedEffect(Unit) {
-        db.collection("inventory").get().addOnSuccessListener { result ->
-            inventory = result.documents.mapNotNull { FirestoreMappers.toVaccine(it) }
-        }
-    }
+    var expandedBrand by rememberSaveable { mutableStateOf(false) }
 
     val availableBrands = remember(selectedBrand, inventory) {
         inventory.filter { 
@@ -177,7 +178,7 @@ fun AddWasteDialog(onDismiss: () -> Unit, onSave: () -> Unit) {
     }
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (!isSaving) onDismiss() },
         title = { Text("Record New Waste") },
         text = {
             Column(
@@ -210,22 +211,9 @@ fun AddWasteDialog(onDismiss: () -> Unit, onSave: () -> Unit) {
                     }
                 )
 
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    StandardTextField(
-                        value = batchNumber,
-                        onValueChange = { batchNumber = it },
-                        label = "Batch",
-                        readOnly = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    StandardTextField(
-                        value = expiryDate,
-                        onValueChange = { expiryDate = it },
-                        label = "Exp",
-                        readOnly = true,
-                        modifier = Modifier.weight(1f)
-                    )
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    StandardTextField(value = batchNumber, onValueChange = {}, label = "Batch", readOnly = true, modifier = Modifier.weight(1f))
+                    StandardTextField(value = expiryDate, onValueChange = {}, label = "Exp", readOnly = true, modifier = Modifier.weight(1f))
                 }
 
                 DateDropdownPicker(
@@ -245,44 +233,31 @@ fun AddWasteDialog(onDismiss: () -> Unit, onSave: () -> Unit) {
         },
         confirmButton = {
             StandardButton(
-                onClick = {
-                    if (selectedVaccineId.isEmpty()) {
-                        Toast.makeText(context, "Please select a vaccine", Toast.LENGTH_SHORT).show()
-                        return@StandardButton
-                    }
-                    isLoading = true
-                    val wasteData = hashMapOf(
-                        "vaccineId" to selectedVaccineId,
-                        "brandName" to selectedBrand,
-                        "batchNumber" to batchNumber,
-                        "expiryDate" to expiryDate,
-                        "dateWasted" to dateWasted,
-                        "reason" to reason,
-                        "quantity" to 1
-                    )
-                    db.collection("waste").add(wasteData).addOnSuccessListener {
-                        val currentStock = inventory.find { it.id == selectedVaccineId }?.stock ?: 0
-                        if (currentStock > 0) {
-                            db.collection("inventory").document(selectedVaccineId)
-                                .update("stock", currentStock - 1)
-                                .addOnSuccessListener {
-                                    Toast.makeText(context, "Waste recorded", Toast.LENGTH_SHORT).show()
-                                    onSave()
-                                    onDismiss()
-                                }
-                        } else {
-                            onSave()
-                            onDismiss()
-                        }
-                    }.addOnFailureListener { isLoading = false }
-                },
-                isLoading = isLoading
+                onClick = { onSave(selectedVaccineId, selectedBrand, batchNumber, expiryDate, dateWasted, reason) },
+                enabled = selectedVaccineId.isNotEmpty() && !isSaving,
+                isLoading = isSaving
             ) {
                 Text("Save")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss, enabled = !isSaving) { Text("Cancel") }
         }
     )
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun WastePreview() {
+    NeoChildTheme {
+        WasteContent(
+            uiState = WasteUiState(
+                isLoading = false,
+                wasteRecords = listOf(WasteRecord("1", "v1", "BCG", "B123", "2025-01-01", "2024-01-01", "Expired", 1))
+            ),
+            onBack = {},
+            onAddClick = {},
+            onDeleteRequest = {}
+        )
+    }
 }

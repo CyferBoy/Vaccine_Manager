@@ -8,6 +8,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -121,7 +122,8 @@ fun PatientDetailsScreen(
                     patient = patient,
                     vaccinations = patientVaccinations,
                     onEditVaccination = onEditVaccination,
-                    onDeleteVaccination = { vaccinationToDelete = it }
+                    onDeleteVaccination = { vaccinationToDelete = it },
+                    onMarkAsDone = { viewModel.markAsDone(it) }
                 )
             }
         }
@@ -142,7 +144,8 @@ private fun PatientDetailsContent(
     patient: Patient,
     vaccinations: List<Vaccination>,
     onEditVaccination: (String) -> Unit,
-    onDeleteVaccination: (Vaccination) -> Unit
+    onDeleteVaccination: (Vaccination) -> Unit,
+    onMarkAsDone: (Vaccination) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 16.dp),
@@ -173,7 +176,8 @@ private fun PatientDetailsContent(
                     vaccination = vaccination,
                     patient = patient,
                     onEdit = { onEditVaccination(vaccination.id) },
-                    onDelete = { onDeleteVaccination(vaccination) }
+                    onDelete = { onDeleteVaccination(vaccination) },
+                    onMarkAsDone = { onMarkAsDone(vaccination) }
                 )
             }
         }
@@ -278,7 +282,8 @@ private fun VaccinationRecordCard(
     vaccination: Vaccination,
     patient: Patient,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onMarkAsDone: () -> Unit
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -329,7 +334,8 @@ private fun VaccinationRecordCard(
                 onDismiss = { menuExpanded = false },
                 onEdit = onEdit,
                 onDelete = onDelete,
-                onDownload = { 
+                onMarkAsDone = if (!vaccination.isDone) onMarkAsDone else null,
+                onDownload = {
                     scope.launch {
                         ReceiptManager.downloadReceipt(context, patient, vaccination)
                     }
@@ -342,8 +348,28 @@ private fun VaccinationRecordCard(
 @Composable
 private fun VaccinationCardHeader(vaccination: Vaccination) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        val displayName = vaccination.vaccineNames.joinToString(", ") { cleanVaccineName(it) }
-        Text(text = displayName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val displayName = vaccination.vaccineNames.joinToString(", ") { cleanVaccineName(it) }
+                Text(text = displayName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                
+                if (vaccination.isDone) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Surface(
+                        color = Color(0xFF4CAF50),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = "DONE",
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
         
         if (vaccination.totalPaid > 0) {
             PaymentInfoColumn(vaccination)
@@ -430,7 +456,8 @@ private fun PatientDetailsPreview() {
             patient = Patient("1", "John Doe", "1234567890", "", "2020-01-01", "Male", "Old Hospital Road", "2024-01-01"),
             vaccinations = emptyList(),
             onEditVaccination = {},
-            onDeleteVaccination = {}
+            onDeleteVaccination = {},
+            onMarkAsDone = {}
         )
     }
 }

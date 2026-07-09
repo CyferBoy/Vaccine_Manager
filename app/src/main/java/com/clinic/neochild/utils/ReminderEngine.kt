@@ -28,8 +28,8 @@ object ReminderEngine {
             for (i in sortedVisits.indices) {
                 val visit = sortedVisits[i]
                 
-                // If this visit doesn't specify any "next vaccines", it creates no requirements
-                if (visit.nextDueDate.isBlank() || visit.nxtVaccineNames.isEmpty()) continue
+                // If this visit doesn't specify any "next vaccines", or it's already marked as done, it creates no requirements
+                if (visit.nextDueDate.isBlank() || visit.nxtVaccineNames.isEmpty() || visit.isDone) continue
 
                 val dueDate = PatientUtils.parseDate(visit.nextDueDate) ?: continue
 

@@ -85,16 +85,6 @@ class NotificationHelper @Inject constructor(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // Mark Vaccinated Action
-        val vaccinatedIntent = Intent(context, NotificationActionReceiver::class.java).apply {
-            action = "ACTION_MARK_VACCINATED"
-            putExtra("vaccinationId", vaccinationId)
-            putExtra("reminderId", reminderId)
-        }
-        val vaccinatedPendingIntent = PendingIntent.getBroadcast(
-            context, id + 1, vaccinatedIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
         // Dismiss Action
         val dismissIntent = Intent(context, NotificationActionReceiver::class.java).apply {
             action = "ACTION_DISMISS"
@@ -112,7 +102,6 @@ class NotificationHelper @Inject constructor(
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .setGroup(GROUP_VACCINATION)
-            .addAction(0, "Mark Vaccinated", vaccinatedPendingIntent)
             .addAction(0, "Dismiss", dismissPendingIntent)
 
         NotificationManagerCompat.from(context).notify(id, builder.build())

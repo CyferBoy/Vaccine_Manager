@@ -47,6 +47,7 @@ fun AddVaccinationScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val allPatients by patientViewModel.allPatients.collectAsState()
+    val existingVaccination by viewModel.vaccination.collectAsState()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -67,6 +68,29 @@ fun AddVaccinationScreen(
     var onlineAmount by rememberSaveable { mutableStateOf("") }
     var withFees by rememberSaveable { mutableStateOf(false) }
     var doctorsAcc by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(vaccinationId) {
+        if (vaccinationId != null) {
+            viewModel.loadVaccination(vaccinationId)
+        }
+    }
+
+    LaunchedEffect(existingVaccination) {
+        existingVaccination?.let { v ->
+            patientId = v.patientId
+            selectedVaccines = v.vaccineNames
+            batchNumbers = v.batchNumbers
+            expiryDates = v.expiryDates
+            nextBrandSearch = v.nxtVaccineNames.joinToString(", ")
+            dateGiven = v.dateGiven
+            nextDueDate = v.nextDueDate
+            cost = if (v.cost % 1.0 == 0.0) v.cost.toInt().toString() else v.cost.toString()
+            cashAmount = if (v.cashAmount % 1.0 == 0.0) v.cashAmount.toInt().toString() else v.cashAmount.toString()
+            onlineAmount = if (v.onlineAmount % 1.0 == 0.0) v.onlineAmount.toInt().toString() else v.onlineAmount.toString()
+            withFees = v.withFees
+            doctorsAcc = v.doctorsAcc
+        }
+    }
 
     val totalPaid = remember(cashAmount, onlineAmount) {
         (cashAmount.toDoubleOrNull() ?: 0.0) + (onlineAmount.toDoubleOrNull() ?: 0.0)

@@ -28,11 +28,15 @@ data class AddVaccinationUiState(
 @HiltViewModel
 class AddVaccinationViewModel @Inject constructor(
     private val firestore: FirebaseFirestore,
-    private val completeVaccinationUseCase: CompleteVaccinationUseCase
+    private val completeVaccinationUseCase: CompleteVaccinationUseCase,
+    private val getVaccinationsUseCase: GetVaccinationsUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AddVaccinationUiState())
     val uiState: StateFlow<AddVaccinationUiState> = _uiState.asStateFlow()
+
+    private val _vaccination = MutableStateFlow<Vaccination?>(null)
+    val vaccination: StateFlow<Vaccination?> = _vaccination.asStateFlow()
 
     init {
         fetchInventory()
@@ -42,6 +46,14 @@ class AddVaccinationViewModel @Inject constructor(
         firestore.collection("inventory").get().addOnSuccessListener { result ->
             val inventory = result.documents.mapNotNull { FirestoreMappers.toVaccine(it) }
             _uiState.value = _uiState.value.copy(inventory = inventory)
+        }
+    }
+
+    fun loadVaccination(id: String) {
+        viewModelScope.launch {
+            getVaccinationsUseCase().collect { all ->
+                _vaccination.value = all.find { it.id == id }
+            }
         }
     }
 

@@ -66,6 +66,7 @@ class VaccinationRepositoryImpl @Inject constructor(
                     localDataSource.insertVaccination(updated, isSynced = false)
                     remoteDataSource.uploadVaccination(updated)
                     localDataSource.markSynced(id)
+                    auditLogger.logAction("MARK_DONE_VACCINATION", id)
                 }
             } catch (e: Exception) { }
         }

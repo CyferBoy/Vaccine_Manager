@@ -37,7 +37,8 @@ fun DueTab(
     overdueCount: Int,
     initialFilter: String = "Today",
     onFilterChanged: (String) -> Unit = {},
-    onUpdateVaccination: (Vaccination) -> Unit = {},
+    onMarkAsDone: (Vaccination) -> Unit = {},
+    onClearReminder: (Vaccination) -> Unit = {},
     onReschedule: (String, String, String) -> Unit = { _, _, _ -> },
     onVaccinatedElsewhere: (String, VaccinationSource, String, String) -> Unit = { _, _, _, _ -> }
 ) {
@@ -51,8 +52,12 @@ fun DueTab(
         ManageDueBottomSheet(
             onDismiss = { showManageSheet = false },
             onMarkAsDone = { 
-                onUpdateVaccination(selectedVaccination!!)
+                onMarkAsDone(selectedVaccination!!)
                 showManageSheet = false 
+            },
+            onClearReminder = {
+                onClearReminder(selectedVaccination!!)
+                showManageSheet = false
             },
             onReschedule = { 
                 showManageSheet = false
@@ -213,7 +218,24 @@ private fun DuePatientCard(
         Column(modifier = Modifier.padding(16.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(patient?.name ?: "Unknown Patient", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(patient?.name ?: "Unknown Patient", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        if (vaccination.isDone) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Surface(
+                                color = Color(0xFF4CAF50), // Green for DONE
+                                shape = RoundedCornerShape(4.dp)
+                            ) {
+                                Text(
+                                    text = "DONE",
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
                     Text(
                         text = "Next: ${vaccination.nxtVaccineNames.joinToString(", ")}",
                         style = MaterialTheme.typography.bodySmall,
@@ -230,14 +252,14 @@ private fun DuePatientCard(
                 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Surface(
-                        color = MaterialTheme.colorScheme.primaryContainer,
+                        color = if (vaccination.isDone) Color.LightGray else MaterialTheme.colorScheme.primaryContainer,
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Text(
                             text = vaccination.nextDueDate,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                             style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                            color = if (vaccination.isDone) Color.DarkGray else MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
                     
@@ -260,6 +282,7 @@ private fun DuePatientCard(
 private fun ManageDueBottomSheet(
     onDismiss: () -> Unit,
     onMarkAsDone: () -> Unit,
+    onClearReminder: () -> Unit,
     onReschedule: () -> Unit,
     onVaccinatedElsewhere: () -> Unit
 ) {
@@ -280,8 +303,13 @@ private fun ManageDueBottomSheet(
             
             ListItem(
                 headlineContent = { Text("Mark as Done") },
-                leadingContent = { Icon(Icons.Default.Check, contentDescription = null) },
+                leadingContent = { Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF4CAF50)) },
                 modifier = Modifier.clickable { onMarkAsDone() }
+            )
+            ListItem(
+                headlineContent = { Text("Clear Reminder") },
+                leadingContent = { Icon(Icons.Default.Check, contentDescription = null) },
+                modifier = Modifier.clickable { onClearReminder() }
             )
             ListItem(
                 headlineContent = { Text("Reschedule") },
@@ -455,7 +483,8 @@ private fun DueTabPreview() {
             patients = listOf(Patient("1", "John Doe", "1234567890", "", "2020-01-01", "Male", "", "")),
             filteredVaccinations = listOf(Vaccination("1", "1", listOf("BCG"), listOf("HepB"), "1 Jan 2024", "1 Feb 2024", 500.0, 500.0, 0.0, 500.0, false, false, false)),
             overdueCount = 1,
-            onUpdateVaccination = {},
+            onMarkAsDone = {},
+            onClearReminder = {},
             onReschedule = { _, _, _ -> },
             onVaccinatedElsewhere = { _, _, _, _ -> }
         )

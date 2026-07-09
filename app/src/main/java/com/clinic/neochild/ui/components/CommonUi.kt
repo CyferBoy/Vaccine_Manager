@@ -158,12 +158,24 @@ fun ActionDropdownMenu(
     onDelete: () -> Unit,
     onPrint: (() -> Unit)? = null,
     onDownload: (() -> Unit)? = null,
-    onMerge: (() -> Unit)? = null
+    onMerge: (() -> Unit)? = null,
+    onMarkAsDone: (() -> Unit)? = null
 ) {
     DropdownMenu(
         expanded = expanded,
         onDismissRequest = onDismiss
     ) {
+        if (onMarkAsDone != null) {
+            DropdownMenuItem(
+                text = { Text("Mark as Done") },
+                onClick = {
+                    onDismiss()
+                    onMarkAsDone()
+                },
+                leadingIcon = { Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF4CAF50)) }
+            )
+            HorizontalDivider()
+        }
         if (onPrint != null) {
             DropdownMenuItem(
                 text = { Text("Print Receipt") },

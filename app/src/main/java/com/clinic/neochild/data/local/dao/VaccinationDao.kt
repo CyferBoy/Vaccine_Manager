@@ -12,6 +12,9 @@ interface VaccinationDao {
     @Query("SELECT * FROM vaccinations WHERE patientId = :patientId AND isDeleted = 0")
     fun getVaccinationsForPatient(patientId: String): Flow<List<VaccinationEntity>>
 
+    @Query("SELECT * FROM vaccinations WHERE id = :id AND isDeleted = 0")
+    suspend fun getVaccinationById(id: String): VaccinationEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertVaccination(vaccination: VaccinationEntity)
 

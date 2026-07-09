@@ -89,7 +89,10 @@ fun DueTab(
                 EmptyDueState(selectedFilter = initialFilter)
             }
         } else {
-            items(filteredVaccinations, key = { it.id }) { v ->
+            items(
+                items = filteredVaccinations, 
+                key = { it.id + it.nxtVaccineNames.joinToString() }
+            ) { v ->
                 val patient = remember(v.patientId, patients) { patients.find { it.id == v.patientId } }
                 DuePatientCard(
                     vaccination = v, 

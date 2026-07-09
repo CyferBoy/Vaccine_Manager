@@ -31,7 +31,6 @@ object ReminderEngine {
                 // If this visit doesn't specify any "next vaccines", it creates no requirements
                 if (visit.nextDueDate.isBlank() || visit.nxtVaccineNames.isEmpty()) continue
 
-                val visitDate = PatientUtils.parseDate(visit.dateGiven) ?: continue
                 val dueDate = PatientUtils.parseDate(visit.nextDueDate) ?: continue
 
                 // Check each expected vaccine in this specific visit's "Next Due" list

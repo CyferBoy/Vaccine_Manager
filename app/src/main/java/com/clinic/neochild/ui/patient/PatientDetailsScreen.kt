@@ -311,6 +311,14 @@ private fun VaccinationRecordCard(
                     )
                 }
 
+                if (vaccination.performedBy.isNotBlank()) {
+                    Text(
+                        text = "Added by: ${vaccination.performedBy}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 VaccinationCardDates(vaccination)

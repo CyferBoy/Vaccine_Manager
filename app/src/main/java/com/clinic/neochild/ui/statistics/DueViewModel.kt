@@ -13,6 +13,7 @@ import com.clinic.neochild.domain.usecase.vaccination.SaveVaccinationUseCase
 import com.clinic.neochild.notification.ReminderScheduler
 import com.clinic.neochild.utils.PatientUtils
 import com.clinic.neochild.utils.ReminderEngine
+import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -35,7 +36,8 @@ class DueViewModel @Inject constructor(
     private val saveVaccinationUseCase: SaveVaccinationUseCase,
     private val vaccineRepository: VaccineRepository,
     private val reminderRepository: ReminderRepository,
-    private val reminderScheduler: ReminderScheduler
+    private val reminderScheduler: ReminderScheduler,
+    private val auth: FirebaseAuth
 ) : ViewModel() {
 
     private val _selectedFilter = MutableStateFlow("Today")
@@ -86,6 +88,7 @@ class DueViewModel @Inject constructor(
 
     fun markAsDone(vaccination: Vaccination) {
         viewModelScope.launch {
+            val user = auth.currentUser?.email ?: "Unknown"
             // Create a new vaccination record for today representing the administered vaccines
             val today = PatientUtils.formatDate(Date())
             val newVaccination = Vaccination(
@@ -94,7 +97,8 @@ class DueViewModel @Inject constructor(
                 vaccineNames = vaccination.nxtVaccineNames,
                 dateGiven = today,
                 isDone = true,
-                source = VaccinationSource.CLINIC.name
+                source = VaccinationSource.CLINIC.name,
+                performedBy = user
             )
             saveVaccinationUseCase(newVaccination)
             
@@ -123,12 +127,14 @@ class DueViewModel @Inject constructor(
 
     fun rescheduleVaccination(vaccinationId: String, newDate: String, reason: String) {
         viewModelScope.launch {
+            val user = auth.currentUser?.email ?: "Unknown"
             val original = uiState.value.vaccinations.find { it.id == vaccinationId }
             if (original != null) {
                 // Update the original record's nextDueDate to the new date
                 saveVaccinationUseCase(original.copy(
                     nextDueDate = newDate,
-                    rescheduleReason = reason
+                    rescheduleReason = reason,
+                    performedBy = user
                 ))
                 reminderRepository.markPatientRemindersCompleted(original.patientId)
                 reminderScheduler.runNow()
@@ -143,6 +149,7 @@ class DueViewModel @Inject constructor(
         notes: String
     ) {
         viewModelScope.launch {
+            val user = auth.currentUser?.email ?: "Unknown"
             val original = uiState.value.vaccinations.find { it.id == vaccinationId }
             if (original != null) {
                 // Find unsatisfied vaccines for this specific visit
@@ -158,7 +165,8 @@ class DueViewModel @Inject constructor(
                         dateGiven = date,
                         isDone = true,
                         source = source.name,
-                        notes = notes
+                        notes = notes,
+                        performedBy = user
                     )
                     saveVaccinationUseCase(newVaccination)
                     reminderRepository.markPatientRemindersCompleted(original.patientId)

@@ -22,7 +22,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         ReminderEntity::class, 
         VaccineEntity::class
     ], 
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

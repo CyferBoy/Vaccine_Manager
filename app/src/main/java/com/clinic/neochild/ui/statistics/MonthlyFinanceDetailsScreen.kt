@@ -183,6 +183,14 @@ private fun FinanceRecordCard(vaccination: Vaccination, patient: Patient?) {
                 }
                 Text(text = "Mode: $mode", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            if (vaccination.performedBy.isNotBlank()) {
+                Text(
+                    text = "Added by: ${vaccination.performedBy}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
         }
     }
 }

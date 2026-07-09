@@ -115,7 +115,7 @@ fun DueTab(
         } else {
             items(
                 items = filteredVaccinations, 
-                key = { it.id + it.nextDueDate }
+                key = { it.patientId + it.nextDueDate + it.nxtVaccineNames.joinToString() }
             ) { v ->
                 val patient = remember(v.patientId, patients) { patients.find { it.id == v.patientId } }
                 DuePatientCard(
@@ -219,6 +219,13 @@ private fun DuePatientCard(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    if (vaccination.performedBy.isNotBlank()) {
+                        Text(
+                            text = "Added by: ${vaccination.performedBy}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                        )
+                    }
                 }
                 
                 Row(verticalAlignment = Alignment.CenterVertically) {

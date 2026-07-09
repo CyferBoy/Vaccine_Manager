@@ -17,6 +17,7 @@ data class Vaccination(
     val source: String = VaccinationSource.CLINIC.name,
     val notes: String = "",
     val rescheduleReason: String = "",
+    val performedBy: String = "",
     val batchNumbers: List<String> = emptyList(),
     val expiryDates: List<String> = emptyList(),
     val batchNumber: String = "",

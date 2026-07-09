@@ -26,6 +26,7 @@ data class VaccinationEntity(
     val source: String = "CLINIC",
     val notes: String = "",
     val rescheduleReason: String = "",
+    val performedBy: String = "",
     val isSynced: Boolean = true,
     val isDeleted: Boolean = false
 )
@@ -46,7 +47,8 @@ fun VaccinationEntity.toVaccination() = Vaccination(
     isDone = isDone,
     source = source,
     notes = notes,
-    rescheduleReason = rescheduleReason
+    rescheduleReason = rescheduleReason,
+    performedBy = performedBy
 )
 
 fun Vaccination.toEntity(isSynced: Boolean = true) = VaccinationEntity(
@@ -66,5 +68,6 @@ fun Vaccination.toEntity(isSynced: Boolean = true) = VaccinationEntity(
     source = source,
     notes = notes,
     rescheduleReason = rescheduleReason,
+    performedBy = performedBy,
     isSynced = isSynced
 )

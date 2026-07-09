@@ -33,6 +33,7 @@ import com.clinic.neochild.ui.theme.NeoChildTheme
 import com.clinic.neochild.ui.viewmodel.PatientViewModel
 import com.clinic.neochild.utils.Constants
 import com.clinic.neochild.utils.ReceiptManager
+import com.google.firebase.auth.FirebaseAuth
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -125,14 +126,16 @@ fun AddVaccinationScreen(
         isLoading = uiState.isLoading,
         onSave = {
             if (validateForm(context, patientId, selectedVaccines)) {
-                val vaccination = createVaccination(vaccinationId, patientId, selectedVaccines, nextBrandSearch, dateGiven, nextDueDate, cost, cashAmount, onlineAmount, totalPaid, withFees, doctorsAcc, batchNumbers, expiryDates)
+                val user = FirebaseAuth.getInstance().currentUser?.email ?: "Unknown"
+                val vaccination = createVaccination(vaccinationId, patientId, selectedVaccines, nextBrandSearch, dateGiven, nextDueDate, cost, cashAmount, onlineAmount, totalPaid, withFees, doctorsAcc, batchNumbers, expiryDates, user)
                 viewModel.saveVaccination(vaccination, vaccinationId == null, selectedVaccineIds, onBack)
             }
         },
         onSaveAndDownload = {
             val patient = allPatients.find { it.id == patientId }
             if (validateForm(context, patientId, selectedVaccines) && patient != null) {
-                val vaccination = createVaccination(vaccinationId, patientId, selectedVaccines, nextBrandSearch, dateGiven, nextDueDate, cost, cashAmount, onlineAmount, totalPaid, withFees, doctorsAcc, batchNumbers, expiryDates)
+                val user = FirebaseAuth.getInstance().currentUser?.email ?: "Unknown"
+                val vaccination = createVaccination(vaccinationId, patientId, selectedVaccines, nextBrandSearch, dateGiven, nextDueDate, cost, cashAmount, onlineAmount, totalPaid, withFees, doctorsAcc, batchNumbers, expiryDates, user)
                 viewModel.saveVaccination(vaccination, true, selectedVaccineIds) {
                     scope.launch {
                         ReceiptManager.downloadReceipt(context, patient, vaccination)
@@ -381,7 +384,7 @@ private fun validateForm(context: android.content.Context, patientId: String, va
 private fun createVaccination(
     id: String?, patientId: String, vaccines: List<String>, nextVaccine: String, dateGiven: String, nextDue: String,
     cost: String, cash: String, online: String, total: Double, withFees: Boolean, doctorsAcc: Boolean,
-    batches: List<String>, expiries: List<String>
+    batches: List<String>, expiries: List<String>, performedBy: String = ""
 ) = Vaccination(
     id = id ?: UUID.randomUUID().toString(),
     patientId = patientId,
@@ -398,7 +401,8 @@ private fun createVaccination(
     batchNumbers = batches,
     expiryDates = expiries,
     batchNumber = batches.firstOrNull() ?: "",
-    expiryDate = expiries.firstOrNull() ?: ""
+    expiryDate = expiries.firstOrNull() ?: "",
+    performedBy = performedBy
 )
 
 @Preview(showBackground = true)

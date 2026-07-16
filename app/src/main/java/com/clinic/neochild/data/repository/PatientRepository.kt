@@ -3,8 +3,8 @@ package com.clinic.neochild.data.repository
 import com.clinic.neochild.data.local.dao.PatientDao
 import com.clinic.neochild.data.local.entity.toEntity
 import com.clinic.neochild.data.local.entity.toPatient
-import com.clinic.neochild.data.model.Patient
-import com.clinic.neochild.utils.FirestoreMappers
+import com.clinic.neochild.domain.model.Patient
+import com.clinic.neochild.data.mapper.FirestoreMappers
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

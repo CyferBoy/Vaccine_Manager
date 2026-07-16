@@ -14,8 +14,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.clinic.neochild.data.model.Patient
-import com.clinic.neochild.data.model.Vaccination
+import com.clinic.neochild.domain.model.Patient
+import com.clinic.neochild.domain.model.Vaccination
 import com.clinic.neochild.core.ui.components.AppBackground
 import com.clinic.neochild.core.ui.theme.NeoChildTheme
 import kotlinx.coroutines.launch

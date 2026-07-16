@@ -1,6 +1,6 @@
 package com.clinic.neochild.domain.usecase.patient
 
-import com.clinic.neochild.data.model.Patient
+import com.clinic.neochild.domain.model.Patient
 import com.clinic.neochild.domain.repository.PatientRepository
 
 /**

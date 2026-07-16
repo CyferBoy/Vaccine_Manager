@@ -3,7 +3,8 @@ package com.clinic.neochild.data.repository
 import com.clinic.neochild.data.local.dao.VaccineDao
 import com.clinic.neochild.data.local.entity.toEntity
 import com.clinic.neochild.data.local.entity.toVaccine
-import com.clinic.neochild.data.model.Vaccine
+import com.clinic.neochild.domain.model.Vaccine
+import com.clinic.neochild.domain.model.SyncOperation
 import com.clinic.neochild.domain.repository.VaccineRepository
 import com.clinic.neochild.data.mapper.FirestoreMappers
 import com.google.firebase.firestore.FirebaseFirestore
@@ -43,7 +44,7 @@ class VaccineRepositoryImpl @Inject constructor(
         syncRepository.enqueue(
             entityName = "INVENTORY",
             entityId = id,
-            operation = com.clinic.neochild.data.model.SyncOperation.DELETE
+            operation = SyncOperation.DELETE
         )
     }
 }

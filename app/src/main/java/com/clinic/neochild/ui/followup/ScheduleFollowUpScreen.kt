@@ -13,7 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.clinic.neochild.data.model.Priority
+import com.clinic.neochild.domain.model.Priority
 import com.clinic.neochild.core.ui.components.AppBackground
 import com.clinic.neochild.core.ui.components.DateDropdownPicker
 import com.clinic.neochild.core.ui.components.StandardButton

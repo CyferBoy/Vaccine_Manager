@@ -17,7 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.clinic.neochild.data.model.Vaccine
+import com.clinic.neochild.domain.model.Vaccine
 import com.clinic.neochild.core.ui.components.*
 import com.clinic.neochild.core.ui.theme.NeoChildTheme
 import com.clinic.neochild.data.mapper.FirestoreMappers

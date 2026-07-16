@@ -24,7 +24,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.clinic.neochild.data.model.Staff
+import com.clinic.neochild.domain.model.Staff
 import com.clinic.neochild.core.ui.components.*
 import com.clinic.neochild.core.ui.theme.NeoChildTheme
 

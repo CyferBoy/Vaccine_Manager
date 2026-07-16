@@ -1,7 +1,8 @@
-package com.clinic.neochild.widget
+package com.clinic.neochild.features.widget
 
 import android.content.Context
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.datastore.preferences.core.Preferences
@@ -26,8 +27,9 @@ import androidx.glance.unit.ColorProvider
 import com.clinic.neochild.data.local.AppDatabase
 import com.clinic.neochild.data.local.entity.toPatient
 import com.clinic.neochild.data.local.entity.toVaccination
-import com.clinic.neochild.data.model.Patient
-import com.clinic.neochild.data.model.Vaccination
+import com.clinic.neochild.domain.model.Patient
+import com.clinic.neochild.domain.model.Vaccination
+import com.clinic.neochild.domain.model.PendingRequirement
 import com.clinic.neochild.core.common.Constants
 import com.clinic.neochild.core.utils.PatientUtils
 import com.clinic.neochild.domain.logic.ReminderEngine

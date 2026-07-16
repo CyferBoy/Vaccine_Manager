@@ -2,8 +2,8 @@ package com.clinic.neochild.ui.vaccine
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.clinic.neochild.data.model.BorrowedVaccine
-import com.clinic.neochild.data.model.Vaccine
+import com.clinic.neochild.domain.model.BorrowedVaccine
+import com.clinic.neochild.domain.model.Vaccine
 import com.clinic.neochild.data.mapper.FirestoreMappers
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration

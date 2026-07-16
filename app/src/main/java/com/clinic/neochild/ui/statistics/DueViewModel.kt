@@ -2,17 +2,14 @@ package com.clinic.neochild.ui.statistics
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.clinic.neochild.data.model.Patient
-import com.clinic.neochild.data.model.ReminderStatus
-import com.clinic.neochild.data.model.Vaccination
-import com.clinic.neochild.data.model.VaccinationSource
-import com.clinic.neochild.domain.repository.ReminderRepository
-import com.clinic.neochild.domain.repository.VaccineRepository
-import com.clinic.neochild.domain.usecase.patient.GetPatientsUseCase
-import com.clinic.neochild.domain.usecase.vaccination.GetVaccinationsUseCase
-import com.clinic.neochild.core.utils.PatientUtils
-import com.clinic.neochild.domain.logic.ReminderEngine
+import com.clinic.neochild.domain.model.Patient
+import com.clinic.neochild.domain.model.ReminderStatus
+import com.clinic.neochild.domain.model.Vaccination
+import com.clinic.neochild.domain.model.VaccinationSource
 import com.clinic.neochild.domain.model.PendingRequirement
+import com.clinic.neochild.domain.repository.ReminderRepository
+import com.clinic.neochild.domain.usecase.patient.GetPatientsUseCase
+import com.clinic.neochild.core.utils.PatientUtils
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -54,13 +51,13 @@ class DueViewModel @Inject constructor(
         val filterStatus = when (filter) {
             "Completed" -> listOf(ReminderStatus.COMPLETED)
             "Dismissed" -> listOf(ReminderStatus.DISMISSED)
-            else -> null // Defaults are filtered inside the repository's getDueList for speed
+            else -> null
         }
 
         val dueVaccinations = reminderRepository.getDueList(query, filterStatus).first()
         
         val filtered = if (filter == "Completed" || filter == "Dismissed") {
-            dueVaccinations // Repository already filtered by status
+            dueVaccinations 
         } else {
             PatientUtils.filterVaccinationsByPeriod(dueVaccinations, filter)
         }
@@ -125,9 +122,9 @@ class DueViewModel @Inject constructor(
         }
     }
 
-    private fun findMatchingRequirement(vaccination: Vaccination): com.clinic.neochild.utils.PendingRequirement? {
+    private fun findMatchingRequirement(vaccination: Vaccination): PendingRequirement? {
         val dueDate = PatientUtils.parseDate(vaccination.nextDueDate) ?: return null
-        return com.clinic.neochild.utils.PendingRequirement(
+        return PendingRequirement(
             patientId = vaccination.patientId,
             vaccineName = vaccination.nxtVaccineNames.firstOrNull() ?: "",
             dueDate = dueDate,

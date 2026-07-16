@@ -2,8 +2,8 @@ package com.clinic.neochild.ui.dashboard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.clinic.neochild.data.model.Vaccine
-import com.clinic.neochild.data.model.Vaccination
+import com.clinic.neochild.domain.model.Vaccine
+import com.clinic.neochild.domain.model.Vaccination
 import com.clinic.neochild.domain.repository.VaccinationRepository
 import com.clinic.neochild.domain.repository.PatientRepository
 import com.clinic.neochild.core.common.Constants

@@ -3,13 +3,17 @@ package com.clinic.neochild.ui.followup
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.clinic.neochild.data.local.entity.ReminderEntity
-import com.clinic.neochild.data.model.Vaccination
+import com.clinic.neochild.domain.model.Vaccination
+import com.clinic.neochild.domain.model.VaccinationSource
+import com.clinic.neochild.domain.model.PendingRequirement
 import com.clinic.neochild.domain.repository.ReminderRepository
 import com.clinic.neochild.domain.usecase.patient.GetPatientsUseCase
+import com.clinic.neochild.core.utils.PatientUtils
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.util.Date
 import javax.inject.Inject
 
 data class FollowUpUiState(
@@ -78,7 +82,7 @@ class FollowUpViewModel @Inject constructor(
         }
     }
 
-    fun markVaccinatedElsewhere(reminder: ReminderEntity, source: com.clinic.neochild.data.model.VaccinationSource, date: String, notes: String) {
+    fun markVaccinatedElsewhere(reminder: ReminderEntity, source: VaccinationSource, date: String, notes: String) {
         viewModelScope.launch {
             reminderRepository.markVaccinatedElsewhere(reminder.toPendingRequirement(), source, date, notes, currentUserEmail)
         }
@@ -102,10 +106,10 @@ class FollowUpViewModel @Inject constructor(
         }
     }
 
-    private fun ReminderEntity.toPendingRequirement() = com.clinic.neochild.utils.PendingRequirement(
+    private fun ReminderEntity.toPendingRequirement() = PendingRequirement(
         patientId = patientId,
         vaccineName = vaccineName,
-        dueDate = com.clinic.neochild.core.utils.PatientUtils.parseDate(dueDate) ?: java.util.Date(),
+        dueDate = PatientUtils.parseDate(dueDate) ?: Date(),
         originalVisitId = originalVisitId
     )
 }

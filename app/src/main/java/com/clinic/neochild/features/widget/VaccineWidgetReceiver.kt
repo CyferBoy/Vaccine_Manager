@@ -1,4 +1,4 @@
-package com.clinic.neochild.widget
+package com.clinic.neochild.features.widget
 
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver

@@ -4,8 +4,8 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
-import com.clinic.neochild.data.model.BatchStatus
-import com.clinic.neochild.data.model.Vaccine
+import com.clinic.neochild.domain.model.BatchStatus
+import com.clinic.neochild.domain.model.Vaccine
 
 @Entity(tableName = "vaccines")
 data class VaccineEntity(

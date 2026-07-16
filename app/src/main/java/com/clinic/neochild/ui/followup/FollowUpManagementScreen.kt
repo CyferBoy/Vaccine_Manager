@@ -16,7 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.clinic.neochild.data.local.entity.ReminderEntity
-import com.clinic.neochild.data.model.ReminderStatus
+import com.clinic.neochild.domain.model.ReminderStatus
 import com.clinic.neochild.core.ui.components.AppBackground
 
 @OptIn(ExperimentalMaterial3Api::class)

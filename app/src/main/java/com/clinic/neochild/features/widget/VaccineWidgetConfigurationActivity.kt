@@ -1,4 +1,4 @@
-package com.clinic.neochild.widget
+package com.clinic.neochild.features.widget
 
 import android.app.Activity
 import android.appwidget.AppWidgetManager
@@ -25,18 +25,14 @@ class VaccineWidgetConfigurationActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Set the result to CANCELED. This will cause the widget host to cancel
-        // out of the widget placement if the user presses the back button.
         setResult(RESULT_CANCELED)
 
-        // Find the widget id from the intent.
         intent.extras?.let {
             appWidgetId = it.getInt(
                 AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID
             )
         }
 
-        // If this activity was started with an invalid widget ID, finish with an error.
         if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
             finish()
             return

@@ -2,8 +2,8 @@ package com.clinic.neochild.ui.statistics
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.clinic.neochild.data.model.Patient
-import com.clinic.neochild.data.model.Vaccination
+import com.clinic.neochild.domain.model.Patient
+import com.clinic.neochild.domain.model.Vaccination
 import com.clinic.neochild.domain.usecase.patient.GetPatientsUseCase
 import com.clinic.neochild.domain.usecase.vaccination.GetVaccinationsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel

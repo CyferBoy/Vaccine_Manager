@@ -21,8 +21,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.clinic.neochild.data.model.BorrowedVaccine
-import com.clinic.neochild.data.model.Vaccine
+import com.clinic.neochild.domain.model.BorrowedVaccine
+import com.clinic.neochild.domain.model.Vaccine
 import com.clinic.neochild.core.ui.components.StandardAutoCompleteField
 import com.clinic.neochild.core.ui.components.StandardButton
 import com.clinic.neochild.core.ui.components.StandardTextField

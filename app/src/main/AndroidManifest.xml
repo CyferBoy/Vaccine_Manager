@@ -32,7 +32,7 @@
         </activity>
 
         <activity
-            android:name=".widget.VaccineWidgetConfigurationActivity"
+            android:name=".features.widget.VaccineWidgetConfigurationActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
@@ -40,7 +40,7 @@
         </activity>
 
         <receiver
-            android:name=".widget.VaccineWidgetReceiver"
+            android:name=".features.widget.VaccineWidgetReceiver"
             android:exported="true"
             android:label="Vaccine Schedule">
             <intent-filter>

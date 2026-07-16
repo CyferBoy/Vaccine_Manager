@@ -5,7 +5,7 @@ import androidx.room.withTransaction
 import com.clinic.neochild.data.local.AppDatabase
 import com.clinic.neochild.data.local.dao.*
 import com.clinic.neochild.data.local.entity.*
-import com.clinic.neochild.data.model.*
+import com.clinic.neochild.domain.model.*
 import com.clinic.neochild.domain.repository.ReminderRepository
 import com.clinic.neochild.domain.repository.ReminderStats
 import com.clinic.neochild.notification.ReminderScheduler

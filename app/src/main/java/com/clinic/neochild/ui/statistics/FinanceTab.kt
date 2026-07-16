@@ -25,8 +25,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.clinic.neochild.data.model.Vaccination
-import com.clinic.neochild.data.model.Vaccine
+import com.clinic.neochild.domain.model.Vaccination
+import com.clinic.neochild.domain.model.Vaccine
 import com.clinic.neochild.core.ui.theme.NeoChildTheme
 import com.clinic.neochild.data.mapper.FirestoreMappers
 import com.clinic.neochild.core.utils.PatientUtils

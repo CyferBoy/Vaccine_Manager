@@ -1,6 +1,6 @@
 package com.clinic.neochild.domain.repository
 
-import com.clinic.neochild.data.model.Vaccine
+import com.clinic.neochild.domain.model.Vaccine
 import kotlinx.coroutines.flow.Flow
 
 interface VaccineRepository {

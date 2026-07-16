@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.clinic.neochild.R
 import com.clinic.neochild.ui.auth.AuthViewModel
-import com.clinic.neochild.ui.theme.*
+import com.clinic.neochild.core.ui.theme.*
 import com.clinic.neochild.core.common.Constants
 
 @OptIn(ExperimentalMaterial3Api::class)

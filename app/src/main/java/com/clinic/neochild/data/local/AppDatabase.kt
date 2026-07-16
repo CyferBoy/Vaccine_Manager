@@ -15,9 +15,12 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         VaccinationEntity::class, 
         ReminderEntity::class, 
         VaccineEntity::class,
-        ReminderAuditEntity::class
+        ReminderAuditEntity::class,
+        VaccineBatchEntity::class,
+        InventoryTransactionEntity::class,
+        SyncQueueEntity::class
     ], 
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -26,6 +29,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun reminderDao(): ReminderDao
     abstract fun vaccineDao(): VaccineDao
     abstract fun reminderAuditDao(): ReminderAuditDao
+    abstract fun syncQueueDao(): SyncQueueDao
 
     companion object {
         @Volatile

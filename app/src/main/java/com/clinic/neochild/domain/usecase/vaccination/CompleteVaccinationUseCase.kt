@@ -1,44 +1,46 @@
 package com.clinic.neochild.domain.usecase.vaccination
 
+import androidx.room.withTransaction
 import com.clinic.neochild.data.model.Vaccination
-import com.clinic.neochild.domain.repository.VaccinationRepository
-import com.google.firebase.firestore.FirebaseFirestore
-import kotlinx.coroutines.tasks.await
+import com.clinic.neochild.domain.repository.*
 import javax.inject.Inject
 
 class CompleteVaccinationUseCase @Inject constructor(
+    private val database: com.clinic.neochild.data.local.AppDatabase,
     private val vaccinationRepository: VaccinationRepository,
-    private val firestore: FirebaseFirestore // Using firestore directly for batch operations during migration
+    private val inventoryRepository: InventoryRepository,
+    private val syncRepository: SyncRepository
 ) {
-    suspend operator fun invoke(vaccination: Vaccination, isNew: Boolean, selectedVaccineIds: List<String>) {
-        // 1. Save the vaccination
-        vaccinationRepository.addVaccination(vaccination)
-        
-        if (isNew) {
-            // 2. Orchestrate side effects via Firestore Batch (Temporary until Repositories handle this)
-            val batch = firestore.batch()
-            
-            // Update stock
-            selectedVaccineIds.forEach { id ->
-                val ref = firestore.collection("inventory").document(id)
-                // Note: This needs the current stock. In a better architecture, 
-                // the VaccineRepository would have a decrementStock method.
-            }
-            
-            // Mark older records as done
-            val previousRecords = firestore.collection("vaccinations")
-                .whereEqualTo("patientId", vaccination.patientId)
-                .whereEqualTo("isDone", false)
-                .get()
-                .await()
-            
-            previousRecords.documents.forEach { doc ->
-                if (doc.id != vaccination.id) {
-                    batch.update(doc.reference, "isDone", true)
+    suspend operator fun invoke(
+        vaccination: Vaccination, 
+        isNew: Boolean, 
+        selectedVaccineIds: List<String>,
+        user: String
+    ) {
+        database.withTransaction {
+            // 1. Save Vaccination Record
+            vaccinationRepository.addVaccination(vaccination)
+
+            if (isNew) {
+                // 2. Deduct Inventory (FEFO)
+                selectedVaccineIds.forEach { vaccineId ->
+                    inventoryRepository.deductStock(
+                        vaccineId = vaccineId,
+                        quantity = 1,
+                        user = user,
+                        transactionType = com.clinic.neochild.data.model.InventoryTransactionType.VACCINATION,
+                        vaccinationId = vaccination.id,
+                        patientId = vaccination.patientId
+                    )
                 }
+
+                // 3. Queue Sync for Vaccination
+                syncRepository.enqueue(
+                    entityName = "VACCINATION",
+                    entityId = vaccination.id,
+                    operation = com.clinic.neochild.data.model.SyncOperation.CREATE
+                )
             }
-            
-            batch.commit().await()
         }
     }
 }

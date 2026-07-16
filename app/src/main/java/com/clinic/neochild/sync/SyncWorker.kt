@@ -26,8 +26,7 @@ import java.util.*
 class SyncWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted workerParams: WorkerParameters,
-    private val db: AppDatabase,
-    private val firestore: FirebaseFirestore,
+    private val syncRepository: com.clinic.neochild.domain.repository.SyncRepository,
     private val settingsManager: com.clinic.neochild.data.local.preferences.NotificationSettingsManager,
     private val notificationHelper: com.clinic.neochild.notification.NotificationHelper
 ) : CoroutineWorker(appContext, workerParams) {
@@ -36,7 +35,7 @@ class SyncWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         return try {
-            syncData()
+            syncRepository.processNextItems()
             sharedPrefs.edit().putInt("failure_count", 0).apply()
             Result.success()
         } catch (e: Exception) {
@@ -48,35 +47,6 @@ class SyncWorker @AssistedInject constructor(
                 notificationHelper.showSyncAlert(e.message ?: "Unknown error")
             }
             Result.retry()
-        }
-    }
-
-    private suspend fun syncData() {
-        val unsyncedPatients = db.patientDao().getUnsyncedPatients()
-        if (unsyncedPatients.isNotEmpty()) {
-            val batch = firestore.batch()
-            unsyncedPatients.forEach { entity ->
-                val docRef = firestore.collection("patients").document(entity.id)
-                if (entity.isDeleted) batch.delete(docRef)
-                else batch.set(docRef, entity.toPatient())
-            }
-            batch.commit().await()
-            unsyncedPatients.forEach { db.patientDao().markSynced(it.id) }
-        }
-
-        val unsyncedVaccinations = db.vaccinationDao().getUnsyncedVaccinations()
-        if (unsyncedVaccinations.isNotEmpty()) {
-            // Firestore batches are limited to 500 operations
-            unsyncedVaccinations.chunked(500).forEach { chunk ->
-                val batch = firestore.batch()
-                chunk.forEach { entity ->
-                    val docRef = firestore.collection("vaccinations").document(entity.id)
-                    if (entity.isDeleted) batch.delete(docRef)
-                    else batch.set(docRef, entity.toVaccination())
-                }
-                batch.commit().await()
-                chunk.forEach { db.vaccinationDao().markSynced(it.id) }
-            }
         }
     }
 }

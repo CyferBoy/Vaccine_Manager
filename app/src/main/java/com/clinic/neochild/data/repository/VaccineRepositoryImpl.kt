@@ -16,45 +16,34 @@ import javax.inject.Singleton
 @Singleton
 class VaccineRepositoryImpl @Inject constructor(
     private val vaccineDao: VaccineDao,
-    private val firestore: FirebaseFirestore
+    private val syncRepository: com.clinic.neochild.domain.repository.SyncRepository
 ) : VaccineRepository {
 
     override fun getInventory(): Flow<List<Vaccine>> {
         return vaccineDao.getAllVaccines().map { entities -> 
-            entities.map { it.toVaccine() } 
+            entities.map { entity ->
+                val totalStock = vaccineDao.getTotalStockForVaccine(entity.id) ?: 0
+                entity.toVaccine(totalStock)
+            } 
         }
     }
 
     override suspend fun refreshInventory() {
-        try {
-            val snapshot = firestore.collection("inventory").get().await()
-            val vaccines = snapshot.documents.mapNotNull { doc ->
-                FirestoreMappers.toVaccine(doc)
-            }
-            vaccineDao.insertVaccines(vaccines.map { it.toEntity(isSynced = true) })
-        } catch (e: Exception) {
-            // Handle error
-        }
+        // Implementation for remote refresh using SyncRepository or Direct fetch
     }
 
     override suspend fun updateStock(vaccineId: String, newStock: Int) {
-        val entity = vaccineDao.getVaccineById(vaccineId)
-        if (entity != null) {
-            val updated = entity.copy(stock = newStock, isSynced = false)
-            vaccineDao.insertVaccine(updated)
-            
-            try {
-                firestore.collection("inventory").document(vaccineId)
-                    .update("stock", newStock).await()
-                vaccineDao.insertVaccine(updated.copy(isSynced = true))
-            } catch (e: Exception) { }
-        }
+        // This is now handled via transactions and batches in InventoryRepository
     }
 
     override suspend fun deleteVaccine(id: String) {
-        vaccineDao.deleteVaccine(id)
-        try {
-            firestore.collection("inventory").document(id).delete().await()
-        } catch (e: Exception) { }
+        vaccineDao.insertVaccine(
+            vaccineDao.getVaccineById(id)?.copy(isDeleted = true) ?: return
+        )
+        syncRepository.enqueue(
+            entityName = "INVENTORY",
+            entityId = id,
+            operation = com.clinic.neochild.data.model.SyncOperation.DELETE
+        )
     }
 }

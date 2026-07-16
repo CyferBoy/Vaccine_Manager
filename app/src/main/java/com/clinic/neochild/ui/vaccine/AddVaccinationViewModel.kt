@@ -71,7 +71,8 @@ class AddVaccinationViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             try {
-                completeVaccinationUseCase(vaccination, isNew, selectedVaccineIds)
+                val user = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.email ?: "Unknown"
+                completeVaccinationUseCase(vaccination, isNew, selectedVaccineIds, user)
                 _uiState.value = _uiState.value.copy(isSaved = true, savedVaccination = vaccination)
                 onSuccess()
             } catch (e: Exception) {

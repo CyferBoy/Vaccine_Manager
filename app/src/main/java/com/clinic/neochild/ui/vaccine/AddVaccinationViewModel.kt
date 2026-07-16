@@ -22,14 +22,16 @@ data class AddVaccinationUiState(
     val isLoading: Boolean = false,
     val inventory: List<Vaccine> = emptyList(),
     val error: String? = null,
-    val isSaved: Boolean = false
+    val isSaved: Boolean = false,
+    val savedVaccination: Vaccination? = null
 )
 
 @HiltViewModel
 class AddVaccinationViewModel @Inject constructor(
     private val firestore: FirebaseFirestore,
     private val completeVaccinationUseCase: CompleteVaccinationUseCase,
-    private val getVaccinationsUseCase: GetVaccinationsUseCase
+    private val getVaccinationsUseCase: GetVaccinationsUseCase,
+    private val reminderRepository: com.clinic.neochild.domain.repository.ReminderRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AddVaccinationUiState())
@@ -43,9 +45,12 @@ class AddVaccinationViewModel @Inject constructor(
     }
 
     private fun fetchInventory() {
+        _uiState.value = _uiState.value.copy(isLoading = true)
         firestore.collection("inventory").get().addOnSuccessListener { result ->
             val inventory = result.documents.mapNotNull { FirestoreMappers.toVaccine(it) }
-            _uiState.value = _uiState.value.copy(inventory = inventory)
+            _uiState.value = _uiState.value.copy(inventory = inventory, isLoading = false)
+        }.addOnFailureListener { e ->
+            _uiState.value = _uiState.value.copy(error = e.message, isLoading = false)
         }
     }
 
@@ -67,7 +72,7 @@ class AddVaccinationViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isLoading = true)
             try {
                 completeVaccinationUseCase(vaccination, isNew, selectedVaccineIds)
-                _uiState.value = _uiState.value.copy(isSaved = true)
+                _uiState.value = _uiState.value.copy(isSaved = true, savedVaccination = vaccination)
                 onSuccess()
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(error = e.message)
@@ -75,5 +80,9 @@ class AddVaccinationViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(isLoading = false)
             }
         }
+    }
+
+    fun resetSaveState() {
+        _uiState.value = _uiState.value.copy(isSaved = false, savedVaccination = null)
     }
 }

@@ -42,6 +42,7 @@ fun AddVaccinationScreen(
     initialPatientId: String = "", 
     vaccinationId: String? = null,
     onBack: () -> Unit = {},
+    onScheduleFollowUp: (String, String, List<String>) -> Unit = { _, _, _ -> },
     patientViewModel: PatientViewModel = hiltViewModel(),
     viewModel: AddVaccinationViewModel = hiltViewModel()
 ) {
@@ -50,6 +51,8 @@ fun AddVaccinationScreen(
     val existingVaccination by viewModel.vaccination.collectAsState()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    var showFollowUpDialog by remember { mutableStateOf(false) }
 
     // Form State - using rememberSaveable for robustness
     var patientId by rememberSaveable { mutableStateOf(initialPatientId) }
@@ -102,6 +105,38 @@ fun AddVaccinationScreen(
         }
     }
 
+    LaunchedEffect(uiState.isSaved) {
+        if (uiState.isSaved) {
+            showFollowUpDialog = true
+        }
+    }
+
+    if (showFollowUpDialog) {
+        AlertDialog(
+            onDismissRequest = { 
+                viewModel.resetSaveState()
+                onBack() 
+            },
+            title = { Text("Vaccination Saved") },
+            text = { Text("Vaccination saved successfully. Would you like to schedule a follow-up?") },
+            confirmButton = {
+                Button(onClick = {
+                    val saved = uiState.savedVaccination
+                    if (saved != null) {
+                        onScheduleFollowUp(saved.patientId, saved.id, saved.nxtVaccineNames)
+                    }
+                    viewModel.resetSaveState()
+                }) { Text("Schedule Follow-up") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    viewModel.resetSaveState()
+                    onBack()
+                }) { Text("Finish") }
+            }
+        )
+    }
+
     AddVaccinationContent(
         isEdit = vaccinationId != null,
         onBack = onBack,
@@ -151,23 +186,30 @@ fun AddVaccinationScreen(
         onSave = {
             if (validateForm(context, patientId, selectedVaccines)) {
                 val user = FirebaseAuth.getInstance().currentUser?.email ?: "Unknown"
-                val vaccination = createVaccination(vaccinationId, patientId, selectedVaccines, nextBrandSearch, dateGiven, nextDueDate, cost, cashAmount, onlineAmount, totalPaid, withFees, doctorsAcc, batchNumbers, expiryDates, user)
-                viewModel.saveVaccination(vaccination, vaccinationId == null, selectedVaccineIds, onBack)
+                val v = createVaccination(vaccinationId, patientId, selectedVaccines, nextBrandSearch, dateGiven, nextDueDate, cost, cashAmount, onlineAmount, totalPaid, withFees, doctorsAcc, batchNumbers, expiryDates, user)
+                viewModel.saveVaccination(v, vaccinationId == null, selectedVaccineIds) {}
             }
         },
         onSaveAndDownload = {
             val patient = allPatients.find { it.id == patientId }
             if (validateForm(context, patientId, selectedVaccines) && patient != null) {
                 val user = FirebaseAuth.getInstance().currentUser?.email ?: "Unknown"
-                val vaccination = createVaccination(vaccinationId, patientId, selectedVaccines, nextBrandSearch, dateGiven, nextDueDate, cost, cashAmount, onlineAmount, totalPaid, withFees, doctorsAcc, batchNumbers, expiryDates, user)
-                viewModel.saveVaccination(vaccination, true, selectedVaccineIds) {
+                val v = createVaccination(vaccinationId, patientId, selectedVaccines, nextBrandSearch, dateGiven, nextDueDate, cost, cashAmount, onlineAmount, totalPaid, withFees, doctorsAcc, batchNumbers, expiryDates, user)
+                viewModel.saveVaccination(v, vaccinationId == null, selectedVaccineIds) {
                     scope.launch {
-                        ReceiptManager.downloadReceipt(context, patient, vaccination)
-                        onBack()
+                        ReceiptManager.downloadReceipt(context, patient, v)
                     }
                 }
             } else if (patient == null) {
                 Toast.makeText(context, "Patient not found", Toast.LENGTH_SHORT).show()
+            }
+        }
+    )
+}
+            }
+        }
+    )
+}
             }
         }
     )

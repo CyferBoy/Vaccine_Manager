@@ -7,6 +7,7 @@ import com.clinic.neochild.data.local.dao.*
 import com.clinic.neochild.data.local.entity.*
 import com.clinic.neochild.data.model.*
 import com.clinic.neochild.domain.repository.ReminderRepository
+import com.clinic.neochild.domain.repository.ReminderStats
 import com.clinic.neochild.notification.ReminderScheduler
 import com.clinic.neochild.utils.*
 import com.google.firebase.auth.FirebaseAuth
@@ -31,6 +32,7 @@ class ReminderRepositoryImpl @Inject constructor(
     private val reminderAuditDao: ReminderAuditDao,
     private val vaccinationDao: VaccinationDao,
     private val vaccineDao: VaccineDao,
+    private val patientDao: com.clinic.neochild.data.local.dao.PatientDao,
     private val firestore: FirebaseFirestore,
     private val auth: FirebaseAuth,
     private val reminderScheduler: ReminderScheduler,
@@ -38,32 +40,39 @@ class ReminderRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context
 ) : ReminderRepository {
 
-    override fun getUnsatisfiedRequirements(): Flow<List<PendingRequirement>> {
-        return vaccinationDao.getAllVaccinations().map { entities ->
-            val vaccinations = entities.map { it.toVaccination() }
-            ReminderEngine.getPotentialRequirements(vaccinations)
-        }
-    }
-
-    override fun getAllReminderHistory(): Flow<List<ReminderEntity>> {
-        return reminderDao.getAllReminders()
-    }
-
-    override fun getDueList(): Flow<List<Vaccination>> {
+    override fun getDueList(
+        searchQuery: String,
+        filterStatus: List<ReminderStatus>?
+    ): Flow<List<Vaccination>> {
         return combine(
             vaccinationDao.getAllVaccinations(),
-            reminderDao.getAllReminders()
-        ) { vaccEntities, reminderEntities ->
+            reminderDao.getAllReminders(),
+            patientDao.getAllPatients()
+        ) { vaccEntities, reminderEntities, patientEntities ->
             val allVaccinations = vaccEntities.map { it.toVaccination() }
             val potential = ReminderEngine.getPotentialRequirements(allVaccinations)
             val reminderMap = reminderEntities.associateBy { "${it.patientId}_${it.originalVisitId}_${it.vaccineName}" }
+            val patientMap = patientEntities.associateBy { it.id }
 
             potential.mapNotNull { req ->
                 val key = "${req.patientId}_${req.originalVisitId}_${req.vaccineName}"
                 val savedReminder = reminderMap[key]
-                
+                val patient = patientMap[req.patientId]
+
+                // Search Filter
+                if (searchQuery.isNotBlank() && patient != null) {
+                    val matchesName = patient.name.contains(searchQuery, ignoreCase = true)
+                    val matchesPhone = patient.phone.contains(searchQuery)
+                    val matchesVaccine = req.vaccineName.contains(searchQuery, ignoreCase = true)
+                    if (!matchesName && !matchesPhone && !matchesVaccine) return@mapNotNull null
+                }
+
                 val status = savedReminder?.status?.let { ReminderStatus.valueOf(it) } ?: ReminderStatus.ACTIVE
                 
+                // Status Filter
+                if (filterStatus != null && !filterStatus.contains(status)) return@mapNotNull null
+
+                // Hidden States
                 if (status == ReminderStatus.COMPLETED || status == ReminderStatus.DISMISSED || status == ReminderStatus.EXTERNAL) {
                     return@mapNotNull null
                 }
@@ -83,23 +92,130 @@ class ReminderRepositoryImpl @Inject constructor(
         }
     }
 
-    override fun getDueToday(): Flow<List<Vaccination>> {
-        return getDueList().map { list ->
-            PatientUtils.filterVaccinationsByPeriod(list, "Today")
+    override fun getDueToday(): Flow<List<Vaccination>> = getDueList().map { 
+        PatientUtils.filterVaccinationsByPeriod(it, "Today") 
+    }
+
+    override fun getDueTomorrow(): Flow<List<Vaccination>> = getDueList().map { 
+        PatientUtils.filterVaccinationsByPeriod(it, "This Week").filter { v ->
+            v.nextDueDate == PatientUtils.formatDate(Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1) }.time)
         }
     }
 
-    override fun getDueTomorrow(): Flow<List<Vaccination>> {
-        val tomorrow = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1) }.time
-        val tomorrowStr = PatientUtils.formatDate(tomorrow)
-        return getDueList().map { list ->
-            list.filter { it.nextDueDate == tomorrowStr }
+    override fun getOverdue(): Flow<List<Vaccination>> = getDueList().map { 
+        PatientUtils.filterVaccinationsByPeriod(it, "Overdue") 
+    }
+
+    override suspend fun scheduleFollowUp(
+        patientId: String,
+        originalVisitId: String,
+        vaccineNames: List<String>,
+        dueDate: String,
+        notes: String,
+        priority: String,
+        reminderEnabled: Boolean,
+        performedBy: String
+    ) {
+        withContext(Dispatchers.IO) {
+            database.withTransaction {
+                vaccineNames.forEach { name ->
+                    val reminder = ReminderEntity(
+                        patientId = patientId,
+                        originalVisitId = originalVisitId,
+                        vaccineName = name,
+                        dueDate = dueDate,
+                        status = ReminderStatus.ACTIVE.name,
+                        priority = priority,
+                        reminderEnabled = reminderEnabled,
+                        notes = notes,
+                        isSynced = false
+                    )
+                    reminderDao.insertOrUpdate(reminder)
+                    
+                    reminderAuditDao.insertAudit(ReminderAuditEntity(
+                        patientId = patientId,
+                        originalVisitId = originalVisitId,
+                        vaccineName = name,
+                        action = "SCHEDULED",
+                        oldStatus = null,
+                        newStatus = ReminderStatus.ACTIVE.name,
+                        oldDate = null,
+                        newDate = dueDate,
+                        priority = priority,
+                        reminderEnabled = reminderEnabled,
+                        performedBy = performedBy,
+                        notes = "Staff scheduled follow-up"
+                    ))
+                }
+            }
+            if (reminderEnabled) triggerImmediateCheck()
+            syncWithRemote()
         }
     }
 
-    override fun getOverdue(): Flow<List<Vaccination>> {
-        return getDueList().map { list ->
-            PatientUtils.filterVaccinationsByPeriod(list, "Overdue")
+    override suspend fun restoreReminder(requirement: PendingRequirement, performedBy: String) {
+        withContext(Dispatchers.IO) {
+            database.withTransaction {
+                updateReminderStateAndAudit(
+                    req = requirement,
+                    newStatus = ReminderStatus.ACTIVE,
+                    performedBy = performedBy,
+                    notes = "Restored by staff"
+                )
+            }
+            triggerImmediateCheck()
+            syncWithRemote()
+        }
+    }
+
+    override suspend fun deleteReminder(requirement: PendingRequirement, performedBy: String) {
+        withContext(Dispatchers.IO) {
+            database.withTransaction {
+                reminderDao.deleteReminder(requirement.patientId, requirement.originalVisitId, requirement.vaccineName)
+                reminderAuditDao.insertAudit(ReminderAuditEntity(
+                    patientId = requirement.patientId,
+                    originalVisitId = requirement.originalVisitId,
+                    vaccineName = requirement.vaccineName,
+                    action = "DELETED",
+                    oldStatus = null,
+                    newStatus = "DELETED",
+                    oldDate = null,
+                    newDate = null,
+                    priority = null,
+                    reminderEnabled = null,
+                    performedBy = performedBy,
+                    notes = "Deleted by admin"
+                ))
+            }
+            triggerImmediateCheck()
+            syncWithRemote()
+        }
+    }
+
+    override fun getPatientFollowUps(patientId: String): Flow<List<ReminderEntity>> {
+        return reminderDao.getFollowUpsForPatient(patientId)
+    }
+
+    override fun getDashboardStats(): Flow<ReminderStats> {
+        return combine(
+            getDueToday(),
+            getDueTomorrow(),
+            getOverdue(),
+            reminderDao.getAllReminders()
+        ) { today, tomorrow, overdue, allReminders ->
+            val todayStart = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
+            
+            ReminderStats(
+                dueToday = today.size,
+                dueTomorrow = tomorrow.size,
+                overdue = overdue.size,
+                completedToday = allReminders.count { it.status == ReminderStatus.COMPLETED.name && it.updatedAt >= todayStart },
+                rescheduledToday = allReminders.count { it.status == ReminderStatus.RESCHEDULED.name && it.updatedAt >= todayStart },
+                externalToday = allReminders.count { it.status == ReminderStatus.EXTERNAL.name && it.updatedAt >= todayStart },
+                notificationsSentToday = allReminders.count { it.notificationSent && it.lastReminderTime >= todayStart }
+            )
         }
     }
 

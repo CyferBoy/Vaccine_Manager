@@ -9,11 +9,13 @@ data class ReminderAuditEntity(
     val patientId: String,
     val originalVisitId: String,
     val vaccineName: String,
-    val action: String, // e.g., "COMPLETED", "RESCHEDULED", "DISMISSED"
+    val action: String, // COMPLETED, RESCHEDULED, DISMISSED, etc.
     val oldStatus: String?,
     val newStatus: String,
     val oldDate: String?,
     val newDate: String?,
+    val priority: String?,
+    val reminderEnabled: Boolean?,
     val performedBy: String,
     val timestamp: Long = System.currentTimeMillis(),
     val reason: String? = null,

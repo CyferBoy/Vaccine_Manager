@@ -3,6 +3,7 @@ package com.clinic.neochild.ui.statistics
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.clinic.neochild.data.model.Patient
+import com.clinic.neochild.data.model.ReminderStatus
 import com.clinic.neochild.data.model.Vaccination
 import com.clinic.neochild.data.model.VaccinationSource
 import com.clinic.neochild.domain.repository.ReminderRepository
@@ -38,16 +39,31 @@ class DueViewModel @Inject constructor(
     private val _selectedFilter = MutableStateFlow("Today")
     val selectedFilter = _selectedFilter.asStateFlow()
 
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery = _searchQuery.asStateFlow()
+
     private val currentUserEmail: String
         get() = auth.currentUser?.email ?: "Unknown Staff"
 
     val uiState: StateFlow<DueUiState> = combine(
         getPatientsUseCase(),
-        reminderRepository.getDueList(),
+        _searchQuery,
         _selectedFilter
-    ) { patients, dueVaccinations, filter ->
+    ) { patients, query, filter ->
         
-        val filtered = PatientUtils.filterVaccinationsByPeriod(dueVaccinations, filter)
+        val filterStatus = when (filter) {
+            "Completed" -> listOf(ReminderStatus.COMPLETED)
+            "Dismissed" -> listOf(ReminderStatus.DISMISSED)
+            else -> null // Defaults are filtered inside the repository's getDueList for speed
+        }
+
+        val dueVaccinations = reminderRepository.getDueList(query, filterStatus).first()
+        
+        val filtered = if (filter == "Completed" || filter == "Dismissed") {
+            dueVaccinations // Repository already filtered by status
+        } else {
+            PatientUtils.filterVaccinationsByPeriod(dueVaccinations, filter)
+        }
         
         val todayStart = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
@@ -70,6 +86,10 @@ class DueViewModel @Inject constructor(
 
     fun updateFilter(filter: String) {
         _selectedFilter.value = filter
+    }
+
+    fun updateSearchQuery(query: String) {
+        _searchQuery.value = query
     }
 
     fun markAsDone(vaccination: Vaccination) {

@@ -37,17 +37,81 @@ fun DueTab(
     overdueCount: Int,
     initialFilter: String = "Today",
     onFilterChanged: (String) -> Unit = {},
+    onSearchQueryChanged: (String) -> Unit = {},
     onMarkAsDone: (Vaccination) -> Unit = {},
     onDismissReminder: (Vaccination, String) -> Unit = { _, _ -> },
     onReschedule: (Vaccination, String, String) -> Unit = { _, _, _ -> },
     onVaccinatedElsewhere: (Vaccination, VaccinationSource, String, String) -> Unit = { _, _, _, _ -> }
 ) {
-    val filters = remember { listOf("Overdue", "Previous Month", "Today", "This Week", "Upcoming") }
+    var searchQuery by remember { mutableStateOf("") }
+    val filters = remember { listOf("Overdue", "Today", "Tomorrow", "This Week", "Upcoming", "Completed", "Dismissed") }
     var selectedVaccination by remember { mutableStateOf<Vaccination?>(null) }
     var showManageSheet by remember { mutableStateOf(false) }
     var showReschedulePicker by remember { mutableStateOf(false) }
     var showElsewhereSheet by remember { mutableStateOf(false) }
     var showDismissDialog by remember { mutableStateOf(false) }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+        contentPadding = PaddingValues(bottom = 80.dp, top = 16.dp)
+    ) {
+        item {
+            Text("Due Vaccination Analytics", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        item {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = {
+                    searchQuery = it
+                    onSearchQueryChanged(it)
+                },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("Search by name, phone or vaccine...") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                shape = RoundedCornerShape(12.dp)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        item {
+            OverdueSummaryCard(overdueCount = overdueCount)
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        item {
+            FilterTabRow(
+                filters = filters,
+                selectedFilter = initialFilter,
+                onFilterChanged = onFilterChanged
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        if (filteredVaccinations.isEmpty()) {
+            item {
+                EmptyDueState(selectedFilter = initialFilter)
+            }
+        } else {
+            items(
+                items = filteredVaccinations, 
+                key = { it.patientId + it.nextDueDate + it.nxtVaccineNames.joinToString() }
+            ) { v ->
+                val patient = remember(v.patientId, patients) { patients.find { it.id == v.patientId } }
+                DuePatientCard(
+                    vaccination = v, 
+                    patient = patient,
+                    onLongPress = { 
+                        selectedVaccination = v
+                        showManageSheet = true 
+                    },
+                    modifier = Modifier.animateItem()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+        }
+    }
 
     if (showManageSheet && selectedVaccination != null) {
         ManageDueBottomSheet(
@@ -114,53 +178,6 @@ fun DueTab(
                 showElsewhereSheet = false
             }
         )
-    }
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-        contentPadding = PaddingValues(bottom = 80.dp, top = 16.dp)
-    ) {
-        item {
-            Text("Due Vaccination Analytics", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-
-        item {
-            OverdueSummaryCard(overdueCount = overdueCount)
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-
-        item {
-            FilterTabRow(
-                filters = filters,
-                selectedFilter = initialFilter,
-                onFilterChanged = onFilterChanged
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-
-        if (filteredVaccinations.isEmpty()) {
-            item {
-                EmptyDueState(selectedFilter = initialFilter)
-            }
-        } else {
-            items(
-                items = filteredVaccinations, 
-                key = { it.patientId + it.nextDueDate + it.nxtVaccineNames.joinToString() }
-            ) { v ->
-                val patient = remember(v.patientId, patients) { patients.find { it.id == v.patientId } }
-                DuePatientCard(
-                    vaccination = v, 
-                    patient = patient,
-                    onLongPress = { 
-                        selectedVaccination = v
-                        showManageSheet = true 
-                    },
-                    modifier = Modifier.animateItem()
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-        }
     }
 }
 

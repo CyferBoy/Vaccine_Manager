@@ -29,7 +29,7 @@ data class DashboardUiState(
 class DashboardViewModel @Inject constructor(
     private val firestore: FirebaseFirestore,
     private val patientRepository: PatientRepository,
-    private val vaccinationRepository: VaccinationRepository
+    private val reminderRepository: com.clinic.neochild.domain.repository.ReminderRepository
 ) : ViewModel() {
 
     private val _lowStockCount = MutableStateFlow(0)
@@ -37,23 +37,14 @@ class DashboardViewModel @Inject constructor(
 
     val uiState: StateFlow<DashboardUiState> = combine(
         patientRepository.allPatients,
-        vaccinationRepository.allVaccinations,
+        reminderRepository.getDashboardStats(),
         _lowStockCount,
         _wasteCount
-    ) { patients, vaccinations, lowStock, waste ->
-        val unsatisfied = ReminderEngine.getUnsatisfiedRequirements(vaccinations)
-        
-        val todayStart = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
-        }.time
-        
-        val dueToday = unsatisfied.groupBy { it.patientId + PatientUtils.formatDate(it.dueDate) }
-            .count { (_, reqs) -> reqs.any { it.dueDate == todayStart } }
-
+    ) { patients, stats, lowStock, waste ->
         DashboardUiState(
             patientCount = patients.size,
             lowStockCount = lowStock,
-            dueTodayCount = dueToday,
+            dueTodayCount = stats.dueToday,
             wasteCount = waste
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardUiState())

@@ -11,11 +11,14 @@ import androidx.room.PrimaryKey
 data class ReminderEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val patientId: String,
-    val originalVisitId: String,
-    val vaccineName: String,
-    val dueDate: String, // Can be manually overridden
-    val status: String, // ReminderStatus enum name
-    val vaccinationSource: String? = null, // For EXTERNAL status
+    val originalVisitId: String, // Can be visitId or a generic source id
+    val vaccineName: String, // Or Follow-up Title
+    val dueDate: String,
+    val status: String, // ReminderStatus enum
+    val priority: String = "NORMAL", // NORMAL, HIGH, URGENT
+    val reminderEnabled: Boolean = true,
+    val category: String = "VACCINATION", // VACCINATION, APPOINTMENT, GROWTH, etc.
+    val vaccinationSource: String? = null,
     val notes: String? = null,
     val lastReminderTime: Long = 0,
     val notificationSent: Boolean = false,

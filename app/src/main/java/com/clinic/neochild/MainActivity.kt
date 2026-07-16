@@ -35,6 +35,9 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var messaging: FirebaseMessaging
 
+    @Inject
+    lateinit var notificationHelper: com.clinic.neochild.notification.NotificationHelper
+
     private var lastActiveTime: Long = System.currentTimeMillis()
     private val SESSION_TIMEOUT = 15 * 60 * 1000 // 15 minutes auto-lock
     
@@ -44,6 +47,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         handleIntent(intent)
         
+        notificationHelper.cancelSummaryNotification()
+
         // SECURITY: Prevent screenshots and recording of patient data
         window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
         

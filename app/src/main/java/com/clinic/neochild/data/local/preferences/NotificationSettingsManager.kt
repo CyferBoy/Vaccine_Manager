@@ -16,45 +16,65 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 class NotificationSettingsManager @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
-    private val NOTIFICATIONS_ENABLED = booleanPreferencesKey("notifications_enabled")
+    private val DAILY_SUMMARY_ENABLED = booleanPreferencesKey("daily_summary_enabled")
+    private val LOW_STOCK_ENABLED = booleanPreferencesKey("low_stock_enabled")
+    private val SYNC_ALERTS_ENABLED = booleanPreferencesKey("sync_alerts_enabled")
     private val REMINDER_TIME = stringPreferencesKey("reminder_time")
-    private val REMINDER_DAYS_BEFORE = intPreferencesKey("reminder_days_before")
-    private val OVERDUE_FREQUENCY = intPreferencesKey("overdue_frequency")
     private val LOW_STOCK_THRESHOLD = intPreferencesKey("low_stock_threshold")
-    private val EXPIRY_DAYS_BEFORE = intPreferencesKey("expiry_days_before")
-    private val SMS_ENABLED = booleanPreferencesKey("sms_enabled")
+    
+    // Internal tracking
+    private val LAST_SUMMARY_SENT_DATE = stringPreferencesKey("last_summary_sent_date")
+    private val NOTIFIED_LOW_STOCK_VACCINES = stringSetPreferencesKey("notified_low_stock_vaccines")
 
     val settingsFlow: Flow<NotificationSettings> = context.dataStore.data.map { preferences ->
         NotificationSettings(
-            enabled = preferences[NOTIFICATIONS_ENABLED] ?: true,
+            dailySummaryEnabled = preferences[DAILY_SUMMARY_ENABLED] ?: true,
+            lowStockEnabled = preferences[LOW_STOCK_ENABLED] ?: true,
+            syncAlertsEnabled = preferences[SYNC_ALERTS_ENABLED] ?: true,
             reminderTime = preferences[REMINDER_TIME] ?: "08:00",
-            reminderDaysBefore = preferences[REMINDER_DAYS_BEFORE] ?: 1,
-            overdueFrequencyDays = preferences[OVERDUE_FREQUENCY] ?: 2,
             lowStockThreshold = preferences[LOW_STOCK_THRESHOLD] ?: 5,
-            expiryDaysBefore = preferences[EXPIRY_DAYS_BEFORE] ?: 30,
-            smsEnabled = preferences[SMS_ENABLED] ?: false
+            lastSummarySentDate = preferences[LAST_SUMMARY_SENT_DATE] ?: "",
+            notifiedLowStockVaccines = preferences[NOTIFIED_LOW_STOCK_VACCINES] ?: emptySet()
         )
     }
 
     suspend fun updateSettings(settings: NotificationSettings) {
         context.dataStore.edit { preferences ->
-            preferences[NOTIFICATIONS_ENABLED] = settings.enabled
+            preferences[DAILY_SUMMARY_ENABLED] = settings.dailySummaryEnabled
+            preferences[LOW_STOCK_ENABLED] = settings.lowStockEnabled
+            preferences[SYNC_ALERTS_ENABLED] = settings.syncAlertsEnabled
             preferences[REMINDER_TIME] = settings.reminderTime
-            preferences[REMINDER_DAYS_BEFORE] = settings.reminderDaysBefore
-            preferences[OVERDUE_FREQUENCY] = settings.overdueFrequencyDays
             preferences[LOW_STOCK_THRESHOLD] = settings.lowStockThreshold
-            preferences[EXPIRY_DAYS_BEFORE] = settings.expiryDaysBefore
-            preferences[SMS_ENABLED] = settings.smsEnabled
+        }
+    }
+
+    suspend fun markSummarySent(dateStr: String) {
+        context.dataStore.edit { preferences ->
+            preferences[LAST_SUMMARY_SENT_DATE] = dateStr
+        }
+    }
+
+    suspend fun markLowStockNotified(vaccineId: String) {
+        context.dataStore.edit { preferences ->
+            val current = preferences[NOTIFIED_LOW_STOCK_VACCINES] ?: emptySet()
+            preferences[NOTIFIED_LOW_STOCK_VACCINES] = current + vaccineId
+        }
+    }
+
+    suspend fun clearLowStockNotification(vaccineId: String) {
+        context.dataStore.edit { preferences ->
+            val current = preferences[NOTIFIED_LOW_STOCK_VACCINES] ?: emptySet()
+            preferences[NOTIFIED_LOW_STOCK_VACCINES] = current - vaccineId
         }
     }
 }
 
 data class NotificationSettings(
-    val enabled: Boolean,
+    val dailySummaryEnabled: Boolean,
+    val lowStockEnabled: Boolean,
+    val syncAlertsEnabled: Boolean,
     val reminderTime: String,
-    val reminderDaysBefore: Int,
-    val overdueFrequencyDays: Int,
     val lowStockThreshold: Int,
-    val expiryDaysBefore: Int,
-    val smsEnabled: Boolean
+    val lastSummarySentDate: String,
+    val notifiedLowStockVaccines: Set<String>
 )

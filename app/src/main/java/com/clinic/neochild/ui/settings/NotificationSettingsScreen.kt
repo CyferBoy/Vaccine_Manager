@@ -46,32 +46,28 @@ fun NotificationSettingsScreen(
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
+                    Text("General Alerts", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                    
                     SettingSwitch(
-                        label = "Enable Notifications",
-                        checked = settings.enabled,
-                        onCheckedChange = { viewModel.updateSettings(settings.copy(enabled = it)) }
+                        label = "Daily Summary Notification",
+                        supportingText = "Sends one notification at 08:00 AM with today's tasks",
+                        checked = settings.dailySummaryEnabled,
+                        onCheckedChange = { viewModel.updateSettings(settings.copy(dailySummaryEnabled = it)) }
                     )
+
+                    SettingItem(label = "Summary Time", value = settings.reminderTime) {
+                        // Time picker implementation
+                    }
 
                     HorizontalDivider()
 
-                    SettingItem(label = "Reminder Time", value = settings.reminderTime) {
-                        // In a real app, show TimePickerDialog
-                    }
+                    Text("Inventory & System", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
 
-                    SettingSlider(
-                        label = "Reminder Days Before",
-                        value = settings.reminderDaysBefore.toFloat(),
-                        range = 1f..7f,
-                        steps = 6,
-                        onValueChange = { viewModel.updateSettings(settings.copy(reminderDaysBefore = it.toInt())) }
-                    )
-
-                    SettingSlider(
-                        label = "Overdue Reminder Frequency (Days)",
-                        value = settings.overdueFrequencyDays.toFloat(),
-                        range = 1f..15f,
-                        steps = 14,
-                        onValueChange = { viewModel.updateSettings(settings.copy(overdueFrequencyDays = it.toInt())) }
+                    SettingSwitch(
+                        label = "Low Stock Alerts",
+                        supportingText = "Notify when vaccine stock is low",
+                        checked = settings.lowStockEnabled,
+                        onCheckedChange = { viewModel.updateSettings(settings.copy(lowStockEnabled = it)) }
                     )
 
                     SettingSlider(
@@ -82,18 +78,11 @@ fun NotificationSettingsScreen(
                         onValueChange = { viewModel.updateSettings(settings.copy(lowStockThreshold = it.toInt())) }
                     )
 
-                    SettingSlider(
-                        label = "Expiry Reminder Days",
-                        value = settings.expiryDaysBefore.toFloat(),
-                        range = 7f..90f,
-                        steps = 83,
-                        onValueChange = { viewModel.updateSettings(settings.copy(expiryDaysBefore = it.toInt())) }
-                    )
-
                     SettingSwitch(
-                        label = "Enable SMS Reminders",
-                        checked = settings.smsEnabled,
-                        onCheckedChange = { viewModel.updateSettings(settings.copy(smsEnabled = it)) }
+                        label = "Sync & Backup Alerts",
+                        supportingText = "High priority alerts for data failures",
+                        checked = settings.syncAlertsEnabled,
+                        onCheckedChange = { viewModel.updateSettings(settings.copy(syncAlertsEnabled = it)) }
                     )
                 }
             } ?: Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -104,13 +93,18 @@ fun NotificationSettingsScreen(
 }
 
 @Composable
-fun SettingSwitch(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+fun SettingSwitch(label: String, supportingText: String? = null, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label, style = MaterialTheme.typography.bodyLarge)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodyLarge)
+            if (supportingText != null) {
+                Text(supportingText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }

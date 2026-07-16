@@ -14,6 +14,7 @@ import com.google.firebase.appcheck.appCheck
 import com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory
 import com.google.firebase.initialize
 import dagger.hilt.android.HiltAndroidApp
+import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
@@ -39,21 +40,10 @@ class NeoChildApp : Application(), Configuration.Provider {
         // Manually load SQLCipher native library (Required for version 4.6.1+ and 16KB support)
         System.loadLibrary("sqlcipher")
         setupSync()
-        reminderScheduler.schedulePeriodicReminders()
-        createNotificationChannel()
-    }
-
-    private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                "neochild_notifications",
-                "Clinic Notifications",
-                NotificationManager.IMPORTANCE_DEFAULT,
-            ).apply {
-                description = "General notifications for vaccine updates and clinic info"
-            }
-            val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-            manager.createNotificationChannel(channel)
+        
+        val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default)
+        scope.launch {
+            reminderScheduler.scheduleDailySummary()
         }
     }
 

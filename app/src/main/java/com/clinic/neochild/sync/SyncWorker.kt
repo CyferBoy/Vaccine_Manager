@@ -17,6 +17,7 @@ import com.clinic.neochild.utils.Constants
 import com.google.firebase.firestore.FirebaseFirestore
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
 import java.util.*
@@ -26,17 +27,28 @@ class SyncWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted workerParams: WorkerParameters,
     private val db: AppDatabase,
-    private val firestore: FirebaseFirestore
+    private val firestore: FirebaseFirestore,
+    private val settingsManager: com.clinic.neochild.data.local.preferences.NotificationSettingsManager,
+    private val notificationHelper: com.clinic.neochild.notification.NotificationHelper
 ) : CoroutineWorker(appContext, workerParams) {
 
+    private val sharedPrefs = appContext.getSharedPreferences("sync_prefs", Context.MODE_PRIVATE)
+
     override suspend fun doWork(): Result {
-        // 1. Sync Local Data to Firestore using Batches for efficiency
-        syncData()
-
-        // 2. Check for Today's Due Vaccinations locally for offline support
-        checkAndNotifyDueVaccines()
-
-        return Result.success()
+        return try {
+            syncData()
+            sharedPrefs.edit().putInt("failure_count", 0).apply()
+            Result.success()
+        } catch (e: Exception) {
+            val count = sharedPrefs.getInt("failure_count", 0) + 1
+            sharedPrefs.edit().putInt("failure_count", count).apply()
+            
+            val settings = settingsManager.settingsFlow.first()
+            if (count >= 5 && settings.syncAlertsEnabled) {
+                notificationHelper.showSyncAlert(e.message ?: "Unknown error")
+            }
+            Result.retry()
+        }
     }
 
     private suspend fun syncData() {
@@ -48,10 +60,8 @@ class SyncWorker @AssistedInject constructor(
                 if (entity.isDeleted) batch.delete(docRef)
                 else batch.set(docRef, entity.toPatient())
             }
-            runCatching {
-                batch.commit().await()
-                unsyncedPatients.forEach { db.patientDao().markSynced(it.id) }
-            }
+            batch.commit().await()
+            unsyncedPatients.forEach { db.patientDao().markSynced(it.id) }
         }
 
         val unsyncedVaccinations = db.vaccinationDao().getUnsyncedVaccinations()
@@ -64,54 +74,9 @@ class SyncWorker @AssistedInject constructor(
                     if (entity.isDeleted) batch.delete(docRef)
                     else batch.set(docRef, entity.toVaccination())
                 }
-                runCatching {
-                    batch.commit().await()
-                    chunk.forEach { db.vaccinationDao().markSynced(it.id) }
-                }
+                batch.commit().await()
+                chunk.forEach { db.vaccinationDao().markSynced(it.id) }
             }
         }
-    }
-
-    private suspend fun checkAndNotifyDueVaccines() {
-        val sharedPrefs = applicationContext.getSharedPreferences("neochild_prefs", Context.MODE_PRIVATE)
-        val todayStr = SimpleDateFormat(Constants.DATE_FORMAT, Locale.ENGLISH).format(Date())
-        val lastNotifyDate = sharedPrefs.getString("last_due_notify_date", "")
-
-        if (lastNotifyDate == todayStr) return
-
-        // Query Room instead of Firestore: Offline support + 0 Cloud Read cost
-        val dueCount = db.vaccinationDao().getDueCount(todayStr)
-        
-        if (dueCount > 0) {
-            showDueNotification(dueCount)
-            sharedPrefs.edit().putString("last_due_notify_date", todayStr).apply()
-        }
-    }
-
-    private fun showDueNotification(count: Int) {
-        val channelId = "neochild_notifications"
-        val notificationManager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
-        val intent = Intent(applicationContext, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra("OPEN_DUE_TAB", true)
-        }
-        
-        val pendingIntent = PendingIntent.getActivity(
-            applicationContext, 101, intent,
-            PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val notification = NotificationCompat.Builder(applicationContext, channelId)
-            .setSmallIcon(R.drawable.app_logo)
-            .setContentTitle("Due Today")
-            .setContentText("You have $count vaccination(s) scheduled for today.")
-            .setAutoCancel(true)
-            .setContentIntent(pendingIntent)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setDefaults(NotificationCompat.DEFAULT_ALL)
-            .build()
-
-        notificationManager.notify(202, notification)
     }
 }

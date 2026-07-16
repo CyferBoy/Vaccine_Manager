@@ -21,12 +21,13 @@ class NotificationHelper @Inject constructor(
     private val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
     companion object {
-        const val CHANNEL_VACCINATION = "vaccination_reminders"
-        const val CHANNEL_INVENTORY = "inventory_alerts"
-        const val CHANNEL_EXPIRY = "expiry_alerts"
+        const val CHANNEL_DAILY_SUMMARY = "daily_summary"
+        const val CHANNEL_LOW_STOCK = "low_stock_alerts"
+        const val CHANNEL_SYNC_BACKUP = "sync_backup_alerts"
         
-        const val SUMMARY_ID = 1000
-        const val GROUP_VACCINATION = "com.clinic.neochild.VACCINATION"
+        const val SUMMARY_ID = 1001
+        const val LOW_STOCK_ID = 1002
+        const val SYNC_ALERT_ID = 1003
     }
 
     init {
@@ -35,119 +36,104 @@ class NotificationHelper @Inject constructor(
 
     private fun createNotificationChannels() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val vaccinationChannel = NotificationChannel(
-                CHANNEL_VACCINATION,
-                "Vaccination Reminders",
-                NotificationManager.IMPORTANCE_DEFAULT
-            ).apply {
-                description = "Reminders for due and overdue vaccinations"
-            }
-
-            val inventoryChannel = NotificationChannel(
-                CHANNEL_INVENTORY,
-                "Inventory Alerts",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Alerts for low or out of stock vaccines"
-            }
-
-            val expiryChannel = NotificationChannel(
-                CHANNEL_EXPIRY,
-                "Expiry Alerts",
-                NotificationManager.IMPORTANCE_DEFAULT
-            ).apply {
-                description = "Alerts for upcoming vaccine expiry"
-            }
-
-            notificationManager.createNotificationChannels(
-                listOf(vaccinationChannel, inventoryChannel, expiryChannel)
+            val channels = listOf(
+                NotificationChannel(
+                    CHANNEL_DAILY_SUMMARY,
+                    "Daily Summary",
+                    NotificationManager.IMPORTANCE_DEFAULT
+                ).apply {
+                    description = "Summary of today's work and upcoming vaccinations"
+                },
+                NotificationChannel(
+                    CHANNEL_LOW_STOCK,
+                    "Low Stock Alerts",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "Alerts when vaccine stock falls below threshold"
+                },
+                NotificationChannel(
+                    CHANNEL_SYNC_BACKUP,
+                    "Sync & Backup Alerts",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "Critical alerts for data synchronization failures"
+                }
             )
+            notificationManager.createNotificationChannels(channels)
         }
     }
 
-    fun showVaccinationNotification(
-        id: Int,
-        title: String,
-        content: String,
-        patientId: String? = null,
-        vaccinationId: String? = null,
-        reminderId: Long = -1L
-    ) {
+    fun showDailySummary(dueToday: Int, overdue: Int, lowStock: Int) {
+        if (dueToday == 0 && overdue == 0 && lowStock == 0) return
+
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-            putExtra("patientId", patientId)
         }
         
         val pendingIntent = PendingIntent.getActivity(
             context, 
-            id, 
+            SUMMARY_ID, 
             intent, 
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // Dismiss Action
-        val dismissIntent = Intent(context, NotificationActionReceiver::class.java).apply {
-            action = "ACTION_DISMISS"
-            putExtra("reminderId", reminderId)
+        val content = buildString {
+            if (dueToday > 0) append("Today's Due: $dueToday\n")
+            if (overdue > 0) append("Overdue: $overdue\n")
+            if (lowStock > 0) append("Low Stock: $lowStock\n")
+            append("\nTap to open Vaccine Manager.")
         }
-        val dismissPendingIntent = PendingIntent.getBroadcast(
-            context, id + 2, dismissIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
 
-        val builder = NotificationCompat.Builder(context, CHANNEL_VACCINATION)
+        val builder = NotificationCompat.Builder(context, CHANNEL_DAILY_SUMMARY)
             .setSmallIcon(R.drawable.app_logo)
-            .setContentTitle(title)
-            .setContentText(content)
+            .setContentTitle("🏥 Vaccine Manager Summary")
+            .setStyle(NotificationCompat.BigTextStyle().bigText(content))
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
-            .setGroup(GROUP_VACCINATION)
-            .addAction(0, "Dismiss", dismissPendingIntent)
 
-        NotificationManagerCompat.from(context).notify(id, builder.build())
-        showSummaryNotification()
+        NotificationManagerCompat.from(context).notify(SUMMARY_ID, builder.build())
     }
 
-    private fun showSummaryNotification() {
-        val summaryNotification = NotificationCompat.Builder(context, CHANNEL_VACCINATION)
+    fun showLowStockAlert(vaccineName: String, remaining: Int) {
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        
+        val pendingIntent = PendingIntent.getActivity(
+            context, 
+            LOW_STOCK_ID, 
+            intent, 
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val builder = NotificationCompat.Builder(context, CHANNEL_LOW_STOCK)
             .setSmallIcon(R.drawable.app_logo)
-            .setStyle(NotificationCompat.InboxStyle()
-                .setSummaryText("Vaccination Reminders"))
-            .setGroup(GROUP_VACCINATION)
-            .setGroupSummary(true)
+            .setContentTitle("⚠️ Low Stock Alert")
+            .setContentText("$vaccineName: Only $remaining doses left!")
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
-            .build()
+            .setContentIntent(pendingIntent)
 
-        NotificationManagerCompat.from(context).notify(SUMMARY_ID, summaryNotification)
+        NotificationManagerCompat.from(context).notify(vaccineName.hashCode(), builder.build())
     }
 
-    fun showInventoryAlert(id: Int, title: String, content: String) {
-        val builder = NotificationCompat.Builder(context, CHANNEL_INVENTORY)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle(title)
-            .setContentText(content)
+    fun showSyncAlert(error: String) {
+        val builder = NotificationCompat.Builder(context, CHANNEL_SYNC_BACKUP)
+            .setSmallIcon(R.drawable.app_logo)
+            .setContentTitle("❌ Sync Failure")
+            .setContentText("Firestore sync failed repeatedly: $error")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
 
-        NotificationManagerCompat.from(context).notify(id, builder.build())
+        NotificationManagerCompat.from(context).notify(SYNC_ALERT_ID, builder.build())
     }
 
-    fun showExpiryAlert(id: Int, title: String, content: String) {
-        val builder = NotificationCompat.Builder(context, CHANNEL_EXPIRY)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle(title)
-            .setContentText(content)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .setAutoCancel(true)
-
-        NotificationManagerCompat.from(context).notify(id, builder.build())
+    fun cancelSummaryNotification() {
+        notificationManager.cancel(SUMMARY_ID)
     }
 
-    fun cancelNotification(id: Int) {
-        NotificationManagerCompat.from(context).cancel(id)
-    }
-
-    fun cancelAllVaccinationNotifications() {
+    fun cancelAll() {
         notificationManager.cancelAll()
     }
 }

@@ -251,7 +251,6 @@ class ReminderRepositoryImpl @Inject constructor(
                     notes = "Vaccinated in clinic"
                 )
             }
-            cancelVaccinationNotifications(requirement.patientId)
             triggerImmediateCheck()
             syncWithRemote()
         }
@@ -273,7 +272,6 @@ class ReminderRepositoryImpl @Inject constructor(
                     reason = reason
                 )
             }
-            cancelVaccinationNotifications(requirement.patientId)
             triggerImmediateCheck()
             syncWithRemote()
         }
@@ -307,7 +305,6 @@ class ReminderRepositoryImpl @Inject constructor(
                     notes = "Given at: ${source.name}. Notes: $notes"
                 )
             }
-            cancelVaccinationNotifications(requirement.patientId)
             triggerImmediateCheck()
             syncWithRemote()
         }
@@ -327,21 +324,14 @@ class ReminderRepositoryImpl @Inject constructor(
                     reason = reason
                 )
             }
-            cancelVaccinationNotifications(requirement.patientId)
             triggerImmediateCheck()
             syncWithRemote()
         }
     }
 
-    private fun cancelVaccinationNotifications(patientId: String) {
-        ReminderType.entries.forEach { type ->
-            notificationHelper.cancelNotification(patientId.hashCode() + type.ordinal)
-        }
-    }
-
     override suspend fun undoAction(auditId: Long, performedBy: String) {
         withContext(Dispatchers.IO) {
-            // Implementation
+            // Future medical correction workflow
         }
     }
 
@@ -418,29 +408,22 @@ class ReminderRepositoryImpl @Inject constructor(
     }
 
     override suspend fun markCompleted(id: Long, timestamp: Long) {
-        reminderDao.markCompleted(id, timestamp)
+        reminderDao.updateStatus(id, ReminderStatus.COMPLETED.name, true, timestamp)
     }
 
     override suspend fun markPatientRemindersCompleted(patientId: String, timestamp: Long) {
-        // This is now handled more granularly by the status system
+        reminderDao.markAllForPatientCompleted(patientId, timestamp)
     }
 
-    override suspend fun getPendingPatientReminder(patientId: String, type: ReminderType): ReminderEntity? {
-        return reminderDao.getPendingPatientReminder(patientId, type.name)
-    }
+    override suspend fun getPendingPatientReminder(patientId: String, type: ReminderType): ReminderEntity? = null
 
-    override suspend fun getPendingVaccineReminder(vaccineId: String, type: ReminderType): ReminderEntity? {
-        return reminderDao.getPendingVaccineReminder(vaccineId, type.name)
-    }
+    override suspend fun getPendingVaccineReminder(vaccineId: String, type: ReminderType): ReminderEntity? = null
 
     override suspend fun insertReminder(reminder: ReminderEntity): Long {
         return reminderDao.insertOrUpdate(reminder)
     }
 
-    override suspend fun deleteOldReminders(days: Int) {
-        val timestamp = System.currentTimeMillis() - (days * 24 * 60 * 60 * 1000L)
-        reminderDao.deleteOldCompletedReminders(timestamp)
-    }
+    override suspend fun deleteOldReminders(days: Int) {}
 
     override fun triggerImmediateCheck() {
         reminderScheduler.runNow()

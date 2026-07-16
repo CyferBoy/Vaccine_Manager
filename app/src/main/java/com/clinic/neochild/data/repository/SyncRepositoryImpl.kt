@@ -40,6 +40,12 @@ class SyncRepositoryImpl @Inject constructor(
 
     override fun getPendingCount(): Flow<Int> = syncDao.getPendingCount()
 
+    override fun getSyncQueue(): Flow<List<SyncQueueEntity>> = syncDao.getAllItems()
+
+    override suspend fun clearSyncedItems() {
+        syncDao.clearSynced()
+    }
+
     override suspend fun processNextItems() {
         val pending = syncDao.getItemsByStatus(SyncStatus.PENDING.name)
         if (pending.isEmpty()) return

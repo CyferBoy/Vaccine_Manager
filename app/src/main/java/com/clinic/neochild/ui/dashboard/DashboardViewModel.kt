@@ -29,21 +29,22 @@ data class DashboardUiState(
 class DashboardViewModel @Inject constructor(
     private val firestore: FirebaseFirestore,
     private val patientRepository: PatientRepository,
-    private val reminderRepository: com.clinic.neochild.domain.repository.ReminderRepository
+    private val reminderRepository: com.clinic.neochild.domain.repository.ReminderRepository,
+    private val getClinicStatsUseCase: com.clinic.neochild.domain.usecase.statistics.GetClinicStatsUseCase,
+    private val inventoryRepository: com.clinic.neochild.domain.repository.InventoryRepository
 ) : ViewModel() {
 
-    private val _lowStockCount = MutableStateFlow(0)
     private val _wasteCount = MutableStateFlow(0)
 
     val uiState: StateFlow<DashboardUiState> = combine(
         patientRepository.allPatients,
-        reminderRepository.getDashboardStats(),
-        _lowStockCount,
+        getClinicStatsUseCase(),
+        inventoryRepository.getInventoryItems(),
         _wasteCount
-    ) { patients, stats, lowStock, waste ->
+    ) { patients, stats, inventory, waste ->
         DashboardUiState(
             patientCount = patients.size,
-            lowStockCount = lowStock,
+            lowStockCount = inventory.count { it.stock <= it.threshold },
             dueTodayCount = stats.dueToday,
             wasteCount = waste
         )
@@ -52,19 +53,7 @@ class DashboardViewModel @Inject constructor(
     private val listeners = mutableListOf<ListenerRegistration>()
 
     init {
-        startListeners()
-    }
-
-    private fun startListeners() {
-        // Inventory/Low Stock Listener
-        listeners.add(
-            firestore.collection("inventory").addSnapshotListener { snapshot, _ ->
-                val inventory = snapshot?.documents?.mapNotNull { FirestoreMappers.toVaccine(it) } ?: emptyList()
-                _lowStockCount.value = inventory.count { it.stock < 5 }
-            }
-        )
-
-        // Waste Listener
+        // Waste Listener (Keeping for real-time until repo supports it)
         listeners.add(
             firestore.collection("waste").addSnapshotListener { snapshot, _ ->
                 _wasteCount.value = snapshot?.size() ?: 0

@@ -6,6 +6,7 @@ import com.clinic.neochild.data.model.Patient
 import com.clinic.neochild.domain.usecase.patient.DeletePatientUseCase
 import com.clinic.neochild.domain.usecase.patient.GetPatientsUseCase
 import com.clinic.neochild.domain.usecase.patient.MergePatientsUseCase
+import com.clinic.neochild.domain.usecase.patient.SearchPatientsUseCase
 import com.clinic.neochild.domain.usecase.vaccination.GetVaccinationsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -34,7 +35,8 @@ class PatientListViewModel @Inject constructor(
     private val getPatientsUseCase: GetPatientsUseCase,
     private val getVaccinationsUseCase: GetVaccinationsUseCase,
     private val deletePatientUseCase: DeletePatientUseCase,
-    private val mergePatientsUseCase: MergePatientsUseCase
+    private val mergePatientsUseCase: MergePatientsUseCase,
+    private val searchPatientsUseCase: SearchPatientsUseCase
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
@@ -56,9 +58,7 @@ class PatientListViewModel @Inject constructor(
         
         val missingPrice = vaccinations.filter { it.cost <= 0.0 }.map { it.patientId }.toSet()
         
-        val filtered = patients.filter {
-            it.name.contains(query, ignoreCase = true) || it.phone.contains(query)
-        }.let { list ->
+        val filtered = searchPatientsUseCase(query, patients, vaccinations).let { list ->
             when (sort) {
                 PatientSortOption.NAME_AZ -> list.sortedBy { it.name.lowercase() }
                 PatientSortOption.NEWEST -> list.sortedByDescending { it.registrationDate }

@@ -26,6 +26,7 @@ import com.clinic.neochild.ui.viewmodel.PatientViewModel
 import com.clinic.neochild.utils.Constants
 import com.clinic.neochild.utils.PatientUtils.calculateDetailedAge
 import com.clinic.neochild.utils.PatientUtils.formatDateForDisplay
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import java.text.SimpleDateFormat
 import java.util.*
@@ -37,12 +38,15 @@ fun AddPatientScreen(
     onNavigateToDetails: (String) -> Unit = {},
     viewModel: PatientViewModel = hiltViewModel(),
 ) {
-    // Form State - using rememberSaveable
+    // Form State
+    var clinicId by rememberSaveable { mutableStateOf("") }
     var name by rememberSaveable { mutableStateOf("") }
+    var parentName by rememberSaveable { mutableStateOf("") }
     var phone by rememberSaveable { mutableStateOf("") }
     var alternatePhone by rememberSaveable { mutableStateOf("") }
     var dob by rememberSaveable { mutableStateOf("") }
     var gender by rememberSaveable { mutableStateOf("Male") }
+    var village by rememberSaveable { mutableStateOf("") }
     var address by rememberSaveable { mutableStateOf("") }
     
     // For age selection
@@ -63,12 +67,15 @@ fun AddPatientScreen(
             db.collection("patients").document(patientId).get()
                 .addOnSuccessListener { doc ->
                     if (doc.exists()) {
+                        clinicId = doc.getString("patientClinicId") ?: ""
                         name = doc.getString("name") ?: ""
+                        parentName = doc.getString("parentName") ?: ""
                         phone = doc.getString("phone") ?: ""
                         alternatePhone = doc.getString("alternatePhone") ?: ""
                         val dobVal = doc["dob"]?.toString() ?: ""
                         dob = formatDateForDisplay(dobVal)
                         gender = doc.getString("gender") ?: "Male"
+                        village = doc.getString("village") ?: ""
                         address = doc.getString("address") ?: ""
                         
                         val detailedAge = calculateDetailedAge(dobVal)
@@ -84,8 +91,12 @@ fun AddPatientScreen(
     AddPatientContent(
         isEditMode = isEditMode,
         onBack = onBack,
+        clinicId = clinicId,
+        onClinicIdChange = { clinicId = it },
         name = name,
         onNameChange = { name = it },
+        parentName = parentName,
+        onParentNameChange = { parentName = it },
         phone = phone,
         onPhoneChange = { phone = it },
         alternatePhone = alternatePhone,
@@ -123,6 +134,8 @@ fun AddPatientScreen(
         },
         gender = gender,
         onGenderChange = { gender = it },
+        village = village,
+        onVillageChange = { village = it },
         address = address,
         onAddressChange = { address = it },
         isLoading = isLoading,
@@ -133,11 +146,14 @@ fun AddPatientScreen(
                 isLoading = true
                 val patient = Patient(
                     id = patientId ?: UUID.randomUUID().toString(),
+                    patientClinicId = clinicId,
                     name = name,
+                    parentName = parentName,
                     phone = phone,
                     alternatePhone = alternatePhone,
                     dob = dob,
                     gender = gender,
+                    village = village,
                     address = address,
                     registrationDate = SimpleDateFormat(Constants.DATE_FORMAT, Locale.ENGLISH).format(Date())
                 )
@@ -157,8 +173,12 @@ fun AddPatientScreen(
 private fun AddPatientContent(
     isEditMode: Boolean,
     onBack: () -> Unit,
+    clinicId: String,
+    onClinicIdChange: (String) -> Unit,
     name: String,
     onNameChange: (String) -> Unit,
+    parentName: String,
+    onParentNameChange: (String) -> Unit,
     phone: String,
     onPhoneChange: (String) -> Unit,
     alternatePhone: String,
@@ -171,6 +191,8 @@ private fun AddPatientContent(
     onAgeUnitChange: (String) -> Unit,
     gender: String,
     onGenderChange: (String) -> Unit,
+    village: String,
+    onVillageChange: (String) -> Unit,
     address: String,
     onAddressChange: (String) -> Unit,
     isLoading: Boolean,
@@ -204,11 +226,28 @@ private fun AddPatientContent(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    StandardTextField(
+                        value = clinicId,
+                        onValueChange = onClinicIdChange,
+                        label = "Patient ID (Optional)",
+                        placeholder = "e.g. NEO-001",
+                        modifier = Modifier.weight(1f)
+                    )
+                    StandardTextField(
+                        value = name,
+                        onValueChange = onNameChange,
+                        label = "Full Name*",
+                        placeholder = "Enter patient's name",
+                        modifier = Modifier.weight(2f)
+                    )
+                }
+
                 StandardTextField(
-                    value = name,
-                    onValueChange = onNameChange,
-                    label = "Full Name*",
-                    placeholder = "Enter patient's name"
+                    value = parentName,
+                    onValueChange = onParentNameChange,
+                    label = "Parent/Guardian Name",
+                    placeholder = "Enter parent's name"
                 )
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -244,12 +283,22 @@ private fun AddPatientContent(
                     onGenderChange = onGenderChange
                 )
 
-                StandardTextField(
-                    value = address,
-                    onValueChange = onAddressChange,
-                    label = "Address (Optional)",
-                    placeholder = "Enter patient's address"
-                )
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    StandardTextField(
+                        value = village,
+                        onValueChange = onVillageChange,
+                        label = "Village/City",
+                        placeholder = "e.g. Sahibganj",
+                        modifier = Modifier.weight(1f)
+                    )
+                    StandardTextField(
+                        value = address,
+                        onValueChange = onAddressChange,
+                        label = "Address (Optional)",
+                        placeholder = "Full address",
+                        modifier = Modifier.weight(1f)
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -365,8 +414,12 @@ private fun AddPatientPreview() {
         AddPatientContent(
             isEditMode = false,
             onBack = {},
+            clinicId = "NEO-001",
+            onClinicIdChange = {},
             name = "John Doe",
             onNameChange = {},
+            parentName = "Jane Doe",
+            onParentNameChange = {},
             phone = "1234567890",
             onPhoneChange = {},
             alternatePhone = "",
@@ -379,6 +432,8 @@ private fun AddPatientPreview() {
             onAgeUnitChange = {},
             gender = "Male",
             onGenderChange = {},
+            village = "Sahibganj",
+            onVillageChange = {},
             address = "Sahibganj",
             onAddressChange = {},
             isLoading = false,

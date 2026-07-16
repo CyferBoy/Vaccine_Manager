@@ -4,9 +4,11 @@ import com.clinic.neochild.data.local.entity.InventoryTransactionEntity
 import com.clinic.neochild.data.local.entity.VaccineBatchEntity
 import com.clinic.neochild.data.local.entity.VaccineEntity
 import com.clinic.neochild.data.model.InventoryTransactionType
+import com.clinic.neochild.domain.model.InventoryItem
 import kotlinx.coroutines.flow.Flow
 
 interface InventoryRepository {
+    fun getInventoryItems(): Flow<List<InventoryItem>>
     fun getAllVaccines(): Flow<List<VaccineEntity>>
     fun getVaccineBatches(vaccineId: String): Flow<List<VaccineBatchEntity>>
     fun getInventoryTransactions(vaccineId: String): Flow<List<InventoryTransactionEntity>>

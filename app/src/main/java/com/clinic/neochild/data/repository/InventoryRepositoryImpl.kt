@@ -8,6 +8,7 @@ import com.clinic.neochild.data.local.entity.VaccineEntity
 import com.clinic.neochild.data.model.InventoryTransactionType
 import com.clinic.neochild.domain.repository.InventoryRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -17,6 +18,26 @@ class InventoryRepositoryImpl @Inject constructor(
 ) : InventoryRepository {
 
     private val vaccineDao = database.vaccineDao()
+
+    override fun getInventoryItems(): Flow<List<com.clinic.neochild.domain.model.InventoryItem>> {
+        return combine(
+            vaccineDao.getAllVaccines(),
+            vaccineDao.getAllBatches()
+        ) { definitions, batches ->
+            definitions.map { def ->
+                val stock = batches.filter { it.vaccineId == def.id && !it.isDeleted }
+                    .sumOf { it.remainingQuantity }
+                com.clinic.neochild.domain.model.InventoryItem(
+                    id = def.id,
+                    brandName = def.brandName,
+                    stock = stock,
+                    threshold = def.lowStockThreshold,
+                    type = def.type,
+                    company = def.companyName
+                )
+            }
+        }
+    }
 
     override fun getAllVaccines(): Flow<List<VaccineEntity>> = vaccineDao.getAllVaccines()
 

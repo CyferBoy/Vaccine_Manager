@@ -2,6 +2,7 @@ package com.clinic.neochild.data.model
 
 data class Vaccination(
     val id: String = "",
+    val receiptNumber: String = "",
     val patientId: String = "",
     val vaccineNames: List<String> = emptyList(),
     val nxtVaccineNames: List<String> = emptyList(),
@@ -20,10 +21,4 @@ data class Vaccination(
     val performedBy: String = "",
     val batchNumbers: List<String> = emptyList(),
     val expiryDates: List<String> = emptyList(),
-    val batchNumber: String = "",
-    val expiryDate: String = "",
-    @Deprecated("Use vaccineNames instead")
-    val vaccineName: String = "",
-    @Deprecated("Use nxtVaccineNames instead")
-    val nxtVaccineName: String = ""
 )

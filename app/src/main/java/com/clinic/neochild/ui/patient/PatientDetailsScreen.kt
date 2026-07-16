@@ -46,6 +46,7 @@ fun PatientDetailsScreen(
     onBack: () -> Unit = {}, 
     onAddVaccine: (String) -> Unit = {},
     onEditVaccination: (String) -> Unit = {},
+    onNavigateToTimeline: (String) -> Unit = {},
     viewModel: PatientViewModel = hiltViewModel()
 ) {
     val allPatients by viewModel.allPatients.collectAsState()
@@ -98,6 +99,11 @@ fun PatientDetailsScreen(
                     navigationIcon = {
                         IconButton(onClick = onBack) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onPrimary)
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { onNavigateToTimeline(patientId) }) {
+                            Icon(Icons.Default.Timeline, contentDescription = "Timeline", tint = MaterialTheme.colorScheme.onPrimary)
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -189,48 +195,78 @@ private fun PatientInfoSection(patient: Patient) {
     val context = LocalContext.current
     
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = patient.name,
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-        )
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = patient.name,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                if (patient.patientClinicId.isNotBlank()) {
+                    Text(text = "ID: ${patient.patientClinicId}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
+                }
+            }
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer,
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text(
+                    text = patient.gender,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+        }
         
+        if (patient.parentName.isNotBlank()) {
+            Text(text = "Parent: ${patient.parentName}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+        }
+
         val ageLabel = remember(patient.dob) { calculateAgeLabel(patient.dob) }
         val dobDisplay = remember(patient.dob) { formatDateForDisplay(patient.dob) }
         val dobAgeValue = if (ageLabel != null) "$dobDisplay ($ageLabel)" else dobDisplay
         
-        Row(modifier = Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(text = dobAgeValue, style = MaterialTheme.typography.bodyLarge)
-            Spacer(modifier = Modifier.width(16.dp))
-            Text(text = patient.gender, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.secondary)
-        }
+        Text(text = "Born: $dobAgeValue", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(vertical = 4.dp))
 
-        ContactRow(icon = Icons.Default.Call, text = patient.phone, onClick = {
-            context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${patient.phone}")))
-        })
-
-        if (patient.alternatePhone.isNotBlank()) {
-            ContactRow(icon = Icons.Default.Call, text = "${patient.alternatePhone} (Alt)", tint = MaterialTheme.colorScheme.secondary, onClick = {
-                context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${patient.alternatePhone}")))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            ContactRow(icon = Icons.Default.Call, text = patient.phone, modifier = Modifier.weight(1f), onClick = {
+                context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${patient.phone}")))
             })
+
+            if (patient.alternatePhone.isNotBlank()) {
+                ContactRow(icon = Icons.Default.Call, text = patient.alternatePhone, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.weight(1f), onClick = {
+                    context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${patient.alternatePhone}")))
+                })
+            }
         }
 
-        if (patient.address.isNotBlank()) {
-            ContactRow(icon = Icons.Default.LocationOn, text = patient.address)
+        if (patient.village.isNotBlank() || patient.address.isNotBlank()) {
+            val fullAddress = listOf(patient.village, patient.address).filter { it.isNotBlank() }.joinToString(", ")
+            ContactRow(icon = Icons.Default.LocationOn, text = fullAddress)
         }
     }
 }
 
 @Composable
-private fun ContactRow(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String, tint: Color = MaterialTheme.colorScheme.primary, onClick: (() -> Unit)? = null) {
+private fun ContactRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector, 
+    text: String, 
+    tint: Color = MaterialTheme.colorScheme.primary, 
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null
+) {
     Row(
-        modifier = Modifier.padding(vertical = 8.dp).then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+        modifier = modifier
+            .padding(vertical = 4.dp)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(24.dp), tint = tint)
+        Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(20.dp), tint = tint)
         Spacer(modifier = Modifier.width(8.dp))
-        Text(text = text, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.fillMaxWidth())
+        Text(text = text, style = MaterialTheme.typography.bodyMedium)
     }
 }
 

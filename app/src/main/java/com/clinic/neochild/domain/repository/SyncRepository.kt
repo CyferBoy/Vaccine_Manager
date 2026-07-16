@@ -14,6 +14,8 @@ interface SyncRepository {
     )
 
     fun getPendingCount(): Flow<Int>
+    fun getSyncQueue(): Flow<List<com.clinic.neochild.data.local.entity.SyncQueueEntity>>
     suspend fun processNextItems()
     suspend fun retryFailedItems()
+    suspend fun clearSyncedItems()
 }

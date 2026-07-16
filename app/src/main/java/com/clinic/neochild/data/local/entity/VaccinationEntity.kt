@@ -7,13 +7,19 @@ import com.clinic.neochild.data.model.Vaccination
 
 @Entity(
     tableName = "vaccinations",
-    indices = [Index(value = ["patientId"]), Index(value = ["isSynced"]), Index(value = ["isDeleted"])]
+    indices = [
+        Index(value = ["patientId"]), 
+        Index(value = ["receiptNumber"]),
+        Index(value = ["isSynced"]), 
+        Index(value = ["isDeleted"])
+    ]
 )
 data class VaccinationEntity(
     @PrimaryKey val id: String,
+    val receiptNumber: String = "",
     val patientId: String,
-    val vaccineNames: String, // Stored as comma-separated string
-    val nxtVaccineNames: String, // Stored as comma-separated string
+    val vaccineNames: String,
+    val nxtVaccineNames: String,
     val dateGiven: String,
     val nextDueDate: String,
     val cost: Double,
@@ -33,6 +39,7 @@ data class VaccinationEntity(
 
 fun VaccinationEntity.toVaccination() = Vaccination(
     id = id,
+    receiptNumber = receiptNumber,
     patientId = patientId,
     vaccineNames = if (vaccineNames.isBlank()) emptyList() else vaccineNames.split(","),
     nxtVaccineNames = if (nxtVaccineNames.isBlank()) emptyList() else nxtVaccineNames.split(","),
@@ -53,6 +60,7 @@ fun VaccinationEntity.toVaccination() = Vaccination(
 
 fun Vaccination.toEntity(isSynced: Boolean = true) = VaccinationEntity(
     id = id,
+    receiptNumber = receiptNumber,
     patientId = patientId,
     vaccineNames = vaccineNames.joinToString(","),
     nxtVaccineNames = nxtVaccineNames.joinToString(","),

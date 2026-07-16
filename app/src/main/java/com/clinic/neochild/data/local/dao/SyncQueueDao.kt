@@ -23,4 +23,10 @@ interface SyncQueueDao {
 
     @Query("SELECT COUNT(*) FROM sync_queue WHERE status = 'PENDING'")
     fun getPendingCount(): Flow<Int>
+
+    @Query("SELECT * FROM sync_queue ORDER BY updatedAt DESC")
+    fun getAllItems(): Flow<List<SyncQueueEntity>>
+
+    @Query("DELETE FROM sync_queue WHERE status = 'SYNCED'")
+    suspend fun clearSynced()
 }

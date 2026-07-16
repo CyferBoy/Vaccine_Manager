@@ -4,14 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import com.clinic.neochild.data.local.dao.PatientDao
-import com.clinic.neochild.data.local.dao.ReminderDao
-import com.clinic.neochild.data.local.dao.VaccinationDao
-import com.clinic.neochild.data.local.dao.VaccineDao
-import com.clinic.neochild.data.local.entity.PatientEntity
-import com.clinic.neochild.data.local.entity.ReminderEntity
-import com.clinic.neochild.data.local.entity.VaccinationEntity
-import com.clinic.neochild.data.local.entity.VaccineEntity
+import com.clinic.neochild.data.local.dao.*
+import com.clinic.neochild.data.local.entity.*
 import com.clinic.neochild.utils.SecurityUtils
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 
@@ -20,9 +14,10 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         PatientEntity::class, 
         VaccinationEntity::class, 
         ReminderEntity::class, 
-        VaccineEntity::class
+        VaccineEntity::class,
+        ReminderAuditEntity::class
     ], 
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -30,6 +25,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun vaccinationDao(): VaccinationDao
     abstract fun reminderDao(): ReminderDao
     abstract fun vaccineDao(): VaccineDao
+    abstract fun reminderAuditDao(): ReminderAuditDao
 
     companion object {
         @Volatile

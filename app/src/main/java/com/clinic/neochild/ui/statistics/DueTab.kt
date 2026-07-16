@@ -38,15 +38,16 @@ fun DueTab(
     initialFilter: String = "Today",
     onFilterChanged: (String) -> Unit = {},
     onMarkAsDone: (Vaccination) -> Unit = {},
-    onClearReminder: (Vaccination) -> Unit = {},
-    onReschedule: (String, String, String) -> Unit = { _, _, _ -> },
-    onVaccinatedElsewhere: (String, VaccinationSource, String, String) -> Unit = { _, _, _, _ -> }
+    onDismissReminder: (Vaccination, String) -> Unit = { _, _ -> },
+    onReschedule: (Vaccination, String, String) -> Unit = { _, _, _ -> },
+    onVaccinatedElsewhere: (Vaccination, VaccinationSource, String, String) -> Unit = { _, _, _, _ -> }
 ) {
     val filters = remember { listOf("Overdue", "Previous Month", "Today", "This Week", "Upcoming") }
     var selectedVaccination by remember { mutableStateOf<Vaccination?>(null) }
     var showManageSheet by remember { mutableStateOf(false) }
     var showReschedulePicker by remember { mutableStateOf(false) }
     var showElsewhereSheet by remember { mutableStateOf(false) }
+    var showDismissDialog by remember { mutableStateOf(false) }
 
     if (showManageSheet && selectedVaccination != null) {
         ManageDueBottomSheet(
@@ -55,9 +56,9 @@ fun DueTab(
                 onMarkAsDone(selectedVaccination!!)
                 showManageSheet = false 
             },
-            onClearReminder = {
-                onClearReminder(selectedVaccination!!)
+            onDismissReminder = {
                 showManageSheet = false
+                showDismissDialog = true
             },
             onReschedule = { 
                 showManageSheet = false
@@ -70,11 +71,36 @@ fun DueTab(
         )
     }
 
+    if (showDismissDialog && selectedVaccination != null) {
+        var reason by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { showDismissDialog = false },
+            title = { Text("Dismiss Reminder") },
+            text = {
+                OutlinedTextField(
+                    value = reason,
+                    onValueChange = { reason = it },
+                    label = { Text("Reason for dismissal") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                Button(onClick = {
+                    onDismissReminder(selectedVaccination!!, reason)
+                    showDismissDialog = false
+                }) { Text("Dismiss") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDismissDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
     if (showReschedulePicker && selectedVaccination != null) {
         RescheduleDialog(
             onDismiss = { showReschedulePicker = false },
             onConfirm = { newDate, reason ->
-                onReschedule(selectedVaccination!!.id, newDate, reason)
+                onReschedule(selectedVaccination!!, newDate, reason)
                 showReschedulePicker = false
             }
         )
@@ -84,7 +110,7 @@ fun DueTab(
         VaccinatedElsewhereBottomSheet(
             onDismiss = { showElsewhereSheet = false },
             onSave = { source, date, notes ->
-                onVaccinatedElsewhere(selectedVaccination!!.id, source, date, notes)
+                onVaccinatedElsewhere(selectedVaccination!!, source, date, notes)
                 showElsewhereSheet = false
             }
         )
@@ -282,7 +308,7 @@ private fun DuePatientCard(
 private fun ManageDueBottomSheet(
     onDismiss: () -> Unit,
     onMarkAsDone: () -> Unit,
-    onClearReminder: () -> Unit,
+    onDismissReminder: () -> Unit,
     onReschedule: () -> Unit,
     onVaccinatedElsewhere: () -> Unit
 ) {
@@ -303,21 +329,25 @@ private fun ManageDueBottomSheet(
             
             ListItem(
                 headlineContent = { Text("Mark as Done") },
+                supportingContent = { Text("Given in this clinic today") },
                 leadingContent = { Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF4CAF50)) },
                 modifier = Modifier.clickable { onMarkAsDone() }
             )
             ListItem(
-                headlineContent = { Text("Clear Reminder") },
-                leadingContent = { Icon(Icons.Default.Check, contentDescription = null) },
-                modifier = Modifier.clickable { onClearReminder() }
+                headlineContent = { Text("Dismiss Reminder") },
+                supportingContent = { Text("Stop reminders for this vaccine") },
+                leadingContent = { Icon(Icons.Default.NotificationsOff, contentDescription = null) },
+                modifier = Modifier.clickable { onDismissReminder() }
             )
             ListItem(
                 headlineContent = { Text("Reschedule") },
+                supportingContent = { Text("Change the due date") },
                 leadingContent = { Icon(Icons.Default.Event, contentDescription = null) },
                 modifier = Modifier.clickable { onReschedule() }
             )
             ListItem(
                 headlineContent = { Text("Vaccinated Elsewhere") },
+                supportingContent = { Text("Recorded at another facility") },
                 leadingContent = { Icon(Icons.Default.Public, contentDescription = null) },
                 modifier = Modifier.clickable { onVaccinatedElsewhere() }
             )
@@ -484,7 +514,7 @@ private fun DueTabPreview() {
             filteredVaccinations = listOf(Vaccination("1", "1", listOf("BCG"), listOf("HepB"), "1 Jan 2024", "1 Feb 2024", 500.0, 500.0, 0.0, 500.0, false, false, false)),
             overdueCount = 1,
             onMarkAsDone = {},
-            onClearReminder = {},
+            onDismissReminder = { _, _ -> },
             onReschedule = { _, _, _ -> },
             onVaccinatedElsewhere = { _, _, _, _ -> }
         )

@@ -36,69 +36,48 @@ class ReminderWorker @AssistedInject constructor(
         val settings = settingsManager.settingsFlow.first()
         if (!settings.enabled) return Result.success()
 
-        // 1. Refresh data
+        // 1. Trigger Data Refresh (Optional, depending on clinic sync needs)
         try {
-            vaccinationRepository.refreshVaccinations()
-            vaccineRepository.refreshInventory()
+            reminderRepository.syncWithRemote()
         } catch (e: Exception) { }
 
-        val today = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
-
-        // 2. Process Vaccinations
+        // 2. Process Vaccinations - Simple Delegation to Repository
         val dueToday = reminderRepository.getDueToday().first()
         val dueTomorrow = reminderRepository.getDueTomorrow().first()
         val overdue = reminderRepository.getOverdue().first()
 
-        // Combine for processing but keep types distinct
-        val allDue = mutableListOf<Pair<Vaccination, ReminderType>>()
-        dueToday.forEach { allDue.add(it to ReminderType.DUE_TODAY) }
-        dueTomorrow.forEach { allDue.add(it to ReminderType.TOMORROW) }
-        overdue.forEach { allDue.add(it to ReminderType.OVERDUE) }
-
         val patientsNotified = mutableSetOf<String>()
 
-        for ((vacc, type) in allDue) {
-            val patientId = vacc.patientId
-            if (patientsNotified.contains(patientId)) continue
-
-            val patient = patientRepository.getPatientById(patientId) ?: continue
-            val vaccineList = vacc.nxtVaccineNames.joinToString(", ")
-            
-            var shouldNotify = true
-            var extraInfo = ""
-
-            if (type == ReminderType.OVERDUE) {
-                val dueDate = PatientUtils.parseDate(vacc.nextDueDate)
-                if (dueDate != null) {
-                    val diff = System.currentTimeMillis() - dueDate.time
-                    val days = (diff / (1000 * 60 * 60 * 24)).toInt()
-                    if (days <= 0 || days % settings.overdueFrequencyDays != 0) {
-                        shouldNotify = false
-                    } else {
-                        extraInfo = "Delayed by $days days"
-                    }
-                }
-            }
-
-            if (shouldNotify) {
-                checkAndNotifyPatient(
-                    patientId = patient.id,
-                    patientName = patient.name,
-                    vaccinationId = vacc.id,
-                    vaccineName = vaccineList,
-                    type = type,
-                    dueDate = vacc.nextDueDate,
-                    extraInfo = extraInfo
-                )
-                patientsNotified.add(patientId)
+        // Notify for Due Today
+        dueToday.forEach { vacc ->
+            if (patientsNotified.add(vacc.patientId)) {
+                notifyForVaccination(vacc, ReminderType.DUE_TODAY)
             }
         }
 
+        // Notify for Tomorrow
+        if (settings.reminderDaysBefore == 1) {
+            dueTomorrow.forEach { vacc ->
+                if (patientsNotified.add(vacc.patientId)) {
+                    notifyForVaccination(vacc, ReminderType.TOMORROW)
+                }
+            }
+        }
+
+        // Notify for Overdue (based on configured frequency)
+        overdue.forEach { vacc ->
+            if (patientsNotified.add(vacc.patientId)) {
+                val dueDate = PatientUtils.parseDate(vacc.nextDueDate) ?: return@forEach
+                val diff = System.currentTimeMillis() - dueDate.time
+                val days = (diff / (1000 * 60 * 60 * 24)).toInt()
+                
+                if (days > 0 && days % settings.overdueFrequencyDays == 0) {
+                    notifyForVaccination(vacc, ReminderType.OVERDUE, "Delayed by $days days")
+                }
+            }
+        }
+
+        // Summary notification if multiple due
         if (dueToday.size > 1) {
             notificationHelper.showVaccinationNotification(
                 100, 
@@ -107,29 +86,48 @@ class ReminderWorker @AssistedInject constructor(
             )
         }
 
-        // 3. Process Inventory
+        // 3. Process Inventory (Delegated to specialized repo if exists, otherwise here)
+        processInventoryAlerts(settings)
+
+        return Result.success()
+    }
+
+    private suspend fun notifyForVaccination(
+        vacc: Vaccination,
+        type: ReminderType,
+        extraInfo: String = ""
+    ) {
+        val patient = patientRepository.getPatientById(vacc.patientId) ?: return
+        val vaccineName = vacc.nxtVaccineNames.firstOrNull() ?: "Vaccination"
+        
+        checkAndNotifyPatient(
+            patientId = patient.id,
+            patientName = patient.name,
+            vaccinationId = vacc.id,
+            vaccineName = vaccineName,
+            type = type,
+            dueDate = vacc.nextDueDate,
+            extraInfo = extraInfo
+        )
+    }
+
+    private suspend fun processInventoryAlerts(settings: com.clinic.neochild.data.local.preferences.NotificationSettings) {
         val inventory = vaccineRepository.getInventory().first()
         for (item in inventory) {
-            // Out of stock
             if (item.stock == 0) {
                 checkAndNotifyInventory(item.id, item.brandName, ReminderType.OUT_OF_STOCK, "Out of Stock")
             } else if (item.stock <= settings.lowStockThreshold) {
-                // Low stock
                 checkAndNotifyInventory(item.id, item.brandName, ReminderType.LOW_STOCK, "Remaining: ${item.stock} doses")
             }
-
-            // Expiry
+            
             val expDate = PatientUtils.parseDate(item.expiryDate) ?: continue
-            val expCal = Calendar.getInstance().apply { time = expDate }
-            val diff = expCal.timeInMillis - today.timeInMillis
+            val diff = expDate.time - System.currentTimeMillis()
             val daysToExpiry = (diff / (1000 * 60 * 60 * 24)).toInt()
 
             if (daysToExpiry <= settings.expiryDaysBefore && daysToExpiry >= 0) {
                 checkAndNotifyInventory(item.id, item.brandName, ReminderType.EXPIRY, "Expires on ${item.expiryDate}")
             }
         }
-
-        return Result.success()
     }
 
     private suspend fun checkAndNotifyPatient(

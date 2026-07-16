@@ -31,11 +31,15 @@ data class DueUiState(
 @HiltViewModel
 class DueViewModel @Inject constructor(
     private val getPatientsUseCase: GetPatientsUseCase,
-    private val reminderRepository: ReminderRepository
+    private val reminderRepository: ReminderRepository,
+    private val auth: FirebaseAuth
 ) : ViewModel() {
 
     private val _selectedFilter = MutableStateFlow("Today")
     val selectedFilter = _selectedFilter.asStateFlow()
+
+    private val currentUserEmail: String
+        get() = auth.currentUser?.email ?: "Unknown Staff"
 
     val uiState: StateFlow<DueUiState> = combine(
         getPatientsUseCase(),
@@ -71,42 +75,39 @@ class DueViewModel @Inject constructor(
     fun markAsDone(vaccination: Vaccination) {
         viewModelScope.launch {
             val req = findMatchingRequirement(vaccination) ?: return@launch
-            reminderRepository.markAsDone(req)
+            reminderRepository.markAsDone(req, currentUserEmail)
         }
     }
 
-    fun clearReminder(vaccination: Vaccination) {
+    fun dismissReminder(vaccination: Vaccination, reason: String) {
         viewModelScope.launch {
             val req = findMatchingRequirement(vaccination) ?: return@launch
-            reminderRepository.dismissReminder(req)
+            reminderRepository.dismissReminder(req, reason, currentUserEmail)
         }
     }
 
-    fun rescheduleVaccination(vaccinationId: String, newDate: String, reason: String) {
+    fun rescheduleVaccination(vaccination: Vaccination, newDate: String, reason: String) {
         viewModelScope.launch {
-            // vaccinationId here refers to originalVisitId in our mapped Vaccination objects
-            val vaccination = uiState.value.vaccinations.find { it.id == vaccinationId } ?: return@launch
             val req = findMatchingRequirement(vaccination) ?: return@launch
-            reminderRepository.reschedule(req, newDate, reason)
+            reminderRepository.reschedule(req, newDate, reason, currentUserEmail)
         }
     }
 
     fun markVaccinatedElsewhere(
-        vaccinationId: String,
+        vaccination: Vaccination,
         source: VaccinationSource,
         date: String,
         notes: String
     ) {
         viewModelScope.launch {
-            val vaccination = uiState.value.vaccinations.find { it.id == vaccinationId } ?: return@launch
             val req = findMatchingRequirement(vaccination) ?: return@launch
-            reminderRepository.markVaccinatedElsewhere(req, source, date, notes)
+            reminderRepository.markVaccinatedElsewhere(req, source, date, notes, currentUserEmail)
         }
     }
 
-    private fun findMatchingRequirement(vaccination: Vaccination): PendingRequirement? {
+    private fun findMatchingRequirement(vaccination: Vaccination): com.clinic.neochild.utils.PendingRequirement? {
         val dueDate = PatientUtils.parseDate(vaccination.nextDueDate) ?: return null
-        return PendingRequirement(
+        return com.clinic.neochild.utils.PendingRequirement(
             patientId = vaccination.patientId,
             vaccineName = vaccination.nxtVaccineNames.firstOrNull() ?: "",
             dueDate = dueDate,

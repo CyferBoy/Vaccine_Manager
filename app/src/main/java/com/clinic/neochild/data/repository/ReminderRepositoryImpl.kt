@@ -1,23 +1,14 @@
 package com.clinic.neochild.data.repository
 
 import android.content.Context
-import com.clinic.neochild.data.local.dao.ReminderDao
-import com.clinic.neochild.data.local.dao.VaccinationDao
-import com.clinic.neochild.data.local.dao.VaccineDao
-import com.clinic.neochild.data.local.entity.ReminderEntity
-import com.clinic.neochild.data.local.entity.toEntity
-import com.clinic.neochild.data.local.entity.toVaccination
-import com.clinic.neochild.data.local.entity.toVaccine
-import com.clinic.neochild.data.model.ReminderStatus
-import com.clinic.neochild.data.model.ReminderType
-import com.clinic.neochild.data.model.Vaccination
-import com.clinic.neochild.data.model.VaccinationSource
+import androidx.room.withTransaction
+import com.clinic.neochild.data.local.AppDatabase
+import com.clinic.neochild.data.local.dao.*
+import com.clinic.neochild.data.local.entity.*
+import com.clinic.neochild.data.model.*
 import com.clinic.neochild.domain.repository.ReminderRepository
 import com.clinic.neochild.notification.ReminderScheduler
-import com.clinic.neochild.utils.PatientUtils
-import com.clinic.neochild.utils.PendingRequirement
-import com.clinic.neochild.utils.ReminderEngine
-import com.clinic.neochild.utils.WidgetUtils
+import com.clinic.neochild.utils.*
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -29,17 +20,21 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import java.util.UUID
+import java.util.Calendar
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class ReminderRepositoryImpl @Inject constructor(
+    private val database: AppDatabase,
     private val reminderDao: ReminderDao,
+    private val reminderAuditDao: ReminderAuditDao,
     private val vaccinationDao: VaccinationDao,
     private val vaccineDao: VaccineDao,
     private val firestore: FirebaseFirestore,
     private val auth: FirebaseAuth,
     private val reminderScheduler: ReminderScheduler,
+    private val notificationHelper: com.clinic.neochild.notification.NotificationHelper,
     @ApplicationContext private val context: Context
 ) : ReminderRepository {
 
@@ -108,120 +103,202 @@ class ReminderRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun markAsDone(requirement: PendingRequirement) = withContext(Dispatchers.IO) {
-        val user = auth.currentUser?.email ?: "Unknown"
-        
-        // 1. Create a new Vaccination record
-        val newVaccination = Vaccination(
-            id = UUID.randomUUID().toString(),
-            patientId = requirement.patientId,
-            vaccineNames = listOf(requirement.vaccineName),
-            dateGiven = PatientUtils.formatDate(java.util.Date()),
-            isDone = true,
-            source = VaccinationSource.CLINIC.name,
-            performedBy = user
-        )
-        
-        vaccinationDao.insertVaccination(newVaccination.toEntity(isSynced = false))
-        
-        // 2. Update Inventory (Deduct stock)
-        try {
-            val vaccines = vaccineDao.getAllVaccines().first()
-            val match = vaccines.find { it.brandName.contains(requirement.vaccineName, ignoreCase = true) }
-            if (match != null && match.stock > 0) {
-                vaccineDao.insertVaccine(match.copy(stock = match.stock - 1, isSynced = false))
+    override suspend fun markAsDone(
+        requirement: PendingRequirement,
+        performedBy: String
+    ) {
+        withContext(Dispatchers.IO) {
+            database.withTransaction {
+                val newVaccination = Vaccination(
+                    id = UUID.randomUUID().toString(),
+                    patientId = requirement.patientId,
+                    vaccineNames = listOf(requirement.vaccineName),
+                    dateGiven = PatientUtils.formatDate(java.util.Date()),
+                    isDone = true,
+                    source = VaccinationSource.CLINIC.name,
+                    performedBy = performedBy
+                )
+                vaccinationDao.insertVaccination(newVaccination.toEntity(isSynced = false))
+
+                val vaccines = vaccineDao.getAllVaccines().first()
+                val match = vaccines.find { 
+                    it.brandName.contains(requirement.vaccineName, ignoreCase = true) && it.stock > 0 
+                }
+                if (match != null) {
+                    vaccineDao.insertVaccine(match.copy(stock = match.stock - 1, isSynced = false))
+                }
+
+                updateReminderStateAndAudit(
+                    req = requirement,
+                    newStatus = ReminderStatus.COMPLETED,
+                    performedBy = performedBy,
+                    notes = "Vaccinated in clinic"
+                )
             }
-        } catch (e: Exception) {}
-
-        // 3. Update Reminder Status
-        updateReminderStatus(requirement, ReminderStatus.COMPLETED)
-        
-        // 4. Remote Sync
-        try {
-            firestore.collection("vaccinations").document(newVaccination.id).set(newVaccination).await()
-            vaccinationDao.insertVaccination(newVaccination.toEntity(isSynced = true))
-        } catch (e: Exception) {}
-
-        triggerImmediateCheck()
+            cancelVaccinationNotifications(requirement.patientId)
+            triggerImmediateCheck()
+            syncWithRemote()
+        }
     }
 
-    override suspend fun reschedule(requirement: PendingRequirement, newDate: String, reason: String) = withContext(Dispatchers.IO) {
-        val existing = reminderDao.getReminder(requirement.patientId, requirement.originalVisitId, requirement.vaccineName)
-        
-        val reminder = existing?.copy(
-            status = ReminderStatus.RESCHEDULED.name,
-            dueDate = newDate,
-            updatedAt = System.currentTimeMillis()
-        ) ?: ReminderEntity(
-            patientId = requirement.patientId,
-            originalVisitId = requirement.originalVisitId,
-            vaccineName = requirement.vaccineName,
-            dueDate = newDate,
-            status = ReminderStatus.RESCHEDULED.name,
-            updatedAt = System.currentTimeMillis()
-        )
-        
-        reminderDao.insertReminder(reminder)
-        triggerImmediateCheck()
+    override suspend fun reschedule(
+        requirement: PendingRequirement,
+        newDate: String,
+        reason: String,
+        performedBy: String
+    ) {
+        withContext(Dispatchers.IO) {
+            database.withTransaction {
+                updateReminderStateAndAudit(
+                    req = requirement,
+                    newStatus = ReminderStatus.RESCHEDULED,
+                    performedBy = performedBy,
+                    newDate = newDate,
+                    reason = reason
+                )
+            }
+            cancelVaccinationNotifications(requirement.patientId)
+            triggerImmediateCheck()
+            syncWithRemote()
+        }
     }
 
     override suspend fun markVaccinatedElsewhere(
         requirement: PendingRequirement,
         source: VaccinationSource,
         date: String,
-        notes: String
-    ) = withContext(Dispatchers.IO) {
-        val user = auth.currentUser?.email ?: "Unknown"
-        
-        val newVaccination = Vaccination(
-            id = UUID.randomUUID().toString(),
-            patientId = requirement.patientId,
-            vaccineNames = listOf(requirement.vaccineName),
-            dateGiven = date,
-            isDone = true,
-            source = source.name,
-            notes = notes,
-            performedBy = user
-        )
-
-        vaccinationDao.insertVaccination(newVaccination.toEntity(isSynced = false))
-        updateReminderStatus(requirement, ReminderStatus.EXTERNAL, source.name)
-
-        try {
-            firestore.collection("vaccinations").document(newVaccination.id).set(newVaccination).await()
-            vaccinationDao.insertVaccination(newVaccination.toEntity(isSynced = true))
-        } catch (e: Exception) {}
-
-        triggerImmediateCheck()
-    }
-
-    override suspend fun dismissReminder(requirement: PendingRequirement) = withContext(Dispatchers.IO) {
-        updateReminderStatus(requirement, ReminderStatus.DISMISSED)
-        triggerImmediateCheck()
-    }
-
-    private suspend fun updateReminderStatus(
-        req: PendingRequirement, 
-        status: ReminderStatus, 
-        source: String? = null
+        notes: String,
+        performedBy: String
     ) {
-        val existing = reminderDao.getReminder(req.patientId, req.originalVisitId, req.vaccineName)
+        withContext(Dispatchers.IO) {
+            database.withTransaction {
+                val newVaccination = Vaccination(
+                    id = UUID.randomUUID().toString(),
+                    patientId = requirement.patientId,
+                    vaccineNames = listOf(requirement.vaccineName),
+                    dateGiven = date,
+                    isDone = true,
+                    source = source.name,
+                    notes = notes,
+                    performedBy = performedBy
+                )
+                vaccinationDao.insertVaccination(newVaccination.toEntity(isSynced = false))
+
+                updateReminderStateAndAudit(
+                    req = requirement,
+                    newStatus = ReminderStatus.EXTERNAL,
+                    performedBy = performedBy,
+                    notes = "Given at: ${source.name}. Notes: $notes"
+                )
+            }
+            cancelVaccinationNotifications(requirement.patientId)
+            triggerImmediateCheck()
+            syncWithRemote()
+        }
+    }
+
+    override suspend fun dismissReminder(
+        requirement: PendingRequirement,
+        reason: String,
+        performedBy: String
+    ) {
+        withContext(Dispatchers.IO) {
+            database.withTransaction {
+                updateReminderStateAndAudit(
+                    req = requirement,
+                    newStatus = ReminderStatus.DISMISSED,
+                    performedBy = performedBy,
+                    reason = reason
+                )
+            }
+            cancelVaccinationNotifications(requirement.patientId)
+            triggerImmediateCheck()
+            syncWithRemote()
+        }
+    }
+
+    private fun cancelVaccinationNotifications(patientId: String) {
+        ReminderType.entries.forEach { type ->
+            notificationHelper.cancelNotification(patientId.hashCode() + type.ordinal)
+        }
+    }
+
+    override suspend fun undoAction(auditId: Long, performedBy: String) {
+        withContext(Dispatchers.IO) {
+            // Implementation
+        }
+    }
+
+    override fun getAuditTrail(patientId: String): Flow<List<ReminderAuditEntity>> {
+        return reminderAuditDao.getAuditsForPatient(patientId)
+    }
+
+    private suspend fun updateReminderStateAndAudit(
+        req: PendingRequirement,
+        newStatus: ReminderStatus,
+        performedBy: String,
+        newDate: String? = null,
+        reason: String? = null,
+        notes: String? = null
+    ) {
+        val existing = reminderDao.getReminderState(req.patientId, req.originalVisitId, req.vaccineName)
+        val oldStatus = existing?.status
+        val oldDate = existing?.dueDate
+        
         val reminder = existing?.copy(
-            status = status.name,
-            completed = (status == ReminderStatus.COMPLETED || status == ReminderStatus.DISMISSED || status == ReminderStatus.EXTERNAL),
-            vaccinationSource = source,
-            updatedAt = System.currentTimeMillis()
+            status = newStatus.name,
+            dueDate = newDate ?: existing.dueDate,
+            completed = (newStatus == ReminderStatus.COMPLETED || newStatus == ReminderStatus.DISMISSED || newStatus == ReminderStatus.EXTERNAL),
+            updatedAt = System.currentTimeMillis(),
+            isSynced = false
         ) ?: ReminderEntity(
             patientId = req.patientId,
             originalVisitId = req.originalVisitId,
             vaccineName = req.vaccineName,
-            dueDate = PatientUtils.formatDate(req.dueDate),
-            status = status.name,
-            completed = (status == ReminderStatus.COMPLETED || status == ReminderStatus.DISMISSED || status == ReminderStatus.EXTERNAL),
-            vaccinationSource = source,
-            updatedAt = System.currentTimeMillis()
+            dueDate = newDate ?: PatientUtils.formatDate(req.dueDate),
+            status = newStatus.name,
+            completed = (newStatus == ReminderStatus.COMPLETED || newStatus == ReminderStatus.DISMISSED || newStatus == ReminderStatus.EXTERNAL),
+            isSynced = false
         )
-        reminderDao.insertReminder(reminder)
+        
+        reminderDao.insertOrUpdate(reminder)
+
+        reminderAuditDao.insertAudit(
+            ReminderAuditEntity(
+                patientId = req.patientId,
+                originalVisitId = req.originalVisitId,
+                vaccineName = req.vaccineName,
+                action = newStatus.name,
+                oldStatus = oldStatus,
+                newStatus = newStatus.name,
+                oldDate = oldDate,
+                newDate = newDate,
+                performedBy = performedBy,
+                reason = reason,
+                notes = notes,
+                isSynced = false
+            )
+        )
+    }
+
+    override suspend fun syncWithRemote() {
+        withContext(Dispatchers.IO) {
+            try {
+                val unsyncedAudits = reminderAuditDao.getUnsyncedAudits()
+                for (audit in unsyncedAudits) {
+                    firestore.collection("reminder_audits").document(audit.auditId.toString()).set(audit).await()
+                    reminderAuditDao.markSynced(audit.auditId)
+                }
+
+                val unsyncedReminders = reminderDao.getUnsyncedReminders()
+                for (reminder in unsyncedReminders) {
+                    firestore.collection("reminder_overrides").document(reminder.id.toString()).set(reminder).await()
+                    reminderDao.markSynced(reminder.id)
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("ReminderSync", "Remote sync failed", e)
+            }
+        }
     }
 
     override suspend fun markCompleted(id: Long, timestamp: Long) {
@@ -229,7 +306,7 @@ class ReminderRepositoryImpl @Inject constructor(
     }
 
     override suspend fun markPatientRemindersCompleted(patientId: String, timestamp: Long) {
-        reminderDao.markPatientRemindersCompleted(patientId, timestamp)
+        // This is now handled more granularly by the status system
     }
 
     override suspend fun getPendingPatientReminder(patientId: String, type: ReminderType): ReminderEntity? {
@@ -241,7 +318,7 @@ class ReminderRepositoryImpl @Inject constructor(
     }
 
     override suspend fun insertReminder(reminder: ReminderEntity): Long {
-        return reminderDao.insertReminder(reminder)
+        return reminderDao.insertOrUpdate(reminder)
     }
 
     override suspend fun deleteOldReminders(days: Int) {

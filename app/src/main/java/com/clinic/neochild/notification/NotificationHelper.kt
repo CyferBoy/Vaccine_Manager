@@ -142,4 +142,12 @@ class NotificationHelper @Inject constructor(
 
         NotificationManagerCompat.from(context).notify(id, builder.build())
     }
+
+    fun cancelNotification(id: Int) {
+        NotificationManagerCompat.from(context).cancel(id)
+    }
+
+    fun cancelAllVaccinationNotifications() {
+        notificationManager.cancelAll()
+    }
 }

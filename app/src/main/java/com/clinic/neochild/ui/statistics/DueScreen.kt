@@ -50,7 +50,7 @@ fun DueScreen(
                         initialFilter = uiState.selectedFilter,
                         onFilterChanged = viewModel::updateFilter,
                         onMarkAsDone = viewModel::markAsDone,
-                        onClearReminder = viewModel::clearReminder,
+                        onDismissReminder = viewModel::dismissReminder,
                         onReschedule = viewModel::rescheduleVaccination,
                         onVaccinatedElsewhere = viewModel::markVaccinatedElsewhere
                     )

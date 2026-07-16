@@ -6,30 +6,27 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ReminderDao {
-    @Query("SELECT * FROM reminders ORDER BY createdAt DESC")
+    @Query("SELECT * FROM reminders ORDER BY updatedAt DESC")
     fun getAllReminders(): Flow<List<ReminderEntity>>
 
-    @Query("SELECT * FROM reminders WHERE patientId = :patientId AND originalVisitId = :originalVisitId AND vaccineName = :vaccineName LIMIT 1")
-    suspend fun getReminder(patientId: String, originalVisitId: String, vaccineName: String): ReminderEntity?
+    @Query("SELECT * FROM reminders WHERE patientId = :patientId AND originalVisitId = :visitId AND vaccineName = :vaccineName LIMIT 1")
+    suspend fun getReminderState(patientId: String, visitId: String, vaccineName: String): ReminderEntity?
 
-    @Query("SELECT * FROM reminders WHERE patientId = :patientId AND type = :type AND completed = 0")
-    suspend fun getPendingPatientReminder(patientId: String, type: String): ReminderEntity?
-
-    @Query("SELECT * FROM reminders WHERE originalVisitId = :vaccineId AND type = :type AND completed = 0")
-    suspend fun getPendingVaccineReminder(vaccineId: String, type: String): ReminderEntity?
+    @Query("SELECT * FROM reminders WHERE completed = 0")
+    fun getActiveOverrides(): Flow<List<ReminderEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertReminder(reminder: ReminderEntity): Long
+    suspend fun insertOrUpdate(reminder: ReminderEntity): Long
 
-    @Update
-    suspend fun updateReminder(reminder: ReminderEntity)
+    @Query("UPDATE reminders SET status = :status, completed = :isCompleted, updatedAt = :timestamp WHERE id = :id")
+    suspend fun updateStatus(id: Long, status: String, isCompleted: Boolean, timestamp: Long = System.currentTimeMillis())
 
-    @Query("UPDATE reminders SET completed = 1, status = 'COMPLETED', updatedAt = :timestamp WHERE id = :id")
-    suspend fun markCompleted(id: Long, timestamp: Long = System.currentTimeMillis())
+    @Query("UPDATE reminders SET completed = 1, status = 'COMPLETED', updatedAt = :timestamp WHERE patientId = :patientId")
+    suspend fun markAllForPatientCompleted(patientId: String, timestamp: Long = System.currentTimeMillis())
 
-    @Query("UPDATE reminders SET completed = 1, status = 'COMPLETED', updatedAt = :timestamp WHERE patientId = :patientId AND completed = 0")
-    suspend fun markPatientRemindersCompleted(patientId: String, timestamp: Long = System.currentTimeMillis())
+    @Query("SELECT * FROM reminders WHERE isSynced = 0")
+    suspend fun getUnsyncedReminders(): List<ReminderEntity>
 
-    @Query("DELETE FROM reminders WHERE completed = 1 AND updatedAt < :timestamp")
-    suspend fun deleteOldCompletedReminders(timestamp: Long)
+    @Query("UPDATE reminders SET isSynced = 1 WHERE id = :id")
+    suspend fun markSynced(id: Long)
 }

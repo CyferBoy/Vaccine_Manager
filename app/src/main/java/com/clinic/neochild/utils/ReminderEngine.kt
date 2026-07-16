@@ -4,17 +4,15 @@ import com.clinic.neochild.data.model.Vaccination
 import java.util.*
 
 /**
- * Requirement-Based Reminder Engine
- * 
- * Instead of checking for "newer records", this engine tracks individual vaccine 
- * requirements (nxtVaccineNames) and checks if they have been "satisfied" by 
- * any subsequent administration (vaccineNames).
+ * Pure Requirement Calculator.
+ * Identifies potential gaps in a patient's vaccination schedule based purely
+ * on medical records. It does NOT check manual overrides (dismissed, rescheduled).
  */
 object ReminderEngine {
 
     /**
-     * Pure calculation: Analyzes vaccination history to find requirements.
-     * A requirement is satisfied if ANY visit occurring ON OR AFTER the 
+     * Analyzes vaccination history to find requirements that haven't been medically satisfied.
+     * A requirement is satisfied if ANY visit occurring ON OR AFTER the
      * visit that created the requirement contains this vaccine in its "Gave" list.
      */
     fun getPotentialRequirements(allVaccinations: List<Vaccination>): List<PendingRequirement> {
@@ -22,10 +20,13 @@ object ReminderEngine {
         val patientVisits = allVaccinations.groupBy { it.patientId }
 
         for ((patientId, visits) in patientVisits) {
+            // Sort visits chronologically
             val sortedVisits = visits.sortedBy { PatientUtils.parseDate(it.dateGiven) ?: Date(0) }
 
             for (i in sortedVisits.indices) {
                 val visit = sortedVisits[i]
+                
+                // If this visit doesn't specify any "next vaccines", it creates no requirements
                 if (visit.nextDueDate.isBlank() || visit.nxtVaccineNames.isEmpty()) continue
 
                 val dueDate = PatientUtils.parseDate(visit.nextDueDate) ?: continue
@@ -34,6 +35,7 @@ object ReminderEngine {
                     val cleanedDueName = PatientUtils.cleanVaccineName(dueVaccineName).lowercase().trim()
                     if (cleanedDueName.isBlank()) continue
 
+                    // A requirement is satisfied if it was medically given in this or any subsequent visit.
                     val isSatisfiedByMedicalRecord = sortedVisits.drop(i).any { laterVisit ->
                         laterVisit.vaccineNames.any { givenName ->
                             PatientUtils.cleanVaccineName(givenName).lowercase().trim() == cleanedDueName
@@ -58,7 +60,7 @@ object ReminderEngine {
 }
 
 /**
- * Represents a specific vaccine that is still missing from a patient's clinical path.
+ * Represents a medically unsatisfied requirement.
  */
 data class PendingRequirement(
     val patientId: String,

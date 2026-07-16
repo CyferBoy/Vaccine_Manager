@@ -14,7 +14,9 @@ import com.clinic.neochild.domain.usecase.sync.RefreshDataUseCase
 import com.clinic.neochild.domain.usecase.vaccination.DeleteVaccinationUseCase
 import com.clinic.neochild.domain.usecase.vaccination.GetVaccinationsUseCase
 import com.clinic.neochild.domain.usecase.vaccination.SaveVaccinationUseCase
+import com.clinic.neochild.domain.model.PendingRequirement
 import com.clinic.neochild.domain.logic.ReminderEngine
+import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -109,6 +111,7 @@ class PatientViewModel @Inject constructor(
             vaccinationRepository.markAsDone(vaccination.id)
             
             // 2. Clear associated reminders
+            val currentUserEmail = FirebaseAuth.getInstance().currentUser?.email ?: "Unknown"
             val allRequirements = ReminderEngine.getPotentialRequirements(allVaccinations.value)
             val matching = allRequirements.filter { req ->
                 req.patientId == vaccination.patientId && 
@@ -116,7 +119,7 @@ class PatientViewModel @Inject constructor(
             }
             
             for (req in matching) {
-                reminderRepository.markAsDone(req)
+                reminderRepository.markAsDone(req, currentUserEmail)
             }
         }
     }

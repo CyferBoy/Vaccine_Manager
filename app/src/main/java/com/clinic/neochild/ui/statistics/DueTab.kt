@@ -528,7 +528,23 @@ private fun DueTabPreview() {
     NeoChildTheme {
         DueTab(
             patients = listOf(Patient("1", "John Doe", "1234567890", "", "2020-01-01", "Male", "", "")),
-            filteredVaccinations = listOf(Vaccination("1", "1", listOf("BCG"), listOf("HepB"), "1 Jan 2024", "1 Feb 2024", 500.0, 500.0, 0.0, 500.0, false, false, false)),
+            filteredVaccinations = listOf(
+                Vaccination(
+                    id = "1",
+                    patientId = "1",
+                    vaccineNames = listOf("BCG"),
+                    nxtVaccineNames = listOf("HepB"),
+                    dateGiven = "1 Jan 2024",
+                    nextDueDate = "1 Feb 2024",
+                    cost = 500.0,
+                    cashAmount = 500.0,
+                    onlineAmount = 0.0,
+                    totalPaid = 500.0,
+                    withFees = false,
+                    doctorsAcc = false,
+                    isDone = false
+                )
+            ),
             overdueCount = 1,
             onMarkAsDone = {},
             onDismissReminder = { _, _ -> },

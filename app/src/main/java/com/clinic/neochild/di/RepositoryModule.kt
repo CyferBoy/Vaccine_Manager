@@ -1,74 +1,48 @@
 package com.clinic.neochild.di
 
-import com.clinic.neochild.data.datasource.patient.PatientLocalDataSource
-import com.clinic.neochild.data.datasource.patient.PatientRemoteDataSource
-import com.clinic.neochild.data.datasource.vaccination.VaccinationLocalDataSource
-import com.clinic.neochild.data.datasource.vaccination.VaccinationRemoteDataSource
-import com.clinic.neochild.data.repository.*
-import com.clinic.neochild.domain.repository.*
-import com.clinic.neochild.utils.AuditLogger
-import com.google.firebase.firestore.FirebaseFirestore
+import com.clinic.neochild.data.repository.InventoryRepositoryImpl
+import com.clinic.neochild.data.repository.PatientRepositoryImpl
+import com.clinic.neochild.data.repository.ReminderRepositoryImpl
+import com.clinic.neochild.data.repository.SyncRepositoryImpl
+import com.clinic.neochild.data.repository.VaccinationRepositoryImpl
+import com.clinic.neochild.data.repository.VaccineRepositoryImpl
+import com.clinic.neochild.domain.repository.InventoryRepository
+import com.clinic.neochild.domain.repository.PatientRepository
+import com.clinic.neochild.domain.repository.ReminderRepository
+import com.clinic.neochild.domain.repository.SyncRepository
+import com.clinic.neochild.domain.repository.VaccinationRepository
+import com.clinic.neochild.domain.repository.VaccineRepository
+import dagger.Binds
 import dagger.Module
-import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
-object RepositoryModule {
+abstract class RepositoryModule {
 
-    @Provides
+    @Binds
     @Singleton
-    fun providePatientRepository(
-        localDataSource: PatientLocalDataSource,
-        remoteDataSource: PatientRemoteDataSource,
-        vaccinationLocal: VaccinationLocalDataSource,
-        vaccinationRemote: VaccinationRemoteDataSource,
-        firestore: FirebaseFirestore,
-        auditLogger: AuditLogger
-    ): PatientRepository {
-        return PatientRepositoryImpl(
-            localDataSource, 
-            remoteDataSource, 
-            vaccinationLocal, 
-            vaccinationRemote, 
-            firestore,
-            auditLogger
-        )
-    }
+    abstract fun bindPatientRepository(impl: PatientRepositoryImpl): PatientRepository
 
-    @Provides
+    @Binds
     @Singleton
-    fun provideVaccinationRepository(
-        localDataSource: VaccinationLocalDataSource,
-        remoteDataSource: VaccinationRemoteDataSource,
-        auditLogger: AuditLogger
-    ): VaccinationRepository {
-        return VaccinationRepositoryImpl(localDataSource, remoteDataSource, auditLogger)
-    }
+    abstract fun bindVaccinationRepository(impl: VaccinationRepositoryImpl): VaccinationRepository
 
-    @Provides
+    @Binds
     @Singleton
-    fun provideReminderRepository(
-        repositoryImpl: ReminderRepositoryImpl
-    ): ReminderRepository = repositoryImpl
+    abstract fun bindReminderRepository(impl: ReminderRepositoryImpl): ReminderRepository
 
-    @Provides
+    @Binds
     @Singleton
-    fun provideVaccineRepository(
-        repositoryImpl: VaccineRepositoryImpl
-    ): VaccineRepository = repositoryImpl
+    abstract fun bindVaccineRepository(impl: VaccineRepositoryImpl): VaccineRepository
 
-    @Provides
+    @Binds
     @Singleton
-    fun provideInventoryRepository(
-        repositoryImpl: InventoryRepositoryImpl
-    ): InventoryRepository = repositoryImpl
+    abstract fun bindInventoryRepository(impl: InventoryRepositoryImpl): InventoryRepository
 
-    @Provides
+    @Binds
     @Singleton
-    fun provideSyncRepository(
-        repositoryImpl: SyncRepositoryImpl
-    ): SyncRepository = repositoryImpl
+    abstract fun bindSyncRepository(impl: SyncRepositoryImpl): SyncRepository
 }

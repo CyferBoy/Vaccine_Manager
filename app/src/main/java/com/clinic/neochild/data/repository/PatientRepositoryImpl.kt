@@ -23,9 +23,10 @@ class PatientRepositoryImpl @Inject constructor(
     private val vaccinationLocal: VaccinationLocalDataSource,
     private val vaccinationRemote: VaccinationRemoteDataSource,
     private val firestore: FirebaseFirestore, // Needed for batch operations for now
-    private val auditLogger: AuditLogger,
-    private val repositoryScope: CoroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val auditLogger: AuditLogger
 ) : PatientRepository {
+
+    private val repositoryScope: CoroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     override val allPatients: Flow<List<Patient>> = localDataSource.getAllPatients()
 

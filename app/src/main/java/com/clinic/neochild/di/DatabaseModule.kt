@@ -4,6 +4,7 @@ import android.content.Context
 import com.clinic.neochild.data.local.AppDatabase
 import com.clinic.neochild.data.local.dao.PatientDao
 import com.clinic.neochild.data.local.dao.ReminderDao
+import com.clinic.neochild.data.local.dao.ReminderAuditDao
 import com.clinic.neochild.data.local.dao.VaccinationDao
 import com.clinic.neochild.data.local.dao.VaccineDao
 import dagger.Module
@@ -36,6 +37,11 @@ object DatabaseModule {
     @Provides
     fun provideReminderDao(database: AppDatabase): ReminderDao {
         return database.reminderDao()
+    }
+
+    @Provides
+    fun provideReminderAuditDao(database: AppDatabase): ReminderAuditDao {
+        return database.reminderAuditDao()
     }
 
     @Provides

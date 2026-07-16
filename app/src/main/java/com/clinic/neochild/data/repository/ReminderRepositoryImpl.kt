@@ -6,6 +6,7 @@ import com.clinic.neochild.data.local.AppDatabase
 import com.clinic.neochild.data.local.dao.*
 import com.clinic.neochild.data.local.entity.*
 import com.clinic.neochild.domain.model.*
+import com.clinic.neochild.domain.repository.InventoryRepository
 import com.clinic.neochild.domain.repository.ReminderRepository
 import com.clinic.neochild.domain.repository.ReminderStats
 import com.clinic.neochild.notification.ReminderScheduler
@@ -39,6 +40,7 @@ class ReminderRepositoryImpl @Inject constructor(
     private val auth: FirebaseAuth,
     private val reminderScheduler: ReminderScheduler,
     private val notificationHelper: com.clinic.neochild.notification.NotificationHelper,
+    private val inventoryRepository: InventoryRepository,
     @ApplicationContext private val context: Context
 ) : ReminderRepository {
 
@@ -240,17 +242,29 @@ class ReminderRepositoryImpl @Inject constructor(
 
                 val vaccines = vaccineDao.getAllVaccines().first()
                 val match = vaccines.find { 
-                    it.brandName.contains(requirement.vaccineName, ignoreCase = true) && it.stock > 0 
+                    it.brandName.contains(requirement.vaccineName, ignoreCase = true)
                 }
                 if (match != null) {
-                    vaccineDao.insertVaccine(match.copy(stock = match.stock - 1, isSynced = false))
+                    val currentStock = vaccineDao.getTotalStockForVaccine(match.id) ?: 0
+                    if (currentStock > 0) {
+                        inventoryRepository.deductStock(
+                            vaccineId = match.id,
+                            quantity = 1,
+                            user = performedBy,
+                            transactionType = InventoryTransactionType.VACCINATION,
+                            vaccinationId = newVaccination.id,
+                            patientId = requirement.patientId
+                        )
+                    }
                 }
 
                 updateReminderStateAndAudit(
                     req = requirement,
                     newStatus = ReminderStatus.COMPLETED,
                     performedBy = performedBy,
-                    notes = "Vaccinated in clinic"
+                    notes = "Vaccinated in clinic",
+                    priority = "NORMAL",
+                    reminderEnabled = true
                 )
             }
             triggerImmediateCheck()
@@ -347,7 +361,9 @@ class ReminderRepositoryImpl @Inject constructor(
         performedBy: String,
         newDate: String? = null,
         reason: String? = null,
-        notes: String? = null
+        notes: String? = null,
+        priority: String? = null,
+        reminderEnabled: Boolean? = null
     ) {
         val existing = reminderDao.getReminderState(req.patientId, req.originalVisitId, req.vaccineName)
         val oldStatus = existing?.status
@@ -357,6 +373,8 @@ class ReminderRepositoryImpl @Inject constructor(
             status = newStatus.name,
             dueDate = newDate ?: existing.dueDate,
             completed = (newStatus == ReminderStatus.COMPLETED || newStatus == ReminderStatus.DISMISSED || newStatus == ReminderStatus.EXTERNAL),
+            priority = priority ?: existing.priority,
+            reminderEnabled = reminderEnabled ?: existing.reminderEnabled,
             updatedAt = System.currentTimeMillis(),
             isSynced = false
         ) ?: ReminderEntity(
@@ -365,6 +383,8 @@ class ReminderRepositoryImpl @Inject constructor(
             vaccineName = req.vaccineName,
             dueDate = newDate ?: PatientUtils.formatDate(req.dueDate),
             status = newStatus.name,
+            priority = priority ?: "NORMAL",
+            reminderEnabled = reminderEnabled ?: true,
             completed = (newStatus == ReminderStatus.COMPLETED || newStatus == ReminderStatus.DISMISSED || newStatus == ReminderStatus.EXTERNAL),
             isSynced = false
         )
@@ -382,6 +402,8 @@ class ReminderRepositoryImpl @Inject constructor(
                 oldDate = oldDate,
                 newDate = newDate,
                 performedBy = performedBy,
+                priority = priority ?: reminder.priority,
+                reminderEnabled = reminderEnabled ?: reminder.reminderEnabled,
                 reason = reason,
                 notes = notes,
                 isSynced = false
@@ -413,19 +435,9 @@ class ReminderRepositoryImpl @Inject constructor(
         reminderDao.updateStatus(id, ReminderStatus.COMPLETED.name, true, timestamp)
     }
 
-    override suspend fun markPatientRemindersCompleted(patientId: String, timestamp: Long) {
-        reminderDao.markAllForPatientCompleted(patientId, timestamp)
-    }
-
-    override suspend fun getPendingPatientReminder(patientId: String, type: ReminderType): ReminderEntity? = null
-
-    override suspend fun getPendingVaccineReminder(vaccineId: String, type: ReminderType): ReminderEntity? = null
-
     override suspend fun insertReminder(reminder: ReminderEntity): Long {
         return reminderDao.insertOrUpdate(reminder)
     }
-
-    override suspend fun deleteOldReminders(days: Int) {}
 
     override fun triggerImmediateCheck() {
         reminderScheduler.runNow()

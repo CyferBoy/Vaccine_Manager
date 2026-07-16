@@ -23,6 +23,7 @@ import com.clinic.neochild.R
 import com.clinic.neochild.domain.model.Consultation
 import com.clinic.neochild.domain.model.Patient
 import com.clinic.neochild.domain.model.Vaccination
+import com.clinic.neochild.core.utils.PatientUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -396,8 +397,8 @@ object ReceiptManager {
         paint.typeface = Typeface.create("serif", Typeface.NORMAL)
         
         val names = vaccination.vaccineNames
-        val batches = vaccination.batchNumbers.ifEmpty { listOf(vaccination.batchNumber) }
-        val expiries = vaccination.expiryDates.ifEmpty { listOf(vaccination.expiryDate) }
+        val batches = vaccination.batchNumbers.ifEmpty { emptyList() }
+        val expiries = vaccination.expiryDates.ifEmpty { emptyList() }
         
         val batchX = MARGIN + 300f
         val expX = MARGIN + 400f
@@ -457,7 +458,7 @@ object ReceiptManager {
         paint.typeface = Typeface.create("serif", Typeface.BOLD)
         canvas.drawText("NEXT VACCINATION DUE ON:", MARGIN + 10f, yPos + 15f, paint)
         
-        val recommendedList = vaccination.nxtVaccineNames.ifEmpty { listOf(vaccination.nxtVaccineName) }.filter { it.isNotBlank() }
+        val recommendedList = vaccination.nxtVaccineNames.filter { it.isNotBlank() }
         val recStr = if (recommendedList.isNotEmpty()) " (${recommendedList.joinToString(", ")})" else ""
         
         var combinedText = vaccination.nextDueDate + recStr

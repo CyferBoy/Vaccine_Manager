@@ -17,9 +17,10 @@ import javax.inject.Inject
 class VaccinationRepositoryImpl @Inject constructor(
     private val localDataSource: VaccinationLocalDataSource,
     private val remoteDataSource: VaccinationRemoteDataSource,
-    private val auditLogger: AuditLogger,
-    private val repositoryScope: CoroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val auditLogger: AuditLogger
 ) : VaccinationRepository {
+
+    private val repositoryScope: CoroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     override val allVaccinations: Flow<List<Vaccination>> = localDataSource.getAllVaccinations()
 

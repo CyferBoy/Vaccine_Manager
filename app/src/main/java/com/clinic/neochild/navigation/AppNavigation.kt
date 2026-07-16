@@ -18,7 +18,7 @@ import com.clinic.neochild.ui.statistics.DueScreen
 import com.clinic.neochild.ui.statistics.MonthlyFinanceDetailsScreen
 import com.clinic.neochild.ui.statistics.StatisticsScreen
 import com.clinic.neochild.ui.vaccine.AddVaccineStockScreen
-import com.clinic.neochild.ui.vaccine.AddVaccinationScreen
+import com.clinic.neochild.feature_vaccination.AddVaccinationScreen
 import com.clinic.neochild.ui.vaccine.BorrowedScreen
 import com.clinic.neochild.ui.vaccine.VaccineInventoryScreen
 import com.clinic.neochild.ui.vaccine.WasteScreen

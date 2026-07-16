@@ -1,8 +1,11 @@
 package com.clinic.neochild.data.model
 
 enum class ReminderStatus {
-    PENDING,
-    SENT,
+    ACTIVE,
     COMPLETED,
-    DISMISSED
+    RESCHEDULED,
+    EXTERNAL,
+    DISMISSED,
+    MISSED,
+    SENT // Kept for notification tracking
 }

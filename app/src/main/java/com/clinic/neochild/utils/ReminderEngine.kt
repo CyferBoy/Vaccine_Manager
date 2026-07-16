@@ -13,43 +13,35 @@ import java.util.*
 object ReminderEngine {
 
     /**
-     * Analyzes vaccination history to find requirements that haven't been met yet.
+     * Pure calculation: Analyzes vaccination history to find requirements.
+     * A requirement is satisfied if ANY visit occurring ON OR AFTER the 
+     * visit that created the requirement contains this vaccine in its "Gave" list.
      */
-    fun getUnsatisfiedRequirements(allVaccinations: List<Vaccination>): List<PendingRequirement> {
-        val pending = mutableListOf<PendingRequirement>()
-        
-        // Group by patient to avoid cross-patient pollution and optimize sorting
+    fun getPotentialRequirements(allVaccinations: List<Vaccination>): List<PendingRequirement> {
+        val requirements = mutableListOf<PendingRequirement>()
         val patientVisits = allVaccinations.groupBy { it.patientId }
 
         for ((patientId, visits) in patientVisits) {
-            // Sort visits chronologically
             val sortedVisits = visits.sortedBy { PatientUtils.parseDate(it.dateGiven) ?: Date(0) }
 
             for (i in sortedVisits.indices) {
                 val visit = sortedVisits[i]
-                
-                // If this visit doesn't specify any "next vaccines", or it's already marked as done, it creates no requirements
-                if (visit.nextDueDate.isBlank() || visit.nxtVaccineNames.isEmpty() || visit.isDone) continue
+                if (visit.nextDueDate.isBlank() || visit.nxtVaccineNames.isEmpty()) continue
 
                 val dueDate = PatientUtils.parseDate(visit.nextDueDate) ?: continue
 
-                // Check each expected vaccine in this specific visit's "Next Due" list
                 for (dueVaccineName in visit.nxtVaccineNames) {
                     val cleanedDueName = PatientUtils.cleanVaccineName(dueVaccineName).lowercase().trim()
                     if (cleanedDueName.isBlank()) continue
 
-                    // A requirement is satisfied if ANY visit occurring ON OR AFTER the 
-                    // visit that created the requirement contains this vaccine in its "Gave" list.
-                    // Note: We check 'i' and onwards because the doctor might have given it the same day 
-                    // (though rare, it handles data entry edge cases).
-                    val isSatisfied = sortedVisits.drop(i).any { laterVisit ->
+                    val isSatisfiedByMedicalRecord = sortedVisits.drop(i).any { laterVisit ->
                         laterVisit.vaccineNames.any { givenName ->
                             PatientUtils.cleanVaccineName(givenName).lowercase().trim() == cleanedDueName
                         }
                     }
 
-                    if (!isSatisfied) {
-                        pending.add(
+                    if (!isSatisfiedByMedicalRecord) {
+                        requirements.add(
                             PendingRequirement(
                                 patientId = patientId,
                                 vaccineName = dueVaccineName,
@@ -61,7 +53,7 @@ object ReminderEngine {
                 }
             }
         }
-        return pending
+        return requirements
     }
 }
 

@@ -31,50 +31,32 @@ data class DueUiState(
 @HiltViewModel
 class DueViewModel @Inject constructor(
     private val getPatientsUseCase: GetPatientsUseCase,
-    private val getVaccinationsUseCase: GetVaccinationsUseCase,
-    private val reminderRepository: ReminderRepository,
-    private val vaccinationRepository: com.clinic.neochild.domain.repository.VaccinationRepository
+    private val reminderRepository: ReminderRepository
 ) : ViewModel() {
 
     private val _selectedFilter = MutableStateFlow("Today")
     val selectedFilter = _selectedFilter.asStateFlow()
 
-    // Requirements with original vaccination context for the UI
-    private val pendingRequirements = reminderRepository.getUnsatisfiedRequirements()
-
     val uiState: StateFlow<DueUiState> = combine(
         getPatientsUseCase(),
-        getVaccinationsUseCase(),
-        pendingRequirements,
+        reminderRepository.getDueList(),
         _selectedFilter
-    ) { patients, allVaccinations, requirements, filter ->
+    ) { patients, dueVaccinations, filter ->
         
-        // 1. Map current pending requirements to UI objects
-        val pending = requirements.groupBy { it.patientId + PatientUtils.formatDate(it.dueDate) }
-            .mapNotNull { (_, reqs) ->
-                val first = reqs.first()
-                allVaccinations.find { it.id == first.originalVisitId }?.copy(
-                    nxtVaccineNames = reqs.map { it.vaccineName },
-                    nextDueDate = PatientUtils.formatDate(first.dueDate),
-                    isDone = false
-                )
-            }
-        
-        // Filter by period
-        val filtered = PatientUtils.filterVaccinationsByPeriod(pending, filter)
+        val filtered = PatientUtils.filterVaccinationsByPeriod(dueVaccinations, filter)
         
         val todayStart = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
         }.time
         
-        val overdue = pending.count { 
+        val overdue = dueVaccinations.count { 
             val date = PatientUtils.parseDate(it.nextDueDate)
             date != null && date.before(todayStart)
         }
 
         DueUiState(
             patients = patients,
-            vaccinations = allVaccinations,
+            vaccinations = dueVaccinations,
             filteredVaccinations = filtered,
             isLoading = false,
             selectedFilter = filter,
@@ -88,33 +70,24 @@ class DueViewModel @Inject constructor(
 
     fun markAsDone(vaccination: Vaccination) {
         viewModelScope.launch {
-            // 1. Mark the vaccination record itself as done
-            vaccinationRepository.markAsDone(vaccination.id)
-            
-            // 2. Clear associated reminders
-            val requirements = findMatchingRequirements(vaccination)
-            for (req in requirements) {
-                reminderRepository.markAsDone(req)
-            }
+            val req = findMatchingRequirement(vaccination) ?: return@launch
+            reminderRepository.markAsDone(req)
         }
     }
 
     fun clearReminder(vaccination: Vaccination) {
         viewModelScope.launch {
-            // Find the specific requirements that match this UI item
-            val requirements = findMatchingRequirements(vaccination)
-            for (req in requirements) {
-                reminderRepository.markAsDone(req)
-            }
+            val req = findMatchingRequirement(vaccination) ?: return@launch
+            reminderRepository.dismissReminder(req)
         }
     }
 
     fun rescheduleVaccination(vaccinationId: String, newDate: String, reason: String) {
         viewModelScope.launch {
-            val requirements = findMatchingRequirementsById(vaccinationId)
-            for (req in requirements) {
-                reminderRepository.reschedule(req, newDate, reason)
-            }
+            // vaccinationId here refers to originalVisitId in our mapped Vaccination objects
+            val vaccination = uiState.value.vaccinations.find { it.id == vaccinationId } ?: return@launch
+            val req = findMatchingRequirement(vaccination) ?: return@launch
+            reminderRepository.reschedule(req, newDate, reason)
         }
     }
 
@@ -125,25 +98,19 @@ class DueViewModel @Inject constructor(
         notes: String
     ) {
         viewModelScope.launch {
-            val requirements = findMatchingRequirementsById(vaccinationId)
-            for (req in requirements) {
-                reminderRepository.markVaccinatedElsewhere(req, source, date, notes)
-            }
+            val vaccination = uiState.value.vaccinations.find { it.id == vaccinationId } ?: return@launch
+            val req = findMatchingRequirement(vaccination) ?: return@launch
+            reminderRepository.markVaccinatedElsewhere(req, source, date, notes)
         }
     }
 
-    private fun findMatchingRequirements(vaccination: Vaccination): List<PendingRequirement> {
-        // Due to the UI mapping, we need to find the underlying requirement(s)
-        val allRequirements = ReminderEngine.getUnsatisfiedRequirements(uiState.value.vaccinations)
-        return allRequirements.filter { req ->
-            req.patientId == vaccination.patientId && 
-            PatientUtils.formatDate(req.dueDate) == vaccination.nextDueDate &&
-            vaccination.nxtVaccineNames.contains(req.vaccineName)
-        }
-    }
-
-    private fun findMatchingRequirementsById(vaccinationId: String): List<PendingRequirement> {
-        val allRequirements = ReminderEngine.getUnsatisfiedRequirements(uiState.value.vaccinations)
-        return allRequirements.filter { it.originalVisitId == vaccinationId }
+    private fun findMatchingRequirement(vaccination: Vaccination): PendingRequirement? {
+        val dueDate = PatientUtils.parseDate(vaccination.nextDueDate) ?: return null
+        return PendingRequirement(
+            patientId = vaccination.patientId,
+            vaccineName = vaccination.nxtVaccineNames.firstOrNull() ?: "",
+            dueDate = dueDate,
+            originalVisitId = vaccination.id
+        )
     }
 }

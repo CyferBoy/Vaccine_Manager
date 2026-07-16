@@ -9,10 +9,13 @@ interface ReminderDao {
     @Query("SELECT * FROM reminders ORDER BY createdAt DESC")
     fun getAllReminders(): Flow<List<ReminderEntity>>
 
+    @Query("SELECT * FROM reminders WHERE patientId = :patientId AND originalVisitId = :originalVisitId AND vaccineName = :vaccineName LIMIT 1")
+    suspend fun getReminder(patientId: String, originalVisitId: String, vaccineName: String): ReminderEntity?
+
     @Query("SELECT * FROM reminders WHERE patientId = :patientId AND type = :type AND completed = 0")
     suspend fun getPendingPatientReminder(patientId: String, type: String): ReminderEntity?
 
-    @Query("SELECT * FROM reminders WHERE vaccineId = :vaccineId AND type = :type AND completed = 0")
+    @Query("SELECT * FROM reminders WHERE originalVisitId = :vaccineId AND type = :type AND completed = 0")
     suspend fun getPendingVaccineReminder(vaccineId: String, type: String): ReminderEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -21,10 +24,10 @@ interface ReminderDao {
     @Update
     suspend fun updateReminder(reminder: ReminderEntity)
 
-    @Query("UPDATE reminders SET completed = 1, status = 'DONE', updatedAt = :timestamp WHERE id = :id")
+    @Query("UPDATE reminders SET completed = 1, status = 'COMPLETED', updatedAt = :timestamp WHERE id = :id")
     suspend fun markCompleted(id: Long, timestamp: Long = System.currentTimeMillis())
 
-    @Query("UPDATE reminders SET completed = 1, status = 'DONE', updatedAt = :timestamp WHERE patientId = :patientId AND completed = 0")
+    @Query("UPDATE reminders SET completed = 1, status = 'COMPLETED', updatedAt = :timestamp WHERE patientId = :patientId AND completed = 0")
     suspend fun markPatientRemindersCompleted(patientId: String, timestamp: Long = System.currentTimeMillis())
 
     @Query("DELETE FROM reminders WHERE completed = 1 AND updatedAt < :timestamp")

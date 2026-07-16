@@ -8,6 +8,7 @@ import com.clinic.neochild.data.local.entity.ReminderEntity
 import com.clinic.neochild.data.local.preferences.NotificationSettingsManager
 import com.clinic.neochild.data.model.ReminderStatus
 import com.clinic.neochild.data.model.ReminderType
+import com.clinic.neochild.data.model.Vaccination
 import com.clinic.neochild.domain.repository.PatientRepository
 import com.clinic.neochild.domain.repository.ReminderRepository
 import com.clinic.neochild.domain.repository.VaccinationRepository
@@ -41,91 +42,68 @@ class ReminderWorker @AssistedInject constructor(
             vaccineRepository.refreshInventory()
         } catch (e: Exception) { }
 
-        // 2. Process Vaccinations
-        val allVaccinations = vaccinationRepository.allVaccinations.first()
-        val unsatisfiedRequirements = ReminderEngine.getUnsatisfiedRequirements(allVaccinations)
-        
         val today = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0)
             set(Calendar.MINUTE, 0)
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
         }
-        val todayTime = today.time
-        
-        val tomorrow = Calendar.getInstance().apply {
-            time = today.time
-            add(Calendar.DAY_OF_YEAR, 1)
-        }.time
 
-        var dueTodayCount = 0
-        
-        // Group by patient to avoid duplicate notifications per person
-        val requirementsByPatient = unsatisfiedRequirements.groupBy { it.patientId }
+        // 2. Process Vaccinations
+        val dueToday = reminderRepository.getDueToday().first()
+        val dueTomorrow = reminderRepository.getDueTomorrow().first()
+        val overdue = reminderRepository.getOverdue().first()
 
-        for ((patientId, requirements) in requirementsByPatient) {
+        // Combine for processing but keep types distinct
+        val allDue = mutableListOf<Pair<Vaccination, ReminderType>>()
+        dueToday.forEach { allDue.add(it to ReminderType.DUE_TODAY) }
+        dueTomorrow.forEach { allDue.add(it to ReminderType.TOMORROW) }
+        overdue.forEach { allDue.add(it to ReminderType.OVERDUE) }
+
+        val patientsNotified = mutableSetOf<String>()
+
+        for ((vacc, type) in allDue) {
+            val patientId = vacc.patientId
+            if (patientsNotified.contains(patientId)) continue
+
             val patient = patientRepository.getPatientById(patientId) ?: continue
+            val vaccineList = vacc.nxtVaccineNames.joinToString(", ")
+            
+            var shouldNotify = true
+            var extraInfo = ""
 
-            // Find requirements that are due or overdue
-            val dueNow = requirements.filter { req ->
-                req.dueDate.before(tomorrow) || req.dueDate == todayTime
-            }
-
-            if (dueNow.isNotEmpty()) {
-                val oldestReq = dueNow.minByOrNull { it.dueDate } ?: continue
-                val vaccineList = dueNow.joinToString(", ") { it.vaccineName }
-                
-                when {
-                    // Due Today
-                    oldestReq.dueDate == todayTime -> {
-                        dueTodayCount++
-                        checkAndNotifyPatient(
-                            patientId = patient.id,
-                            patientName = patient.name,
-                            vaccinationId = oldestReq.originalVisitId,
-                            vaccineName = vaccineList,
-                            type = ReminderType.DUE_TODAY,
-                            dueDate = PatientUtils.formatDate(oldestReq.dueDate)
-                        )
-                    }
-                    // Tomorrow
-                    oldestReq.dueDate == tomorrow -> {
-                        if (settings.reminderDaysBefore == 1) {
-                            checkAndNotifyPatient(
-                                patientId = patient.id,
-                                patientName = patient.name,
-                                vaccinationId = oldestReq.originalVisitId,
-                                vaccineName = vaccineList,
-                                type = ReminderType.TOMORROW,
-                                dueDate = PatientUtils.formatDate(oldestReq.dueDate)
-                            )
-                        }
-                    }
-                    // Overdue
-                    oldestReq.dueDate.before(todayTime) -> {
-                        val diff = todayTime.time - oldestReq.dueDate.time
-                        val days = (diff / (1000 * 60 * 60 * 24)).toInt()
-                        if (days > 0 && days % settings.overdueFrequencyDays == 0) {
-                            checkAndNotifyPatient(
-                                patientId = patient.id,
-                                patientName = patient.name,
-                                vaccinationId = oldestReq.originalVisitId,
-                                vaccineName = vaccineList,
-                                type = ReminderType.OVERDUE,
-                                dueDate = PatientUtils.formatDate(oldestReq.dueDate),
-                                extraInfo = "Delayed by $days days"
-                            )
-                        }
+            if (type == ReminderType.OVERDUE) {
+                val dueDate = PatientUtils.parseDate(vacc.nextDueDate)
+                if (dueDate != null) {
+                    val diff = System.currentTimeMillis() - dueDate.time
+                    val days = (diff / (1000 * 60 * 60 * 24)).toInt()
+                    if (days <= 0 || days % settings.overdueFrequencyDays != 0) {
+                        shouldNotify = false
+                    } else {
+                        extraInfo = "Delayed by $days days"
                     }
                 }
             }
+
+            if (shouldNotify) {
+                checkAndNotifyPatient(
+                    patientId = patient.id,
+                    patientName = patient.name,
+                    vaccinationId = vacc.id,
+                    vaccineName = vaccineList,
+                    type = type,
+                    dueDate = vacc.nextDueDate,
+                    extraInfo = extraInfo
+                )
+                patientsNotified.add(patientId)
+            }
         }
 
-        if (dueTodayCount > 1) {
+        if (dueToday.size > 1) {
             notificationHelper.showVaccinationNotification(
                 100, 
                 "Vaccinations Due Today", 
-                "$dueTodayCount patients are due today. Tap to open."
+                "${dueToday.size} patients are due today. Tap to open."
             )
         }
 

@@ -25,6 +25,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 if (reminderId != -1L) {
                     CoroutineScope(Dispatchers.IO).launch {
                         reminderRepository.markCompleted(reminderId)
+                        reminderRepository.triggerImmediateCheck()
                     }
                 }
             }

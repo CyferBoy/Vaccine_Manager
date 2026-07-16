@@ -12,13 +12,16 @@ interface ReminderDao {
     @Query("SELECT * FROM reminders WHERE patientId = :patientId AND originalVisitId = :visitId AND vaccineName = :vaccineName LIMIT 1")
     suspend fun getReminderState(patientId: String, visitId: String, vaccineName: String): ReminderEntity?
 
+    @Query("SELECT * FROM reminders WHERE id = :id LIMIT 1")
+    suspend fun getReminderById(id: Long): ReminderEntity?
+
     @Query("SELECT * FROM reminders WHERE completed = 0")
     fun getActiveOverrides(): Flow<List<ReminderEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrUpdate(reminder: ReminderEntity): Long
 
-    @Query("UPDATE reminders SET status = :status, completed = :isCompleted, updatedAt = :timestamp WHERE id = :id")
+    @Query("UPDATE reminders SET status = :status, completed = :isCompleted, updatedAt = :timestamp, isSynced = 0 WHERE id = :id")
     suspend fun updateStatus(id: Long, status: String, isCompleted: Boolean, timestamp: Long = System.currentTimeMillis())
 
     @Query("SELECT * FROM reminders WHERE patientId = :patientId ORDER BY dueDate ASC")

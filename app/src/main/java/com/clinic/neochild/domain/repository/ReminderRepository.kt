@@ -2,10 +2,10 @@ package com.clinic.neochild.domain.repository
 
 import com.clinic.neochild.data.local.entity.ReminderAuditEntity
 import com.clinic.neochild.data.local.entity.ReminderEntity
-import com.clinic.neochild.data.model.ReminderStatus
-import com.clinic.neochild.data.model.Vaccination
-import com.clinic.neochild.data.model.VaccinationSource
-import com.clinic.neochild.utils.PendingRequirement
+import com.clinic.neochild.domain.model.ReminderStatus
+import com.clinic.neochild.domain.model.Vaccination
+import com.clinic.neochild.domain.model.VaccinationSource
+import com.clinic.neochild.domain.model.PendingRequirement
 import kotlinx.coroutines.flow.Flow
 
 /**

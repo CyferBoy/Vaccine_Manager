@@ -9,9 +9,10 @@ import com.clinic.neochild.ui.auth.AuthViewModel
 import com.clinic.neochild.ui.auth.LoginScreen
 import com.clinic.neochild.ui.auth.ManageStaffScreen
 import com.clinic.neochild.ui.dashboard.DashboardScreen
-import com.clinic.neochild.ui.patient.AddPatientScreen
-import com.clinic.neochild.ui.patient.PatientDetailsScreen
-import com.clinic.neochild.ui.patient.PatientListScreen
+import com.clinic.neochild.feature_patient.AddPatientScreen
+import com.clinic.neochild.feature_patient.PatientDetailsScreen
+import com.clinic.neochild.feature_patient.PatientListScreen
+import com.clinic.neochild.feature_sync.SyncScreen
 import com.clinic.neochild.ui.settings.NotificationSettingsScreen
 import com.clinic.neochild.ui.statistics.DueScreen
 import com.clinic.neochild.ui.statistics.MonthlyFinanceDetailsScreen
@@ -73,6 +74,9 @@ fun AppNavigation(
                 onSettings = {
                     navController.navigate(Routes.SETTINGS)
                 },
+                onSync = {
+                    navController.navigate(Routes.SYNC)
+                },
                 onLogout = {
                     navController.navigate(Routes.LOGIN) {
                         popUpTo(Routes.DASHBOARD) { inclusive = true }
@@ -83,6 +87,10 @@ fun AppNavigation(
 
         composable(Routes.SETTINGS) {
             NotificationSettingsScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(Routes.SYNC) {
+            SyncScreen(onBack = { navController.popBackStack() })
         }
 
         composable(Routes.MANAGE_STAFF) {

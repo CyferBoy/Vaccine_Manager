@@ -3,8 +3,8 @@ package com.clinic.neochild.domain.repository
 import com.clinic.neochild.data.local.entity.InventoryTransactionEntity
 import com.clinic.neochild.data.local.entity.VaccineBatchEntity
 import com.clinic.neochild.data.local.entity.VaccineEntity
-import com.clinic.neochild.data.model.InventoryTransactionType
 import com.clinic.neochild.domain.model.InventoryItem
+import com.clinic.neochild.domain.model.InventoryTransactionType
 import kotlinx.coroutines.flow.Flow
 
 interface InventoryRepository {

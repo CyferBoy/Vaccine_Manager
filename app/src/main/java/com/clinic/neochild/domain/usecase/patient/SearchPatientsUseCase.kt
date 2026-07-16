@@ -1,7 +1,7 @@
 package com.clinic.neochild.domain.usecase.patient
 
-import com.clinic.neochild.data.model.Patient
-import com.clinic.neochild.data.model.Vaccination
+import com.clinic.neochild.domain.model.Patient
+import com.clinic.neochild.domain.model.Vaccination
 import javax.inject.Inject
 
 class SearchPatientsUseCase @Inject constructor() {

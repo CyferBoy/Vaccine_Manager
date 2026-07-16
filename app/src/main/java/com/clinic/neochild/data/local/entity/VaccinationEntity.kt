@@ -3,7 +3,7 @@ package com.clinic.neochild.data.local.entity
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
-import com.clinic.neochild.data.model.Vaccination
+import com.clinic.neochild.domain.model.Vaccination
 
 @Entity(
     tableName = "vaccinations",

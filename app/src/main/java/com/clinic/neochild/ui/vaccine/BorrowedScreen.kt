@@ -23,11 +23,11 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.clinic.neochild.data.model.BorrowedVaccine
 import com.clinic.neochild.data.model.Vaccine
-import com.clinic.neochild.ui.components.StandardAutoCompleteField
-import com.clinic.neochild.ui.components.StandardButton
-import com.clinic.neochild.ui.components.StandardTextField
-import com.clinic.neochild.ui.theme.NeoChildTheme
-import com.clinic.neochild.utils.PatientUtils.formatDateForDisplay
+import com.clinic.neochild.core.ui.components.StandardAutoCompleteField
+import com.clinic.neochild.core.ui.components.StandardButton
+import com.clinic.neochild.core.ui.components.StandardTextField
+import com.clinic.neochild.core.ui.theme.NeoChildTheme
+import com.clinic.neochild.core.utils.PatientUtils.formatDateForDisplay
 import java.text.SimpleDateFormat
 import java.util.*
 

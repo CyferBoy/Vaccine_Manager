@@ -6,7 +6,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.clinic.neochild.data.local.dao.*
 import com.clinic.neochild.data.local.entity.*
-import com.clinic.neochild.utils.SecurityUtils
+import com.clinic.neochild.core.utils.SecurityUtils
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 
 @Database(

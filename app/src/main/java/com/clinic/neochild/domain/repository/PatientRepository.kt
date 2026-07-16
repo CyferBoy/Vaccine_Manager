@@ -1,6 +1,6 @@
 package com.clinic.neochild.domain.repository
 
-import com.clinic.neochild.data.model.Patient
+import com.clinic.neochild.domain.model.Patient
 import kotlinx.coroutines.flow.Flow
 
 /**

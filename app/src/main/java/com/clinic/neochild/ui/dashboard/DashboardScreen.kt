@@ -32,7 +32,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.clinic.neochild.R
 import com.clinic.neochild.ui.auth.AuthViewModel
 import com.clinic.neochild.ui.theme.*
-import com.clinic.neochild.utils.Constants
+import com.clinic.neochild.core.common.Constants
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,6 +47,7 @@ fun DashboardScreen(
     onManageStaff: () -> Unit = {},
     onLogout: () -> Unit = {},
     onSettings: () -> Unit = {},
+    onSync: () -> Unit = {},
     authViewModel: AuthViewModel = hiltViewModel(),
     dashboardViewModel: DashboardViewModel = hiltViewModel()
 ) {
@@ -72,6 +73,7 @@ fun DashboardScreen(
                     isAdmin = isAdmin,
                     onManageStaff = onManageStaff,
                     onSettings = onSettings,
+                    onSync = onSync,
                     onLogout = {
                         authViewModel.logout()
                         onLogout()
@@ -120,7 +122,8 @@ fun DashboardScreen(
                         uiState = uiState,
                         onBorrowed = onBorrowed,
                         onDue = onDue,
-                        onWaste = onWaste
+                        onWaste = onWaste,
+                        onSync = onSync
                     )
                     
                     Spacer(modifier = Modifier.height(40.dp))
@@ -137,6 +140,7 @@ private fun DashboardTopBar(
     isAdmin: Boolean,
     onManageStaff: () -> Unit,
     onSettings: () -> Unit,
+    onSync: () -> Unit,
     onLogout: () -> Unit
 ) {
     var profileMenuExpanded by remember { mutableStateOf(false) }
@@ -174,6 +178,14 @@ private fun DashboardTopBar(
                         leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) }
                     )
                     HorizontalDivider()
+                    DropdownMenuItem(
+                        text = { Text("Cloud Sync") },
+                        onClick = {
+                            profileMenuExpanded = false
+                            onSync()
+                        },
+                        leadingIcon = { Icon(Icons.Default.Sync, contentDescription = null) }
+                    )
                     DropdownMenuItem(
                         text = { Text("Notification Settings") },
                         onClick = {
@@ -342,20 +354,13 @@ private fun DashboardSmallActionsRow(
     uiState: DashboardUiState,
     onBorrowed: () -> Unit,
     onDue: () -> Unit,
-    onWaste: () -> Unit
+    onWaste: () -> Unit,
+    onSync: () -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        DashboardCardSmall(
-            title = "Borrowed",
-            icon = Icons.Default.CompareArrows,
-            containerColor = if (isSystemInDarkTheme()) Color(0xFF37474F) else Color(0xFFECEFF1),
-            contentColor = if (isSystemInDarkTheme()) Color(0xFFCFD8DC) else Color(0xFF263238),
-            modifier = Modifier.weight(1f),
-            onClick = onBorrowed
-        )
         DashboardCardSmall(
             title = "Due",
             icon = Icons.Default.EventNote,
@@ -364,6 +369,14 @@ private fun DashboardSmallActionsRow(
             badge = if (uiState.dueTodayCount > 0) uiState.dueTodayCount.toString() else null,
             modifier = Modifier.weight(1f),
             onClick = onDue
+        )
+        DashboardCardSmall(
+            title = "Cloud Sync",
+            icon = Icons.Default.CloudUpload,
+            containerColor = if (isSystemInDarkTheme()) Color(0xFF37474F) else Color(0xFFE1F5FE),
+            contentColor = if (isSystemInDarkTheme()) Color(0xFFCFD8DC) else Color(0xFF0288D1),
+            modifier = Modifier.weight(1f),
+            onClick = onSync
         )
         DashboardCardSmall(
             title = "Waste",

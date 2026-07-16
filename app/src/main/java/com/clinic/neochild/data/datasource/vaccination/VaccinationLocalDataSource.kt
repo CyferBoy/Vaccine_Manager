@@ -3,7 +3,7 @@ package com.clinic.neochild.data.datasource.vaccination
 import com.clinic.neochild.data.local.dao.VaccinationDao
 import com.clinic.neochild.data.local.entity.toEntity
 import com.clinic.neochild.data.local.entity.toVaccination
-import com.clinic.neochild.data.model.Vaccination
+import com.clinic.neochild.domain.model.Vaccination
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 

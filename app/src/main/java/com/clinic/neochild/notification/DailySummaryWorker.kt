@@ -7,7 +7,7 @@ import androidx.work.WorkerParameters
 import com.clinic.neochild.data.local.preferences.NotificationSettingsManager
 import com.clinic.neochild.domain.repository.ReminderRepository
 import com.clinic.neochild.domain.repository.VaccineRepository
-import com.clinic.neochild.utils.PatientUtils
+import com.clinic.neochild.core.utils.PatientUtils
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.flow.first

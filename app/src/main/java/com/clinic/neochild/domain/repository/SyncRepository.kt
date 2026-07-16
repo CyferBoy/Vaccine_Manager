@@ -1,8 +1,8 @@
 package com.clinic.neochild.domain.repository
 
-import com.clinic.neochild.data.local.entity.SyncQueueEntity
-import com.clinic.neochild.data.model.SyncOperation
-import com.clinic.neochild.data.model.SyncPriority
+import com.clinic.neochild.domain.model.SyncItem
+import com.clinic.neochild.domain.model.SyncOperation
+import com.clinic.neochild.domain.model.SyncPriority
 import kotlinx.coroutines.flow.Flow
 
 interface SyncRepository {
@@ -14,7 +14,7 @@ interface SyncRepository {
     )
 
     fun getPendingCount(): Flow<Int>
-    fun getSyncQueue(): Flow<List<com.clinic.neochild.data.local.entity.SyncQueueEntity>>
+    fun getSyncQueue(): Flow<List<SyncItem>>
     suspend fun processNextItems()
     suspend fun retryFailedItems()
     suspend fun clearSyncedItems()

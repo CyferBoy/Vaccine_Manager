@@ -16,8 +16,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.clinic.neochild.data.model.Patient
 import com.clinic.neochild.data.model.Vaccination
-import com.clinic.neochild.ui.components.AppBackground
-import com.clinic.neochild.ui.theme.NeoChildTheme
+import com.clinic.neochild.core.ui.components.AppBackground
+import com.clinic.neochild.core.ui.theme.NeoChildTheme
 import kotlinx.coroutines.launch
 
 @Composable

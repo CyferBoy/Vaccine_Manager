@@ -20,9 +20,9 @@ import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toBitmap
 import com.clinic.neochild.R
-import com.clinic.neochild.data.model.Consultation
-import com.clinic.neochild.data.model.Patient
-import com.clinic.neochild.data.model.Vaccination
+import com.clinic.neochild.domain.model.Consultation
+import com.clinic.neochild.domain.model.Patient
+import com.clinic.neochild.domain.model.Vaccination
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File

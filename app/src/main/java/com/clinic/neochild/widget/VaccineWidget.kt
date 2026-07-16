@@ -28,9 +28,9 @@ import com.clinic.neochild.data.local.entity.toPatient
 import com.clinic.neochild.data.local.entity.toVaccination
 import com.clinic.neochild.data.model.Patient
 import com.clinic.neochild.data.model.Vaccination
-import com.clinic.neochild.utils.Constants
-import com.clinic.neochild.utils.PatientUtils
-import com.clinic.neochild.utils.ReminderEngine
+import com.clinic.neochild.core.common.Constants
+import com.clinic.neochild.core.utils.PatientUtils
+import com.clinic.neochild.domain.logic.ReminderEngine
 import kotlinx.coroutines.flow.first
 import java.text.SimpleDateFormat
 import java.util.*
@@ -56,7 +56,7 @@ class VaccineWidget : GlanceAppWidget() {
         val today = todayCalendar.time
 
         // Use the new Requirement-Based Reminder Engine
-        val unsatisfied = ReminderEngine.getUnsatisfiedRequirements(vaccinations)
+        val unsatisfied = ReminderEngine.getPotentialRequirements(vaccinations)
         
         // Convert requirements to Vaccination objects for display
         val filteredVaccinations = unsatisfied.groupBy { it.patientId + PatientUtils.formatDate(it.dueDate) }

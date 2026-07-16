@@ -20,4 +20,5 @@ object Routes {
     const val WASTE = "waste"
     const val MONTHLY_FINANCE_DETAILS = "monthly_finance_details/{monthKey}"
     const val SETTINGS = "settings"
+    const val SYNC = "sync"
 }

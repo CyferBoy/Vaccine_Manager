@@ -9,7 +9,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.clinic.neochild.ui.components.AppBackground
+import com.clinic.neochild.core.ui.components.AppBackground
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

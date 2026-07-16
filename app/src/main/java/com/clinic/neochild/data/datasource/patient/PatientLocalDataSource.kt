@@ -3,7 +3,7 @@ package com.clinic.neochild.data.datasource.patient
 import com.clinic.neochild.data.local.dao.PatientDao
 import com.clinic.neochild.data.local.entity.toEntity
 import com.clinic.neochild.data.local.entity.toPatient
-import com.clinic.neochild.data.model.Patient
+import com.clinic.neochild.domain.model.Patient
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 

@@ -2,7 +2,7 @@ package com.clinic.neochild.data.repository
 
 import com.clinic.neochild.data.datasource.vaccination.VaccinationLocalDataSource
 import com.clinic.neochild.data.datasource.vaccination.VaccinationRemoteDataSource
-import com.clinic.neochild.data.model.Vaccination
+import com.clinic.neochild.domain.model.Vaccination
 import com.clinic.neochild.domain.repository.VaccinationRepository
 import com.clinic.neochild.utils.AuditLogger
 import kotlinx.coroutines.CoroutineScope

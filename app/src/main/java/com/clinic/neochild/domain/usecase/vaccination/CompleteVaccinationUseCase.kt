@@ -1,7 +1,9 @@
 package com.clinic.neochild.domain.usecase.vaccination
 
 import androidx.room.withTransaction
-import com.clinic.neochild.data.model.Vaccination
+import com.clinic.neochild.domain.model.Vaccination
+import com.clinic.neochild.domain.model.InventoryTransactionType
+import com.clinic.neochild.domain.model.SyncOperation
 import com.clinic.neochild.domain.repository.*
 import javax.inject.Inject
 
@@ -28,7 +30,7 @@ class CompleteVaccinationUseCase @Inject constructor(
                         vaccineId = vaccineId,
                         quantity = 1,
                         user = user,
-                        transactionType = com.clinic.neochild.data.model.InventoryTransactionType.VACCINATION,
+                        transactionType = InventoryTransactionType.VACCINATION,
                         vaccinationId = vaccination.id,
                         patientId = vaccination.patientId
                     )
@@ -38,7 +40,7 @@ class CompleteVaccinationUseCase @Inject constructor(
                 syncRepository.enqueue(
                     entityName = "VACCINATION",
                     entityId = vaccination.id,
-                    operation = com.clinic.neochild.data.model.SyncOperation.CREATE
+                    operation = SyncOperation.CREATE
                 )
             }
         }

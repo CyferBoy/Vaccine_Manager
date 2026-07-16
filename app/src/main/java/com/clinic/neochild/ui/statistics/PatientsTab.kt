@@ -20,9 +20,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.clinic.neochild.data.model.Patient
-import com.clinic.neochild.ui.theme.NeoChildTheme
-import com.clinic.neochild.utils.Constants
-import com.clinic.neochild.utils.PatientUtils
+import com.clinic.neochild.core.ui.theme.NeoChildTheme
+import com.clinic.neochild.core.common.Constants
+import com.clinic.neochild.core.utils.PatientUtils
 import java.text.SimpleDateFormat
 import java.util.*
 

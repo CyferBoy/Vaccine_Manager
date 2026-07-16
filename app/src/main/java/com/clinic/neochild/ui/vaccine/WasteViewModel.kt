@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.clinic.neochild.data.model.Vaccine
 import com.clinic.neochild.data.model.WasteRecord
-import com.clinic.neochild.utils.FirestoreMappers
+import com.clinic.neochild.data.mapper.FirestoreMappers
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import dagger.hilt.android.lifecycle.HiltViewModel

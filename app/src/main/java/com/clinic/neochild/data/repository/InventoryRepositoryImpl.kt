@@ -5,7 +5,7 @@ import com.clinic.neochild.data.local.AppDatabase
 import com.clinic.neochild.data.local.entity.InventoryTransactionEntity
 import com.clinic.neochild.data.local.entity.VaccineBatchEntity
 import com.clinic.neochild.data.local.entity.VaccineEntity
-import com.clinic.neochild.data.model.InventoryTransactionType
+import com.clinic.neochild.domain.model.InventoryTransactionType
 import com.clinic.neochild.domain.repository.InventoryRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine

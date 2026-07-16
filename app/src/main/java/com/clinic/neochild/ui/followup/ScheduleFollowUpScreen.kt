@@ -14,10 +14,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.clinic.neochild.data.model.Priority
-import com.clinic.neochild.ui.components.AppBackground
-import com.clinic.neochild.ui.components.DateDropdownPicker
-import com.clinic.neochild.ui.components.StandardButton
-import com.clinic.neochild.ui.components.StandardTextField
+import com.clinic.neochild.core.ui.components.AppBackground
+import com.clinic.neochild.core.ui.components.DateDropdownPicker
+import com.clinic.neochild.core.ui.components.StandardButton
+import com.clinic.neochild.core.ui.components.StandardTextField
 import java.text.SimpleDateFormat
 import java.util.*
 

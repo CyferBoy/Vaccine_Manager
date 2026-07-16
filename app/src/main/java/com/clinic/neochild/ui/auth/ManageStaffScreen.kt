@@ -25,8 +25,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.clinic.neochild.data.model.Staff
-import com.clinic.neochild.ui.components.*
-import com.clinic.neochild.ui.theme.NeoChildTheme
+import com.clinic.neochild.core.ui.components.*
+import com.clinic.neochild.core.ui.theme.NeoChildTheme
 
 @Composable
 fun ManageStaffScreen(

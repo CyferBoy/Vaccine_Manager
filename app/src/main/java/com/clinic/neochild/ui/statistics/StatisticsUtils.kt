@@ -1,6 +1,6 @@
 package com.clinic.neochild.ui.statistics
 
-import com.clinic.neochild.utils.PatientUtils
+import com.clinic.neochild.core.utils.PatientUtils
 import java.util.*
 
 object StatisticsUtils {

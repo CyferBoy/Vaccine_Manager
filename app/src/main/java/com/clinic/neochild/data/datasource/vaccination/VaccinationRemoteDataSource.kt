@@ -1,7 +1,7 @@
 package com.clinic.neochild.data.datasource.vaccination
 
-import com.clinic.neochild.data.model.Vaccination
-import com.clinic.neochild.utils.FirestoreMappers
+import com.clinic.neochild.domain.model.Vaccination
+import com.clinic.neochild.data.mapper.FirestoreMappers
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 

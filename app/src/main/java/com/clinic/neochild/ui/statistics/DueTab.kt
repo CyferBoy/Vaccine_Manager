@@ -25,7 +25,7 @@ import androidx.compose.ui.unit.dp
 import com.clinic.neochild.data.model.Patient
 import com.clinic.neochild.data.model.Vaccination
 import com.clinic.neochild.data.model.VaccinationSource
-import com.clinic.neochild.ui.theme.NeoChildTheme
+import com.clinic.neochild.core.ui.theme.NeoChildTheme
 import java.text.SimpleDateFormat
 import java.util.*
 

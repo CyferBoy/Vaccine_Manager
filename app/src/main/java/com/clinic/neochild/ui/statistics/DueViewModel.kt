@@ -10,9 +10,9 @@ import com.clinic.neochild.domain.repository.ReminderRepository
 import com.clinic.neochild.domain.repository.VaccineRepository
 import com.clinic.neochild.domain.usecase.patient.GetPatientsUseCase
 import com.clinic.neochild.domain.usecase.vaccination.GetVaccinationsUseCase
-import com.clinic.neochild.utils.PatientUtils
-import com.clinic.neochild.utils.PendingRequirement
-import com.clinic.neochild.utils.ReminderEngine
+import com.clinic.neochild.core.utils.PatientUtils
+import com.clinic.neochild.domain.logic.ReminderEngine
+import com.clinic.neochild.domain.model.PendingRequirement
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*

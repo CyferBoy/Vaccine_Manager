@@ -16,7 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.navigation.compose.rememberNavController
 import com.clinic.neochild.navigation.AppNavigation
 import com.clinic.neochild.navigation.Routes
-import com.clinic.neochild.ui.theme.NeoChildTheme
+import com.clinic.neochild.core.ui.theme.NeoChildTheme
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.messaging.FirebaseMessaging

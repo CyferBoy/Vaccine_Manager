@@ -2,7 +2,7 @@ package com.clinic.neochild.domain.usecase.statistics
 
 import com.clinic.neochild.domain.repository.ReminderRepository
 import com.clinic.neochild.domain.repository.VaccinationRepository
-import com.clinic.neochild.utils.PatientUtils
+import com.clinic.neochild.core.utils.PatientUtils
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import java.text.SimpleDateFormat

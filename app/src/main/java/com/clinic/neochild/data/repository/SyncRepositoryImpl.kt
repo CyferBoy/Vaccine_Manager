@@ -2,14 +2,17 @@ package com.clinic.neochild.data.repository
 
 import com.clinic.neochild.data.local.AppDatabase
 import com.clinic.neochild.data.local.entity.SyncQueueEntity
+import com.clinic.neochild.data.local.entity.toDomain
 import com.clinic.neochild.data.local.entity.toPatient
 import com.clinic.neochild.data.local.entity.toVaccination
-import com.clinic.neochild.data.model.SyncOperation
-import com.clinic.neochild.data.model.SyncPriority
-import com.clinic.neochild.data.model.SyncStatus
+import com.clinic.neochild.domain.model.SyncItem
+import com.clinic.neochild.domain.model.SyncOperation
+import com.clinic.neochild.domain.model.SyncPriority
+import com.clinic.neochild.domain.model.SyncStatus
 import com.clinic.neochild.domain.repository.SyncRepository
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -40,7 +43,8 @@ class SyncRepositoryImpl @Inject constructor(
 
     override fun getPendingCount(): Flow<Int> = syncDao.getPendingCount()
 
-    override fun getSyncQueue(): Flow<List<SyncQueueEntity>> = syncDao.getAllItems()
+    override fun getSyncQueue(): Flow<List<SyncItem>> = 
+        syncDao.getAllItems().map { list -> list.map { it.toDomain() } }
 
     override suspend fun clearSyncedItems() {
         syncDao.clearSynced()

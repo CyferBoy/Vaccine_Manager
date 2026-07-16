@@ -5,7 +5,7 @@ import com.clinic.neochild.data.local.entity.toEntity
 import com.clinic.neochild.data.local.entity.toVaccine
 import com.clinic.neochild.data.model.Vaccine
 import com.clinic.neochild.domain.repository.VaccineRepository
-import com.clinic.neochild.utils.FirestoreMappers
+import com.clinic.neochild.data.mapper.FirestoreMappers
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map

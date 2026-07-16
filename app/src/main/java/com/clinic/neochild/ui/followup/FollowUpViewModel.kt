@@ -105,7 +105,7 @@ class FollowUpViewModel @Inject constructor(
     private fun ReminderEntity.toPendingRequirement() = com.clinic.neochild.utils.PendingRequirement(
         patientId = patientId,
         vaccineName = vaccineName,
-        dueDate = com.clinic.neochild.utils.PatientUtils.parseDate(dueDate) ?: java.util.Date(),
+        dueDate = com.clinic.neochild.core.utils.PatientUtils.parseDate(dueDate) ?: java.util.Date(),
         originalVisitId = originalVisitId
     )
 }

@@ -2,18 +2,19 @@ package com.clinic.neochild.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.clinic.neochild.data.model.Patient
-import com.clinic.neochild.data.model.Vaccination
+import com.clinic.neochild.domain.model.Patient
+import com.clinic.neochild.domain.model.Vaccination
 import com.clinic.neochild.domain.repository.ReminderRepository
 import com.clinic.neochild.domain.repository.VaccinationRepository
 import com.clinic.neochild.domain.usecase.patient.DeletePatientUseCase
+import com.clinic.neochild.domain.usecase.patient.GetPatientByIdUseCase
 import com.clinic.neochild.domain.usecase.patient.GetPatientsUseCase
 import com.clinic.neochild.domain.usecase.patient.SavePatientUseCase
 import com.clinic.neochild.domain.usecase.sync.RefreshDataUseCase
 import com.clinic.neochild.domain.usecase.vaccination.DeleteVaccinationUseCase
 import com.clinic.neochild.domain.usecase.vaccination.GetVaccinationsUseCase
 import com.clinic.neochild.domain.usecase.vaccination.SaveVaccinationUseCase
-import com.clinic.neochild.utils.ReminderEngine
+import com.clinic.neochild.domain.logic.ReminderEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -22,6 +23,7 @@ import javax.inject.Inject
 @HiltViewModel
 class PatientViewModel @Inject constructor(
     private val getPatientsUseCase: GetPatientsUseCase,
+    private val getPatientByIdUseCase: GetPatientByIdUseCase,
     private val getVaccinationsUseCase: GetVaccinationsUseCase,
     private val savePatientUseCase: SavePatientUseCase,
     private val deletePatientUseCase: DeletePatientUseCase,
@@ -73,6 +75,10 @@ class PatientViewModel @Inject constructor(
         }
     }
 
+    suspend fun getPatientById(id: String): Patient? {
+        return getPatientByIdUseCase(id)
+    }
+
     fun savePatient(patient: Patient, onComplete: () -> Unit) {
         viewModelScope.launch {
             try {
@@ -103,7 +109,7 @@ class PatientViewModel @Inject constructor(
             vaccinationRepository.markAsDone(vaccination.id)
             
             // 2. Clear associated reminders
-            val allRequirements = ReminderEngine.getUnsatisfiedRequirements(allVaccinations.value)
+            val allRequirements = ReminderEngine.getPotentialRequirements(allVaccinations.value)
             val matching = allRequirements.filter { req ->
                 req.patientId == vaccination.patientId && 
                 vaccination.nxtVaccineNames.contains(req.vaccineName)

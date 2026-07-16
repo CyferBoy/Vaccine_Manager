@@ -17,10 +17,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.clinic.neochild.R
-import com.clinic.neochild.ui.components.AppBackground
-import com.clinic.neochild.ui.components.StandardButton
-import com.clinic.neochild.ui.components.StandardTextField
-import com.clinic.neochild.ui.theme.NeoChildTheme
+import com.clinic.neochild.core.ui.components.AppBackground
+import com.clinic.neochild.core.ui.components.StandardButton
+import com.clinic.neochild.core.ui.components.StandardTextField
+import com.clinic.neochild.core.ui.theme.NeoChildTheme
 
 @Composable
 fun LoginScreen(

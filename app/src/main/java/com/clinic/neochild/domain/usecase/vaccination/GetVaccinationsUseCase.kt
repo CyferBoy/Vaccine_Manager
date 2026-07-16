@@ -1,6 +1,6 @@
 package com.clinic.neochild.domain.usecase.vaccination
 
-import com.clinic.neochild.data.model.Vaccination
+import com.clinic.neochild.domain.model.Vaccination
 import com.clinic.neochild.domain.repository.VaccinationRepository
 import kotlinx.coroutines.flow.Flow
 

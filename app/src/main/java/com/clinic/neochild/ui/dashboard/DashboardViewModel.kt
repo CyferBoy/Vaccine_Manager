@@ -6,10 +6,10 @@ import com.clinic.neochild.data.model.Vaccine
 import com.clinic.neochild.data.model.Vaccination
 import com.clinic.neochild.domain.repository.VaccinationRepository
 import com.clinic.neochild.domain.repository.PatientRepository
-import com.clinic.neochild.utils.Constants
-import com.clinic.neochild.utils.FirestoreMappers
-import com.clinic.neochild.utils.ReminderEngine
-import com.clinic.neochild.utils.PatientUtils
+import com.clinic.neochild.core.common.Constants
+import com.clinic.neochild.data.mapper.FirestoreMappers
+import com.clinic.neochild.domain.logic.ReminderEngine
+import com.clinic.neochild.core.utils.PatientUtils
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import dagger.hilt.android.lifecycle.HiltViewModel

@@ -3,7 +3,7 @@ package com.clinic.neochild.ui.auth
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import com.clinic.neochild.data.model.Staff
-import com.clinic.neochild.utils.FirestoreMappers
+import com.clinic.neochild.data.mapper.FirestoreMappers
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore

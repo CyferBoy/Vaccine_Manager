@@ -2,10 +2,10 @@ package com.clinic.neochild.data.local.entity
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import com.clinic.neochild.domain.model.SyncItem
-import com.clinic.neochild.domain.model.SyncOperation
-import com.clinic.neochild.domain.model.SyncPriority
-import com.clinic.neochild.domain.model.SyncStatus
+import com.clinic.neochild.core.model.SyncItem
+import com.clinic.neochild.core.model.SyncOperation
+import com.clinic.neochild.core.model.SyncPriority
+import com.clinic.neochild.core.model.SyncStatus
 
 @Entity(tableName = "sync_queue")
 data class SyncQueueEntity(

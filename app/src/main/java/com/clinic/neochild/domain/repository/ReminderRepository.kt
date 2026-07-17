@@ -36,7 +36,7 @@ interface ReminderRepository {
     )
 
     // Core Business Actions (Atomic)
-    suspend fun markAsDone(requirement: PendingRequirement, performedBy: String)
+    suspend fun markRequirementSatisfied(requirement: PendingRequirement, performedBy: String)
     suspend fun reschedule(requirement: PendingRequirement, newDate: String, reason: String, performedBy: String)
     suspend fun markVaccinatedElsewhere(requirement: PendingRequirement, source: VaccinationSource, date: String, notes: String, performedBy: String)
     suspend fun dismissReminder(requirement: PendingRequirement, reason: String, performedBy: String)

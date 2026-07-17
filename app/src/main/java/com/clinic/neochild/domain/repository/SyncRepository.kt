@@ -1,8 +1,8 @@
 package com.clinic.neochild.domain.repository
 
-import com.clinic.neochild.domain.model.SyncItem
-import com.clinic.neochild.domain.model.SyncOperation
-import com.clinic.neochild.domain.model.SyncPriority
+import com.clinic.neochild.core.model.SyncItem
+import com.clinic.neochild.core.model.SyncOperation
+import com.clinic.neochild.core.model.SyncPriority
 import kotlinx.coroutines.flow.Flow
 
 interface SyncRepository {

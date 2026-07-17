@@ -4,9 +4,10 @@ import com.clinic.neochild.data.local.dao.VaccineDao
 import com.clinic.neochild.data.local.entity.toEntity
 import com.clinic.neochild.data.local.entity.toVaccine
 import com.clinic.neochild.domain.model.Vaccine
-import com.clinic.neochild.domain.model.SyncOperation
+import com.clinic.neochild.core.model.SyncOperation
+import com.clinic.neochild.domain.repository.SyncRepository
 import com.clinic.neochild.domain.repository.VaccineRepository
-import com.clinic.neochild.data.mapper.FirestoreMappers
+import com.clinic.neochild.data.remote.mapper.FirestoreMappers
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -17,7 +18,7 @@ import javax.inject.Singleton
 @Singleton
 class VaccineRepositoryImpl @Inject constructor(
     private val vaccineDao: VaccineDao,
-    private val syncRepository: com.clinic.neochild.domain.repository.SyncRepository
+    private val syncRepository: SyncRepository
 ) : VaccineRepository {
 
     override fun getInventory(): Flow<List<Vaccine>> {

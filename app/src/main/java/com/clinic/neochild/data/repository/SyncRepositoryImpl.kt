@@ -1,11 +1,11 @@
 package com.clinic.neochild.data.repository
 
-import com.clinic.neochild.data.local.AppDatabase
+import com.clinic.neochild.data.local.database.AppDatabase
 import com.clinic.neochild.data.local.entity.*
-import com.clinic.neochild.domain.model.SyncItem
-import com.clinic.neochild.domain.model.SyncOperation
-import com.clinic.neochild.domain.model.SyncPriority
-import com.clinic.neochild.domain.model.SyncStatus
+import com.clinic.neochild.core.model.SyncItem
+import com.clinic.neochild.core.model.SyncOperation
+import com.clinic.neochild.core.model.SyncPriority
+import com.clinic.neochild.core.model.SyncStatus
 import com.clinic.neochild.domain.repository.SyncRepository
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.Flow

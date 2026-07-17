@@ -1,6 +1,6 @@
 package com.clinic.neochild.core.utils
 
-import com.clinic.neochild.core.common.Constants
+import com.clinic.neochild.core.constants.Constants
 import com.clinic.neochild.domain.model.Vaccination
 import java.text.SimpleDateFormat
 import java.util.*

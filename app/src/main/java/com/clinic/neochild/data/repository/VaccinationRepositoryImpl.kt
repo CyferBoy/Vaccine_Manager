@@ -1,12 +1,15 @@
 package com.clinic.neochild.data.repository
 
-import com.clinic.neochild.data.datasource.vaccination.VaccinationLocalDataSource
-import com.clinic.neochild.domain.model.SyncOperation
-import com.clinic.neochild.domain.model.SyncPriority
+import com.clinic.neochild.data.local.database.AppDatabase
+import com.clinic.neochild.data.local.entity.toVaccination
+import com.clinic.neochild.data.local.entity.toEntity
+import com.clinic.neochild.core.model.SyncOperation
+import com.clinic.neochild.core.model.SyncPriority
+import com.clinic.neochild.core.logger.AuditLogger
 import com.clinic.neochild.domain.model.Vaccination
 import com.clinic.neochild.domain.repository.SyncRepository
 import com.clinic.neochild.domain.repository.VaccinationRepository
-import com.clinic.neochild.utils.AuditLogger
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -15,37 +18,45 @@ import javax.inject.Singleton
 
 @Singleton
 class VaccinationRepositoryImpl @Inject constructor(
-    private val localDataSource: VaccinationLocalDataSource,
+    private val database: AppDatabase,
     private val syncRepository: SyncRepository,
     private val auditLogger: AuditLogger
 ) : VaccinationRepository {
 
-    override val allVaccinations: Flow<List<Vaccination>> = localDataSource.getAllVaccinations()
+    private val vaccinationDao = database.vaccinationDao()
+
+    override val allVaccinations: Flow<List<Vaccination>> = 
+        vaccinationDao.getAllVaccinations().map { list -> list.map { it.toVaccination() } }
 
     override fun getVaccinationsForPatient(patientId: String): Flow<List<Vaccination>> = 
-        localDataSource.getVaccinationsForPatient(patientId)
+        vaccinationDao.getVaccinationsForPatient(patientId).map { list -> list.map { it.toVaccination() } }
 
     override suspend fun refreshVaccinations() {
-        // Implement remote fetch if needed, but usually triggered via SyncWorker/RefreshUseCase
     }
 
     override suspend fun addVaccination(vaccination: Vaccination) {
-        // 1. Save locally
-        localDataSource.insertVaccination(vaccination, isSynced = false)
+        // 1. Check if it's an update
+        val existing = vaccinationDao.getVaccinationById(vaccination.id)
         
-        // 2. Queue for background sync
+        // 2. Save locally
+        vaccinationDao.insertVaccination(vaccination.toEntity(isSynced = false))
+        
+        // 3. Queue for background sync
+        val operation = if (existing == null) SyncOperation.CREATE else SyncOperation.UPDATE
+        
         syncRepository.enqueue(
             entityName = "VACCINATION",
             entityId = vaccination.id,
-            operation = SyncOperation.CREATE,
+            operation = operation,
             priority = SyncPriority.HIGH
         )
         
-        auditLogger.logAction("ADD_VACCINATION", vaccination.id, "Patient: ${vaccination.patientId}")
+        val auditAction = if (existing == null) "ADD_VACCINATION" else "UPDATE_VACCINATION"
+        auditLogger.logAction(auditAction, vaccination.id, "Patient: ${vaccination.patientId}")
     }
 
     override suspend fun deleteVaccination(id: String) {
-        localDataSource.deleteVaccination(id)
+        vaccinationDao.deleteVaccination(id)
         
         syncRepository.enqueue(
             entityName = "VACCINATION",
@@ -59,10 +70,10 @@ class VaccinationRepositoryImpl @Inject constructor(
 
     override suspend fun markAsDone(id: String) {
         withContext(Dispatchers.IO) {
-            val current = localDataSource.getVaccinationById(id)
+            val current = vaccinationDao.getVaccinationById(id)
             if (current != null) {
-                val updated = current.copy(isDone = true)
-                localDataSource.insertVaccination(updated, isSynced = false)
+                val updated = current.copy(isDone = true, isSynced = false)
+                vaccinationDao.insertVaccination(updated)
                 
                 syncRepository.enqueue(
                     entityName = "VACCINATION",
@@ -76,10 +87,12 @@ class VaccinationRepositoryImpl @Inject constructor(
         }
     }
 
-    override fun getTodayCount(date: String): Flow<Int> = localDataSource.getTodayCount(date)
-    override fun getTodayRevenue(date: String): Flow<Double?> = localDataSource.getTodayRevenue(date)
-    override fun getTodayCash(date: String): Flow<Double?> = localDataSource.getTodayCash(date)
-    override fun getTodayOnline(date: String): Flow<Double?> = localDataSource.getTodayOnline(date)
-    override fun getMonthlyCount(pattern: String): Flow<Int> = localDataSource.getMonthlyCount(pattern)
-    override fun getMonthlyRevenue(pattern: String): Flow<Double?> = localDataSource.getMonthlyRevenue(pattern)
+    override fun getTodayCount(date: String): Flow<Int> = vaccinationDao.getCountByDate(date)
+    override fun getTodayRevenue(date: String): Flow<Double?> = vaccinationDao.getRevenueByDate(date)
+    override fun getTodayCash(date: String): Flow<Double?> = vaccinationDao.getCashByDate(date)
+    override fun getTodayOnline(date: String): Flow<Double?> = vaccinationDao.getOnlineByDate(date)
+    override fun getMonthlyCount(pattern: String): Flow<Int> = vaccinationDao.getMonthlyCount(pattern)
+    override fun getMonthlyRevenue(pattern: String): Flow<Double?> = vaccinationDao.getMonthlyRevenue(pattern)
+    override fun getVaccineNamesForMonth(pattern: String): Flow<List<String>> = vaccinationDao.getVaccineNamesForMonth(pattern)
 }
+

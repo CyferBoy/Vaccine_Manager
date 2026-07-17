@@ -2,7 +2,8 @@ package com.clinic.neochild.notification
 
 import android.content.Context
 import androidx.work.*
-import com.clinic.neochild.data.local.preferences.NotificationSettingsManager
+import com.clinic.neochild.features.settings.NotificationSettingsManager
+import com.clinic.neochild.worker.DailySummaryWorker
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
 import java.util.*

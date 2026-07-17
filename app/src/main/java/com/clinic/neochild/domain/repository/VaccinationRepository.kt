@@ -17,4 +17,5 @@ interface VaccinationRepository {
     fun getTodayOnline(date: String): Flow<Double?>
     fun getMonthlyCount(pattern: String): Flow<Int>
     fun getMonthlyRevenue(pattern: String): Flow<Double?>
+    fun getVaccineNamesForMonth(pattern: String): Flow<List<String>>
 }

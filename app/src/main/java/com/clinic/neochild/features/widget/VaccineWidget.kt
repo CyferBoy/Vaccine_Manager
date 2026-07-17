@@ -23,8 +23,9 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
-import com.clinic.neochild.data.local.AppDatabase
+import com.clinic.neochild.data.local.database.AppDatabase
 import com.clinic.neochild.data.local.entity.WidgetDueEntity
+import com.clinic.neochild.app.MainActivity
 import kotlinx.coroutines.flow.first
 
 class VaccineWidget : GlanceAppWidget() {
@@ -67,7 +68,7 @@ class VaccineWidget : GlanceAppWidget() {
                 .cornerRadius(24.dp)
                 .padding(9.dp)
                 .clickable(
-                    actionStartActivity<com.clinic.neochild.MainActivity>(
+                    actionStartActivity<MainActivity>(
                         actionParametersOf(
                             ActionParameters.Key<Boolean>("OPEN_DUE_TAB") to true
                         )

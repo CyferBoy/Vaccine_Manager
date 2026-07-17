@@ -1,46 +1,54 @@
 package com.clinic.neochild.data.repository
 
-import com.clinic.neochild.data.datasource.patient.PatientLocalDataSource
-import com.clinic.neochild.data.datasource.patient.PatientRemoteDataSource
+import com.clinic.neochild.data.local.database.AppDatabase
+import com.clinic.neochild.data.local.entity.toPatient
+import com.clinic.neochild.data.local.entity.toEntity
+import com.clinic.neochild.core.model.SyncOperation
+import com.clinic.neochild.core.model.SyncPriority
+import com.clinic.neochild.core.logger.AuditLogger
 import com.clinic.neochild.domain.model.Patient
-import com.clinic.neochild.domain.model.SyncOperation
-import com.clinic.neochild.domain.model.SyncPriority
 import com.clinic.neochild.domain.repository.PatientRepository
 import com.clinic.neochild.domain.repository.SyncRepository
-import com.clinic.neochild.utils.AuditLogger
+import com.clinic.neochild.data.remote.mapper.FirestoreMappers
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 class PatientRepositoryImpl @Inject constructor(
-    private val localDataSource: PatientLocalDataSource,
-    private val remoteDataSource: PatientRemoteDataSource,
+    private val database: AppDatabase,
+    private val firestore: FirebaseFirestore,
     private val syncRepository: SyncRepository,
     private val auditLogger: AuditLogger
 ) : PatientRepository {
 
-    override val allPatients: Flow<List<Patient>> = localDataSource.getAllPatients()
+    private val patientDao = database.patientDao()
+
+    override val allPatients: Flow<List<Patient>> = 
+        patientDao.getAllPatients().map { list -> list.map { it.toPatient() } }
 
     override suspend fun getPatientById(id: String): Patient? {
-        return localDataSource.getPatientById(id)
+        return patientDao.getPatientById(id)?.toPatient()
     }
 
     override suspend fun refreshPatients() {
         withContext(Dispatchers.IO) {
             try {
-                // Potential optimization: Use lastUpdated timestamp to fetch only changes.
-                val patients = remoteDataSource.fetchAllPatients()
-                localDataSource.insertPatients(patients, isSynced = true)
+                val snapshot = firestore.collection("patients").get().await()
+                val patients = snapshot.documents.mapNotNull { FirestoreMappers.toPatient(it) }
+                patientDao.insertPatients(patients.map { it.toEntity() })
             } catch (e: Exception) {
-                // Error handling handled by callers or logging
+                // Error handling
             }
         }
     }
 
     override suspend fun addPatient(patient: Patient) {
-        // 1. Save locally FIRST (Immediate UI update)
-        localDataSource.insertPatient(patient, isSynced = false)
+        // 1. Save locally FIRST
+        patientDao.insertPatient(patient.toEntity())
         
         // 2. Queue for background sync
         syncRepository.enqueue(
@@ -55,7 +63,7 @@ class PatientRepositoryImpl @Inject constructor(
 
     override suspend fun deletePatient(id: String) {
         // 1. Mark as deleted locally
-        localDataSource.deletePatient(id)
+        patientDao.deletePatient(id)
         
         // 2. Queue for background sync
         syncRepository.enqueue(
@@ -69,8 +77,9 @@ class PatientRepositoryImpl @Inject constructor(
     }
 
     override fun searchPatients(query: String): Flow<List<Patient>> {
-        return localDataSource.searchPatients(query)
+        return patientDao.searchPatients("%$query%").map { list -> list.map { it.toPatient() } }
     }
 
-    override fun getPatientCount(): Flow<Int> = localDataSource.getPatientCount()
+    override fun getPatientCount(): Flow<Int> = patientDao.getPatientCount()
 }
+

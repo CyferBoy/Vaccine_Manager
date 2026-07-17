@@ -1,7 +1,7 @@
 package com.clinic.neochild.di
 
 import android.content.Context
-import com.clinic.neochild.data.local.AppDatabase
+import com.clinic.neochild.data.local.database.AppDatabase
 import com.clinic.neochild.data.local.dao.PatientDao
 import com.clinic.neochild.data.local.dao.ReminderDao
 import com.clinic.neochild.data.local.dao.ReminderAuditDao

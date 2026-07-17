@@ -3,9 +3,9 @@ package com.clinic.neochild.domain.usecase.patient
 import com.clinic.neochild.domain.repository.PatientRepository
 import com.clinic.neochild.domain.repository.VaccinationRepository
 import com.clinic.neochild.domain.repository.SyncRepository
-import com.clinic.neochild.domain.model.SyncOperation
-import com.clinic.neochild.domain.model.SyncPriority
-import com.clinic.neochild.data.local.AppDatabase
+import com.clinic.neochild.data.local.database.AppDatabase
+import com.clinic.neochild.core.model.SyncOperation
+import com.clinic.neochild.core.model.SyncPriority
 import com.clinic.neochild.domain.model.Vaccination
 import com.clinic.neochild.domain.model.Patient
 import androidx.room.withTransaction

@@ -1,12 +1,12 @@
 package com.clinic.neochild.data.repository
 
 import androidx.room.withTransaction
-import com.clinic.neochild.data.local.AppDatabase
+import com.clinic.neochild.data.local.database.AppDatabase
 import com.clinic.neochild.data.local.entity.toDomain
 import com.clinic.neochild.data.local.entity.toEntity
 import com.clinic.neochild.domain.model.InventoryTransactionType
-import com.clinic.neochild.domain.model.SyncOperation
-import com.clinic.neochild.domain.model.SyncPriority
+import com.clinic.neochild.core.model.SyncOperation
+import com.clinic.neochild.core.model.SyncPriority
 import com.clinic.neochild.domain.model.WasteRecord
 import com.clinic.neochild.domain.repository.InventoryRepository
 import com.clinic.neochild.domain.repository.SyncRepository

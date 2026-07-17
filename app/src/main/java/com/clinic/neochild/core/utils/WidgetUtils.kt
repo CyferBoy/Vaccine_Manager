@@ -6,7 +6,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
 import com.clinic.neochild.features.widget.VaccineWidget
-import com.clinic.neochild.features.widget.WidgetWorker
+import com.clinic.neochild.worker.WidgetWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

@@ -2,23 +2,23 @@ package com.clinic.neochild.data.repository
 
 import android.content.Context
 import androidx.room.withTransaction
-import com.clinic.neochild.data.local.AppDatabase
+import com.clinic.neochild.data.local.database.AppDatabase
 import com.clinic.neochild.data.local.dao.*
 import com.clinic.neochild.data.local.entity.*
 import com.clinic.neochild.domain.model.*
-import com.clinic.neochild.domain.repository.InventoryRepository
 import com.clinic.neochild.domain.repository.ReminderRepository
 import com.clinic.neochild.domain.repository.ReminderStats
 import com.clinic.neochild.domain.repository.SyncRepository
 import com.clinic.neochild.notification.ReminderScheduler
 import com.clinic.neochild.core.utils.*
+import com.clinic.neochild.core.model.SyncOperation
+import com.clinic.neochild.core.model.SyncPriority
 import com.clinic.neochild.domain.logic.ReminderEngine
 import com.clinic.neochild.domain.model.PendingRequirement
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.util.UUID
@@ -36,11 +36,9 @@ class ReminderRepositoryImpl @Inject constructor(
     private val reminderDao: ReminderDao,
     private val reminderAuditDao: ReminderAuditDao,
     private val vaccinationDao: VaccinationDao,
-    private val vaccineDao: VaccineDao,
     private val patientDao: PatientDao,
     private val syncRepository: SyncRepository,
     private val reminderScheduler: ReminderScheduler,
-    private val inventoryRepository: InventoryRepository,
     @ApplicationContext private val context: Context
 ) : ReminderRepository {
 
@@ -207,50 +205,17 @@ class ReminderRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun markAsDone(requirement: PendingRequirement, performedBy: String) {
+    override suspend fun markRequirementSatisfied(requirement: PendingRequirement, performedBy: String) {
         withContext(Dispatchers.IO) {
             database.withTransaction {
-                val newVaccination = Vaccination(
-                    id = UUID.randomUUID().toString(),
-                    patientId = requirement.patientId,
-                    vaccineNames = listOf(requirement.vaccineName),
-                    dateGiven = PatientUtils.formatDate(java.util.Date()),
-                    isDone = true,
-                    source = VaccinationSource.CLINIC.name,
-                    performedBy = performedBy
-                )
-                vaccinationDao.insertVaccination(newVaccination.toEntity(isSynced = false))
-                syncRepository.enqueue("VACCINATION", newVaccination.id, SyncOperation.CREATE, SyncPriority.HIGH)
-
-                // Inventory Management
-                deductFromInventoryIfMatchFound(requirement.vaccineName, newVaccination.id, requirement.patientId, performedBy)
-
                 updateReminderStateAndAudit(
                     req = requirement,
                     newStatus = ReminderStatus.COMPLETED,
                     performedBy = performedBy,
-                    notes = "Vaccinated in clinic"
+                    notes = "Requirement satisfied"
                 )
             }
             triggerImmediateCheck()
-        }
-    }
-
-    private suspend fun deductFromInventoryIfMatchFound(vaccineName: String, vaccinationId: String, patientId: String, user: String) {
-        val vaccines = vaccineDao.getAllVaccines().first()
-        val match = vaccines.find { it.brandName.contains(vaccineName, ignoreCase = true) }
-        if (match != null) {
-            val currentStock = vaccineDao.getTotalStockForVaccine(match.id) ?: 0
-            if (currentStock > 0) {
-                inventoryRepository.deductStock(
-                    vaccineId = match.id,
-                    quantity = 1,
-                    user = user,
-                    transactionType = InventoryTransactionType.VACCINATION,
-                    vaccinationId = vaccinationId,
-                    patientId = patientId
-                )
-            }
         }
     }
 

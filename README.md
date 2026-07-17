@@ -1,6 +1,6 @@
-# NeoChild Clinic - Vaccine Manager (v1.1)
+# Neo Child Clinic - Vaccine Manager (v1.1)
 
-NeoChild Clinic is a modern Android application designed for pediatric clinics to manage patient records, vaccination schedules, and consultations efficiently.
+Neo Child Clinic is a modern Android application designed for pediatric clinics to manage patient records, vaccination schedules, and consultations efficiently.
 
 ## Recent Updates (v1.1)
 - **Advanced Reminder Engine:** Implemented a "Requirement-Based Satisfaction" model. Reminders are now tracked per vaccine rather than per visit, ensuring catch-up vaccinations are never missed even if visits are out of order.

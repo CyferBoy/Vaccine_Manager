@@ -367,6 +367,7 @@ private fun DashboardSmallActionsRow(
             modifier = Modifier.weight(1f),
             onClick = onBorrowed
         )
+@Suppress("DEPRECATION")
         DashboardCardSmall(
             title = "Due",
             icon = Icons.Default.EventNote,

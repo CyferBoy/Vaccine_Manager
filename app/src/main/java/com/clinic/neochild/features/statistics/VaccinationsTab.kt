@@ -188,6 +188,7 @@ private fun QuarterAndMonthFilters(
     }
 }
 
+@Suppress("DEPRECATION")
 @Composable
 private fun SummaryCards(vaccinations: List<Vaccination>) {
     Row(modifier = Modifier.fillMaxWidth()) {

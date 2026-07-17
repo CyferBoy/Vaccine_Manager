@@ -43,15 +43,23 @@ class ClinicStatsManager @Inject constructor(
             inventoryRepository.getInventoryItems(),
             vaccinationRepository.getVaccineNamesForMonth(monthPattern)
         ) { args ->
-            // Use a stable index mapping to avoid errors if flows are reordered
+            @Suppress("UNCHECKED_CAST")
             val todayCount = args[0] as Int
+            @Suppress("UNCHECKED_CAST")
             val todayRevenue = args[1] as? Double ?: 0.0
+            @Suppress("UNCHECKED_CAST")
             val todayCash = args[2] as? Double ?: 0.0
+            @Suppress("UNCHECKED_CAST")
             val todayOnline = args[3] as? Double ?: 0.0
+            @Suppress("UNCHECKED_CAST")
             val monthlyCount = args[4] as Int
+            @Suppress("UNCHECKED_CAST")
             val monthlyRevenue = args[5] as? Double ?: 0.0
+            @Suppress("UNCHECKED_CAST")
             val reminderStats = args[6] as ReminderStats
+            @Suppress("UNCHECKED_CAST")
             val inventory = args[7] as List<InventoryItem>
+            @Suppress("UNCHECKED_CAST")
             val vaccineNamesList = args[8] as List<String>
 
             val topVaccines = calculateTopVaccines(vaccineNamesList)

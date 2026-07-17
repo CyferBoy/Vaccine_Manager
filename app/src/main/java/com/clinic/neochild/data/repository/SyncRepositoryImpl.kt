@@ -1,10 +1,7 @@
 package com.clinic.neochild.data.repository
 
 import com.clinic.neochild.data.local.AppDatabase
-import com.clinic.neochild.data.local.entity.SyncQueueEntity
-import com.clinic.neochild.data.local.entity.toDomain
-import com.clinic.neochild.data.local.entity.toPatient
-import com.clinic.neochild.data.local.entity.toVaccination
+import com.clinic.neochild.data.local.entity.*
 import com.clinic.neochild.domain.model.SyncItem
 import com.clinic.neochild.domain.model.SyncOperation
 import com.clinic.neochild.domain.model.SyncPriority
@@ -59,7 +56,7 @@ class SyncRepositoryImpl @Inject constructor(
                 syncDao.updateStatus(item.queueId, SyncStatus.SYNCING.name)
                 uploadEntity(item)
                 syncDao.updateStatus(item.queueId, SyncStatus.SYNCED.name)
-                syncDao.deleteItem(item) // Optionally keep history or delete
+                syncDao.deleteItem(item) 
             } catch (e: Exception) {
                 syncDao.markFailed(item.queueId, SyncStatus.FAILED.name, e.message ?: "Unknown error")
             }
@@ -70,7 +67,10 @@ class SyncRepositoryImpl @Inject constructor(
         val collection = when (item.entityName) {
             "PATIENT" -> "patients"
             "VACCINATION" -> "vaccinations"
-            "INVENTORY" -> "inventory"
+            "WASTE" -> "waste"
+            "REMINDER_OVERRIDE" -> "reminder_overrides"
+            "REMINDER_AUDIT" -> "reminder_audits"
+            "VACCINE" -> "vaccines"
             "BATCH" -> "vaccine_batches"
             "TRANSACTION" -> "inventory_transactions"
             else -> throw IllegalArgumentException("Unknown entity: ${item.entityName}")
@@ -83,15 +83,24 @@ class SyncRepositoryImpl @Inject constructor(
             return
         }
 
-        val data = when (item.entityName) {
+        val finalData = fetchEntityData(item)
+
+        if (finalData != null) {
+            docRef.set(finalData).await()
+        }
+    }
+    
+    private suspend fun fetchEntityData(item: SyncQueueEntity): Any? {
+        return when (item.entityName) {
             "PATIENT" -> database.patientDao().getPatientById(item.entityId)?.toPatient()
             "VACCINATION" -> database.vaccinationDao().getVaccinationById(item.entityId)?.toVaccination()
-            // Add other mappers
+            "WASTE" -> database.wasteDao().getWasteById(item.entityId)?.toDomain()
+            "REMINDER_OVERRIDE" -> database.reminderDao().getReminderById(item.entityId.toLong())
+            "REMINDER_AUDIT" -> database.reminderAuditDao().getUnsyncedAudits().find { it.auditId.toString() == item.entityId }
+            "VACCINE" -> database.vaccineDao().getVaccineById(item.entityId)
+            "BATCH" -> database.vaccineDao().getBatchById(item.entityId)
+            "TRANSACTION" -> database.vaccineDao().getTransactionById(item.entityId.toLong())
             else -> null
-        }
-
-        if (data != null) {
-            docRef.set(data).await()
         }
     }
 

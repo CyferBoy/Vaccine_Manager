@@ -18,42 +18,57 @@ object ReminderEngine {
      * visit that created the requirement contains this vaccine in its "Gave" list.
      */
     fun getPotentialRequirements(allVaccinations: List<Vaccination>): List<PendingRequirement> {
-        val requirements = mutableListOf<PendingRequirement>()
         val patientVisits = allVaccinations.groupBy { it.patientId }
+        return patientVisits.flatMap { (_, visits) -> 
+            getPotentialRequirementsForPatient(visits) 
+        }
+    }
 
-        for ((patientId, visits) in patientVisits) {
-            // Sort visits chronologically
-            val sortedVisits = visits.sortedBy { PatientUtils.parseDate(it.dateGiven) ?: Date(0) }
+    /**
+     * Analyzes vaccination history for a SINGLE patient.
+     */
+    fun getPotentialRequirementsForPatient(visits: List<Vaccination>): List<PendingRequirement> {
+        if (visits.isEmpty()) return emptyList()
+        
+        val requirements = mutableListOf<PendingRequirement>()
+        val sortedVisits = visits.sortedBy { PatientUtils.parseDate(it.dateGiven) ?: Date(0) }
+        val patientId = sortedVisits.first().patientId
 
-            for (i in sortedVisits.indices) {
-                val visit = sortedVisits[i]
-                
-                // If this visit doesn't specify any "next vaccines", it creates no requirements
-                if (visit.nextDueDate.isBlank() || visit.nxtVaccineNames.isEmpty()) continue
+        // Pre-calculate cleaned names of given vaccines to avoid repeated string operations
+        val givenVaccinesByVisit = sortedVisits.map { visit ->
+            visit.vaccineNames.map { PatientUtils.cleanVaccineName(it).lowercase().trim() }
+                .filter { it.isNotBlank() }
+                .toSet()
+        }
 
-                val dueDate = PatientUtils.parseDate(visit.nextDueDate) ?: continue
+        for (i in sortedVisits.indices) {
+            val visit = sortedVisits[i]
+            if (visit.nextDueDate.isBlank() || visit.nxtVaccineNames.isEmpty()) continue
 
-                for (dueVaccineName in visit.nxtVaccineNames) {
-                    val cleanedDueName = PatientUtils.cleanVaccineName(dueVaccineName).lowercase().trim()
-                    if (cleanedDueName.isBlank()) continue
+            val dueDate = PatientUtils.parseDate(visit.nextDueDate) ?: continue
 
-                    // A requirement is satisfied if it was medically given in this or any subsequent visit.
-                    val isSatisfiedByMedicalRecord = sortedVisits.drop(i).any { laterVisit ->
-                        laterVisit.vaccineNames.any { givenName ->
-                            PatientUtils.cleanVaccineName(givenName).lowercase().trim() == cleanedDueName
-                        }
+            for (dueVaccineName in visit.nxtVaccineNames) {
+                val cleanedDueName = PatientUtils.cleanVaccineName(dueVaccineName).lowercase().trim()
+                if (cleanedDueName.isBlank()) continue
+
+                // Check if satisfied by this or any later visit
+                var isSatisfied = false
+                for (j in i until sortedVisits.size) {
+                    if (givenVaccinesByVisit[j].contains(cleanedDueName)) {
+                        isSatisfied = true
+                        break
                     }
+                }
 
-                    if (!isSatisfiedByMedicalRecord) {
-                        requirements.add(
-                            PendingRequirement(
-                                patientId = patientId,
-                                vaccineName = dueVaccineName,
-                                dueDate = dueDate,
-                                originalVisitId = visit.id
-                            )
+                if (!isSatisfied) {
+                    requirements.add(
+                        PendingRequirement(
+                            patientId = patientId,
+                            vaccineName = dueVaccineName,
+                            dueDate = dueDate,
+                            originalVisitId = visit.id
                         )
-                    }
+                    )
                 }
             }
         }

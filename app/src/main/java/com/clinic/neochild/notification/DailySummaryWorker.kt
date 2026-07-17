@@ -6,8 +6,8 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.clinic.neochild.data.local.preferences.NotificationSettingsManager
 import com.clinic.neochild.domain.repository.ReminderRepository
-import com.clinic.neochild.domain.repository.VaccineRepository
-import com.clinic.neochild.core.utils.PatientUtils
+import com.clinic.neochild.domain.repository.InventoryRepository
+import com.clinic.neochild.domain.usecase.statistics.GetClinicStatsUseCase
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.flow.first
@@ -18,8 +18,8 @@ import java.util.*
 class DailySummaryWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted params: WorkerParameters,
-    private val reminderRepository: ReminderRepository,
-    private val vaccineRepository: VaccineRepository,
+    private val getClinicStatsUseCase: GetClinicStatsUseCase,
+    private val inventoryRepository: InventoryRepository,
     private val settingsManager: NotificationSettingsManager,
     private val notificationHelper: NotificationHelper
 ) : CoroutineWorker(context, params) {
@@ -30,30 +30,26 @@ class DailySummaryWorker @AssistedInject constructor(
 
         // 1. Daily Summary Logic
         if (settings.dailySummaryEnabled && settings.lastSummarySentDate != todayStr) {
-            val dueToday = reminderRepository.getDueToday().first().size
-            val overdue = reminderRepository.getOverdue().first().size
-            val inventory = vaccineRepository.getInventory().first()
-            val lowStockCount = inventory.count { it.stock <= settings.lowStockThreshold }
-
-            if (dueToday > 0 || overdue > 0 || lowStockCount > 0) {
-                notificationHelper.showDailySummary(dueToday, overdue, lowStockCount)
+            val stats = getClinicStatsUseCase().first()
+            
+            if (stats.dueToday > 0 || stats.overdue > 0 || stats.lowStockCount > 0) {
+                notificationHelper.showDailySummary(stats.dueToday, stats.overdue, stats.lowStockCount)
                 settingsManager.markSummarySent(todayStr)
             }
         }
 
-        // 2. Individual Low Stock Logic (Persistent alerts when they first happen)
+        // 2. Individual Low Stock Logic
         if (settings.lowStockEnabled) {
-            val inventory = vaccineRepository.getInventory().first()
-            for (vaccine in inventory) {
-                val isBelowThreshold = vaccine.stock <= settings.lowStockThreshold
-                val alreadyNotified = settings.notifiedLowStockVaccines.contains(vaccine.id)
+            val inventory = inventoryRepository.getInventoryItems().first()
+            for (item in inventory) {
+                val isBelowThreshold = item.stock <= item.threshold
+                val alreadyNotified = settings.notifiedLowStockVaccines.contains(item.id)
 
                 if (isBelowThreshold && !alreadyNotified) {
-                    notificationHelper.showLowStockAlert(vaccine.brandName, vaccine.stock)
-                    settingsManager.markLowStockNotified(vaccine.id)
+                    notificationHelper.showLowStockAlert(item.brandName, item.stock)
+                    settingsManager.markLowStockNotified(item.id)
                 } else if (!isBelowThreshold && alreadyNotified) {
-                    // Reset so we can notify again if it falls below later
-                    settingsManager.clearLowStockNotification(vaccine.id)
+                    settingsManager.clearLowStockNotification(item.id)
                 }
             }
         }

@@ -2,20 +2,11 @@ package com.clinic.neochild.ui.dashboard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.clinic.neochild.domain.model.Vaccine
-import com.clinic.neochild.domain.model.Vaccination
-import com.clinic.neochild.domain.repository.VaccinationRepository
 import com.clinic.neochild.domain.repository.PatientRepository
-import com.clinic.neochild.core.common.Constants
-import com.clinic.neochild.data.mapper.FirestoreMappers
-import com.clinic.neochild.domain.logic.ReminderEngine
-import com.clinic.neochild.core.utils.PatientUtils
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.ListenerRegistration
+import com.clinic.neochild.domain.repository.WasteRepository
+import com.clinic.neochild.domain.usecase.statistics.GetClinicStatsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
-import java.text.SimpleDateFormat
-import java.util.*
 import javax.inject.Inject
 
 data class DashboardUiState(
@@ -25,44 +16,26 @@ data class DashboardUiState(
     val wasteCount: Int = 0
 )
 
+/**
+ * Orchestrates Dashboard data using unified data streams.
+ */
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
-    private val firestore: FirebaseFirestore,
     private val patientRepository: PatientRepository,
-    private val reminderRepository: com.clinic.neochild.domain.repository.ReminderRepository,
-    private val getClinicStatsUseCase: com.clinic.neochild.domain.usecase.statistics.GetClinicStatsUseCase,
-    private val inventoryRepository: com.clinic.neochild.domain.repository.InventoryRepository
+    private val getClinicStatsUseCase: GetClinicStatsUseCase,
+    private val wasteRepository: WasteRepository
 ) : ViewModel() {
 
-    private val _wasteCount = MutableStateFlow(0)
-
     val uiState: StateFlow<DashboardUiState> = combine(
-        patientRepository.allPatients,
+        patientRepository.getPatientCount(),
         getClinicStatsUseCase(),
-        inventoryRepository.getInventoryItems(),
-        _wasteCount
-    ) { patients, stats, inventory, waste ->
+        wasteRepository.getWasteCount()
+    ) { patientCount, stats, wasteCount ->
         DashboardUiState(
-            patientCount = patients.size,
-            lowStockCount = inventory.count { it.stock <= it.threshold },
+            patientCount = patientCount,
+            lowStockCount = stats.lowStockCount,
             dueTodayCount = stats.dueToday,
-            wasteCount = waste
+            wasteCount = wasteCount
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardUiState())
-
-    private val listeners = mutableListOf<ListenerRegistration>()
-
-    init {
-        // Waste Listener (Keeping for real-time until repo supports it)
-        listeners.add(
-            firestore.collection("waste").addSnapshotListener { snapshot, _ ->
-                _wasteCount.value = snapshot?.size() ?: 0
-            }
-        )
-    }
-
-    override fun onCleared() {
-        super.onCleared()
-        listeners.forEach { it.remove() }
-    }
 }

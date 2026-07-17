@@ -1,0 +1,42 @@
+package com.clinic.neochild.data.local.entity
+
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+import com.clinic.neochild.domain.model.WasteRecord
+
+@Entity(tableName = "waste_records")
+data class WasteEntity(
+    @PrimaryKey val id: String,
+    val vaccineId: String,
+    val brandName: String,
+    val batchNumber: String,
+    val expiryDate: String,
+    val dateWasted: String,
+    val reason: String,
+    val quantity: Int,
+    val isSynced: Boolean = false,
+    val isDeleted: Boolean = false
+)
+
+fun WasteEntity.toDomain() = WasteRecord(
+    id = id,
+    vaccineId = vaccineId,
+    brandName = brandName,
+    batchNumber = batchNumber,
+    expiryDate = expiryDate,
+    dateWasted = dateWasted,
+    reason = reason,
+    quantity = quantity
+)
+
+fun WasteRecord.toEntity(isSynced: Boolean = false) = WasteEntity(
+    id = id,
+    vaccineId = vaccineId,
+    brandName = brandName,
+    batchNumber = batchNumber,
+    expiryDate = expiryDate,
+    dateWasted = dateWasted,
+    reason = reason,
+    quantity = quantity,
+    isSynced = isSynced
+)

@@ -6,7 +6,10 @@ import com.clinic.neochild.data.local.entity.InventoryTransactionEntity
 import com.clinic.neochild.data.local.entity.VaccineBatchEntity
 import com.clinic.neochild.data.local.entity.VaccineEntity
 import com.clinic.neochild.domain.model.InventoryTransactionType
+import com.clinic.neochild.domain.model.SyncOperation
+import com.clinic.neochild.domain.model.SyncPriority
 import com.clinic.neochild.domain.repository.InventoryRepository
+import com.clinic.neochild.domain.repository.SyncRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import javax.inject.Inject
@@ -14,7 +17,8 @@ import javax.inject.Singleton
 
 @Singleton
 class InventoryRepositoryImpl @Inject constructor(
-    private val database: AppDatabase
+    private val database: AppDatabase,
+    private val syncRepository: SyncRepository
 ) : InventoryRepository {
 
     private val vaccineDao = database.vaccineDao()
@@ -42,14 +46,14 @@ class InventoryRepositoryImpl @Inject constructor(
     override fun getAllVaccines(): Flow<List<VaccineEntity>> = vaccineDao.getAllVaccines()
 
     override fun getVaccineBatches(vaccineId: String): Flow<List<VaccineBatchEntity>> = 
-        // Need to add this specific query or use filter
-        vaccineDao.getAllBatches() // Simplified for now, should be filtered by vaccineId
+        vaccineDao.getBatchesByVaccine(vaccineId)
 
     override fun getInventoryTransactions(vaccineId: String): Flow<List<InventoryTransactionEntity>> = 
         vaccineDao.getTransactionsForVaccine(vaccineId)
 
     override suspend fun addVaccineDefinition(vaccine: VaccineEntity) {
         vaccineDao.insertVaccine(vaccine)
+        syncRepository.enqueue("VACCINE", vaccine.id, SyncOperation.CREATE, SyncPriority.MEDIUM)
     }
 
     override suspend fun addBatch(batch: VaccineBatchEntity, user: String) {
@@ -57,18 +61,21 @@ class InventoryRepositoryImpl @Inject constructor(
             val currentTotal = vaccineDao.getTotalStockForVaccine(batch.vaccineId) ?: 0
             vaccineDao.insertBatch(batch)
             
-            vaccineDao.insertTransaction(
-                InventoryTransactionEntity(
-                    vaccineId = batch.vaccineId,
-                    batchId = batch.batchId,
-                    transactionType = InventoryTransactionType.PURCHASE.name,
-                    quantity = batch.purchaseQuantity,
-                    previousQuantity = currentTotal,
-                    currentQuantity = currentTotal + batch.purchaseQuantity,
-                    user = user,
-                    notes = "New Batch: ${batch.batchNumber}"
-                )
+            val transaction = InventoryTransactionEntity(
+                vaccineId = batch.vaccineId,
+                batchId = batch.batchId,
+                transactionType = InventoryTransactionType.PURCHASE.name,
+                quantity = batch.purchaseQuantity,
+                previousQuantity = currentTotal,
+                currentQuantity = currentTotal + batch.purchaseQuantity,
+                user = user,
+                notes = "New Batch: ${batch.batchNumber}"
             )
+            vaccineDao.insertTransaction(transaction)
+            
+            // Queue Sync
+            syncRepository.enqueue("BATCH", batch.batchId, SyncOperation.CREATE, SyncPriority.MEDIUM)
+            // Transactions could also be synced if needed for remote audit
         }
     }
 
@@ -95,19 +102,21 @@ class InventoryRepositoryImpl @Inject constructor(
                 )
                 vaccineDao.updateBatch(updatedBatch)
 
-                vaccineDao.insertTransaction(
-                    InventoryTransactionEntity(
-                        vaccineId = vaccineId,
-                        batchId = batch.batchId,
-                        patientId = patientId,
-                        vaccinationId = vaccinationId,
-                        transactionType = transactionType.name,
-                        quantity = -deductFromThisBatch,
-                        previousQuantity = prevQty,
-                        currentQuantity = prevQty - deductFromThisBatch,
-                        user = user
-                    )
+                val transaction = InventoryTransactionEntity(
+                    vaccineId = vaccineId,
+                    batchId = batch.batchId,
+                    patientId = patientId,
+                    vaccinationId = vaccinationId,
+                    transactionType = transactionType.name,
+                    quantity = -deductFromThisBatch,
+                    previousQuantity = prevQty,
+                    currentQuantity = prevQty - deductFromThisBatch,
+                    user = user
                 )
+                vaccineDao.insertTransaction(transaction)
+                
+                // Queue Sync for the updated batch
+                syncRepository.enqueue("BATCH", batch.batchId, SyncOperation.UPDATE, SyncPriority.HIGH)
 
                 remainingToDeduct -= deductFromThisBatch
             }
@@ -119,6 +128,27 @@ class InventoryRepositoryImpl @Inject constructor(
     }
 
     override suspend fun adjustStock(batchId: String, newQuantity: Int, user: String, reason: String) {
-        // Implementation for manual adjustment
+        database.withTransaction {
+            val batch = vaccineDao.getBatchById(batchId) ?: return@withTransaction
+            val currentTotal = vaccineDao.getTotalStockForVaccine(batch.vaccineId) ?: 0
+            val diff = newQuantity - batch.remainingQuantity
+            
+            val updatedBatch = batch.copy(remainingQuantity = newQuantity)
+            vaccineDao.updateBatch(updatedBatch)
+            
+            val transaction = InventoryTransactionEntity(
+                vaccineId = batch.vaccineId,
+                batchId = batchId,
+                transactionType = InventoryTransactionType.MANUAL_ADJUSTMENT.name,
+                quantity = diff,
+                previousQuantity = currentTotal,
+                currentQuantity = currentTotal + diff,
+                user = user,
+                notes = "Adjustment: $reason"
+            )
+            vaccineDao.insertTransaction(transaction)
+            
+            syncRepository.enqueue("BATCH", batchId, SyncOperation.UPDATE, SyncPriority.MEDIUM)
+        }
     }
 }

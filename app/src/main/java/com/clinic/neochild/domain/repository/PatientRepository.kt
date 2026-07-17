@@ -13,5 +13,6 @@ interface PatientRepository {
     suspend fun refreshPatients()
     suspend fun addPatient(patient: Patient)
     suspend fun deletePatient(id: String)
-    suspend fun mergePatients(masterId: String, duplicateIds: List<String>)
+    fun searchPatients(query: String): Flow<List<Patient>>
+    fun getPatientCount(): Flow<Int>
 }

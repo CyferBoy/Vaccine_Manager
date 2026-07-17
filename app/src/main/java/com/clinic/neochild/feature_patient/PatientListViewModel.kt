@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.clinic.neochild.domain.model.Patient
 import com.clinic.neochild.domain.usecase.patient.DeletePatientUseCase
-import com.clinic.neochild.domain.usecase.patient.GetPatientsUseCase
 import com.clinic.neochild.domain.usecase.patient.MergePatientsUseCase
 import com.clinic.neochild.domain.usecase.patient.SearchPatientsUseCase
 import com.clinic.neochild.domain.usecase.vaccination.GetVaccinationsUseCase
@@ -32,7 +31,6 @@ data class PatientListUiState(
 
 @HiltViewModel
 class PatientListViewModel @Inject constructor(
-    private val getPatientsUseCase: GetPatientsUseCase,
     private val getVaccinationsUseCase: GetVaccinationsUseCase,
     private val deletePatientUseCase: DeletePatientUseCase,
     private val mergePatientsUseCase: MergePatientsUseCase,
@@ -46,37 +44,41 @@ class PatientListViewModel @Inject constructor(
     private val _isMerging = MutableStateFlow(false)
     private val _error = MutableStateFlow<String?>(null)
 
-    val uiState: StateFlow<PatientListUiState> = combine(
-        getPatientsUseCase(),
-        getVaccinationsUseCase(),
-        _searchQuery,
-        _sortOption,
-        combine(_isMergeSelectionMode, _selectedPatients, _isMerging, _error) { mode, selected, merging, err ->
-            Quad(mode, selected, merging, err)
-        }
-    ) { patients, vaccinations, query, sort, internalState ->
-        
-        val missingPrice = vaccinations.filter { it.cost <= 0.0 }.map { it.patientId }.toSet()
-        
-        val filtered = searchPatientsUseCase(query, patients, vaccinations).let { list ->
-            when (sort) {
-                PatientSortOption.NAME_AZ -> list.sortedBy { it.name.lowercase() }
-                PatientSortOption.NEWEST -> list.sortedByDescending { it.registrationDate }
-            }
-        }
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class, kotlinx.coroutines.FlowPreview::class)
+    val uiState: StateFlow<PatientListUiState> = _searchQuery
+        .debounce(300)
+        .flatMapLatest { query ->
+            combine(
+                searchPatientsUseCase(query),
+                _sortOption,
+                getVaccinationsUseCase(),
+                combine(_isMergeSelectionMode, _selectedPatients, _isMerging, _error) { mode, selected, merging, err ->
+                    Quad(mode, selected, merging, err)
+                }
+            ) { patients, sort, vaccinations, internalState ->
+                
+                val missingPrice = if (query.isEmpty()) {
+                    vaccinations.filter { it.cost <= 0.0 }.map { it.patientId }.toSet()
+                } else emptySet()
 
-        PatientListUiState(
-            patients = filtered,
-            isLoading = false,
-            searchQuery = query,
-            sortOption = sort,
-            isMergeSelectionMode = internalState.first,
-            selectedPatients = internalState.second,
-            isMerging = internalState.third,
-            error = internalState.fourth,
-            patientsWithMissingPrice = missingPrice
-        )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), PatientListUiState(isLoading = true))
+                val sorted = when (sort) {
+                    PatientSortOption.NAME_AZ -> patients.sortedBy { it.name.lowercase() }
+                    PatientSortOption.NEWEST -> patients.sortedByDescending { it.registrationDate }
+                }
+
+                PatientListUiState(
+                    patients = sorted,
+                    isLoading = false,
+                    searchQuery = query,
+                    sortOption = sort,
+                    isMergeSelectionMode = internalState.first,
+                    selectedPatients = internalState.second,
+                    isMerging = internalState.third,
+                    error = internalState.fourth,
+                    patientsWithMissingPrice = missingPrice
+                )
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), PatientListUiState(isLoading = true))
 
     fun updateSearchQuery(query: String) {
         _searchQuery.value = query
@@ -158,4 +160,4 @@ class PatientListViewModel @Inject constructor(
     }
 }
 
-data class Quad<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
+private data class Quad<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)

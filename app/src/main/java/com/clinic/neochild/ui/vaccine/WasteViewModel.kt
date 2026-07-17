@@ -4,12 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.clinic.neochild.domain.model.Vaccine
 import com.clinic.neochild.domain.model.WasteRecord
-import com.clinic.neochild.data.mapper.FirestoreMappers
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.ListenerRegistration
+import com.clinic.neochild.domain.repository.InventoryRepository
+import com.clinic.neochild.domain.repository.WasteRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.util.UUID
 import javax.inject.Inject
 
 data class WasteUiState(
@@ -22,44 +22,34 @@ data class WasteUiState(
 
 @HiltViewModel
 class WasteViewModel @Inject constructor(
-    private val firestore: FirebaseFirestore
+    private val wasteRepository: WasteRepository,
+    private val inventoryRepository: InventoryRepository
 ) : ViewModel() {
 
-    private val _wasteRecords = MutableStateFlow<List<WasteRecord>>(emptyList())
-    private val _inventory = MutableStateFlow<List<Vaccine>>(emptyList())
-    private val _isLoading = MutableStateFlow(true)
     private val _isSaving = MutableStateFlow(false)
     private val _error = MutableStateFlow<String?>(null)
 
     val uiState: StateFlow<WasteUiState> = combine(
-        _wasteRecords, _inventory, _isLoading, _isSaving, _error
-    ) { waste, inv, loading, saving, err ->
-        WasteUiState(waste, inv, loading, saving, err)
+        wasteRepository.getAllWaste(),
+        inventoryRepository.getAllVaccines(),
+        _isSaving,
+        _error
+    ) { waste, vaccines, saving, err ->
+        WasteUiState(
+            wasteRecords = waste,
+            inventory = vaccines.map { 
+                Vaccine(
+                    id = it.id,
+                    brandName = it.brandName,
+                    type = it.type,
+                    companyName = it.companyName
+                )
+            },
+            isLoading = false,
+            isSaving = saving,
+            error = err
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), WasteUiState(isLoading = true))
-
-    private var wasteListener: ListenerRegistration? = null
-
-    init {
-        startListeners()
-    }
-
-    private fun startListeners() {
-        wasteListener = firestore.collection("waste")
-            .addSnapshotListener { snapshot, e ->
-                if (e != null) {
-                    _isLoading.value = false
-                    return@addSnapshotListener
-                }
-                val records = snapshot?.documents?.mapNotNull { FirestoreMappers.toWasteRecord(it) }
-                    ?.sortedByDescending { it.dateWasted } ?: emptyList()
-                _wasteRecords.value = records
-                _isLoading.value = false
-            }
-
-        firestore.collection("inventory").get().addOnSuccessListener { result ->
-            _inventory.value = result.documents.mapNotNull { FirestoreMappers.toVaccine(it) }
-        }
-    }
 
     fun recordWaste(
         vaccineId: String,
@@ -72,22 +62,20 @@ class WasteViewModel @Inject constructor(
     ) {
         viewModelScope.launch {
             _isSaving.value = true
-            val wasteData = hashMapOf(
-                "vaccineId" to vaccineId,
-                "brandName" to brandName,
-                "batchNumber" to batchNumber,
-                "expiryDate" to expiryDate,
-                "dateWasted" to dateWasted,
-                "reason" to reason,
-                "quantity" to 1
+            val record = WasteRecord(
+                id = UUID.randomUUID().toString(),
+                vaccineId = vaccineId,
+                brandName = brandName,
+                batchNumber = batchNumber,
+                expiryDate = expiryDate,
+                dateWasted = dateWasted,
+                reason = reason,
+                quantity = 1
             )
             
             try {
-                firestore.collection("waste").add(wasteData)
-                val currentStock = _inventory.value.find { it.id == vaccineId }?.stock ?: 0
-                if (currentStock > 0) {
-                    firestore.collection("inventory").document(vaccineId).update("stock", currentStock - 1)
-                }
+                // In a real app, user would be from Auth. Using fallback for now.
+                wasteRepository.recordWaste(record, "System User")
                 onSuccess()
             } catch (e: Exception) {
                 _error.value = e.message
@@ -98,15 +86,12 @@ class WasteViewModel @Inject constructor(
     }
 
     fun deleteWaste(id: String) {
-        firestore.collection("waste").document(id).delete()
+        viewModelScope.launch {
+            wasteRepository.deleteWaste(id)
+        }
     }
 
     fun clearError() {
         _error.value = null
-    }
-
-    override fun onCleared() {
-        super.onCleared()
-        wasteListener?.remove()
     }
 }

@@ -10,4 +10,11 @@ interface VaccinationRepository {
     suspend fun addVaccination(vaccination: Vaccination)
     suspend fun deleteVaccination(id: String)
     suspend fun markAsDone(id: String)
+
+    fun getTodayCount(date: String): Flow<Int>
+    fun getTodayRevenue(date: String): Flow<Double?>
+    fun getTodayCash(date: String): Flow<Double?>
+    fun getTodayOnline(date: String): Flow<Double?>
+    fun getMonthlyCount(pattern: String): Flow<Int>
+    fun getMonthlyRevenue(pattern: String): Flow<Double?>
 }

@@ -6,12 +6,14 @@ import com.clinic.neochild.data.repository.ReminderRepositoryImpl
 import com.clinic.neochild.data.repository.SyncRepositoryImpl
 import com.clinic.neochild.data.repository.VaccinationRepositoryImpl
 import com.clinic.neochild.data.repository.VaccineRepositoryImpl
+import com.clinic.neochild.data.repository.WasteRepositoryImpl
 import com.clinic.neochild.domain.repository.InventoryRepository
 import com.clinic.neochild.domain.repository.PatientRepository
 import com.clinic.neochild.domain.repository.ReminderRepository
 import com.clinic.neochild.domain.repository.SyncRepository
 import com.clinic.neochild.domain.repository.VaccinationRepository
 import com.clinic.neochild.domain.repository.VaccineRepository
+import com.clinic.neochild.domain.repository.WasteRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -45,4 +47,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindSyncRepository(impl: SyncRepositoryImpl): SyncRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindWasteRepository(impl: WasteRepositoryImpl): WasteRepository
 }

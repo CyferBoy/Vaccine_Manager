@@ -25,6 +25,12 @@ interface VaccineDao {
     @Query("SELECT * FROM vaccine_batches WHERE isDeleted = 0")
     fun getAllBatches(): Flow<List<VaccineBatchEntity>>
 
+    @Query("SELECT * FROM vaccine_batches WHERE vaccineId = :vaccineId AND isDeleted = 0")
+    fun getBatchesByVaccine(vaccineId: String): Flow<List<VaccineBatchEntity>>
+
+    @Query("SELECT * FROM vaccine_batches WHERE batchId = :batchId LIMIT 1")
+    suspend fun getBatchById(batchId: String): VaccineBatchEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertBatch(batch: VaccineBatchEntity)
 
@@ -37,6 +43,9 @@ interface VaccineDao {
 
     @Query("SELECT * FROM inventory_transactions WHERE vaccineId = :vaccineId ORDER BY timestamp DESC")
     fun getTransactionsForVaccine(vaccineId: String): Flow<List<InventoryTransactionEntity>>
+
+    @Query("SELECT * FROM inventory_transactions WHERE transactionId = :id LIMIT 1")
+    suspend fun getTransactionById(id: Long): InventoryTransactionEntity?
 
     // Stock Summary
     @Query("SELECT SUM(remainingQuantity) FROM vaccine_batches WHERE vaccineId = :vaccineId AND isDeleted = 0")

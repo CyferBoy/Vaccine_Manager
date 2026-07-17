@@ -9,26 +9,22 @@ import com.clinic.neochild.domain.model.*
 import com.clinic.neochild.domain.repository.InventoryRepository
 import com.clinic.neochild.domain.repository.ReminderRepository
 import com.clinic.neochild.domain.repository.ReminderStats
+import com.clinic.neochild.domain.repository.SyncRepository
 import com.clinic.neochild.notification.ReminderScheduler
 import com.clinic.neochild.core.utils.*
 import com.clinic.neochild.domain.logic.ReminderEngine
 import com.clinic.neochild.domain.model.PendingRequirement
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import java.util.UUID
 import java.util.Calendar
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 
 /**
  * Production-ready implementation of [ReminderRepository].
@@ -42,13 +38,11 @@ class ReminderRepositoryImpl @Inject constructor(
     private val vaccinationDao: VaccinationDao,
     private val vaccineDao: VaccineDao,
     private val patientDao: PatientDao,
-    private val firestore: FirebaseFirestore,
+    private val syncRepository: SyncRepository,
     private val reminderScheduler: ReminderScheduler,
     private val inventoryRepository: InventoryRepository,
     @ApplicationContext private val context: Context
 ) : ReminderRepository {
-
-    private val syncMutex = Mutex()
 
     /**
      * Shared logic to combine raw entities into a processed list of vaccinations with overrides applied.
@@ -80,14 +74,7 @@ class ReminderRepositoryImpl @Inject constructor(
             }
             if (!matchesSearch) return@filter false
 
-            // Status filter logic (Note: processDueListInternal already hides COMPLETED/DISMISSED/EXTERNAL)
-            if (filterStatus != null) {
-                // In a more complex scenario, we'd resolve status here. 
-                // For now, we assume the list contains only ACTIVE/RESCHEDULED.
-                true 
-            } else {
-                true
-            }
+            true
         }
     }
 
@@ -193,9 +180,9 @@ class ReminderRepositoryImpl @Inject constructor(
                         notes = notes,
                         isSynced = false
                     )
-                    reminderDao.insertOrUpdate(reminder)
+                    val id = reminderDao.insertOrUpdate(reminder)
                     
-                    reminderAuditDao.insertAudit(ReminderAuditEntity(
+                    val audit = ReminderAuditEntity(
                         patientId = patientId,
                         originalVisitId = originalVisitId,
                         vaccineName = name,
@@ -207,12 +194,16 @@ class ReminderRepositoryImpl @Inject constructor(
                         priority = priority,
                         reminderEnabled = reminderEnabled,
                         performedBy = performedBy,
-                        notes = "Staff scheduled follow-up"
-                    ))
+                        notes = "Staff scheduled follow-up",
+                        isSynced = false
+                    )
+                    val auditId = reminderAuditDao.insertAudit(audit)
+
+                    syncRepository.enqueue("REMINDER_OVERRIDE", id.toString(), SyncOperation.CREATE, SyncPriority.MEDIUM)
+                    syncRepository.enqueue("REMINDER_AUDIT", auditId.toString(), SyncOperation.CREATE, SyncPriority.LOW)
                 }
             }
             if (reminderEnabled) triggerImmediateCheck()
-            syncWithRemote()
         }
     }
 
@@ -229,6 +220,7 @@ class ReminderRepositoryImpl @Inject constructor(
                     performedBy = performedBy
                 )
                 vaccinationDao.insertVaccination(newVaccination.toEntity(isSynced = false))
+                syncRepository.enqueue("VACCINATION", newVaccination.id, SyncOperation.CREATE, SyncPriority.HIGH)
 
                 // Inventory Management
                 deductFromInventoryIfMatchFound(requirement.vaccineName, newVaccination.id, requirement.patientId, performedBy)
@@ -241,7 +233,6 @@ class ReminderRepositoryImpl @Inject constructor(
                 )
             }
             triggerImmediateCheck()
-            syncWithRemote()
         }
     }
 
@@ -275,7 +266,6 @@ class ReminderRepositoryImpl @Inject constructor(
                 )
             }
             triggerImmediateCheck()
-            syncWithRemote()
         }
     }
 
@@ -293,6 +283,7 @@ class ReminderRepositoryImpl @Inject constructor(
                     performedBy = performedBy
                 )
                 vaccinationDao.insertVaccination(newVaccination.toEntity(isSynced = false))
+                syncRepository.enqueue("VACCINATION", newVaccination.id, SyncOperation.CREATE, SyncPriority.MEDIUM)
 
                 updateReminderStateAndAudit(
                     req = requirement,
@@ -302,7 +293,6 @@ class ReminderRepositoryImpl @Inject constructor(
                 )
             }
             triggerImmediateCheck()
-            syncWithRemote()
         }
     }
 
@@ -317,7 +307,6 @@ class ReminderRepositoryImpl @Inject constructor(
                 )
             }
             triggerImmediateCheck()
-            syncWithRemote()
         }
     }
 
@@ -332,31 +321,37 @@ class ReminderRepositoryImpl @Inject constructor(
                 )
             }
             triggerImmediateCheck()
-            syncWithRemote()
         }
     }
 
     override suspend fun deleteReminder(requirement: PendingRequirement, performedBy: String) {
         withContext(Dispatchers.IO) {
             database.withTransaction {
+                val existing = reminderDao.getReminderState(requirement.patientId, requirement.originalVisitId, requirement.vaccineName)
                 reminderDao.deleteReminder(requirement.patientId, requirement.originalVisitId, requirement.vaccineName)
-                reminderAuditDao.insertAudit(ReminderAuditEntity(
+                
+                val auditId = reminderAuditDao.insertAudit(ReminderAuditEntity(
                     patientId = requirement.patientId,
                     originalVisitId = requirement.originalVisitId,
                     vaccineName = requirement.vaccineName,
                     action = "DELETED",
-                    oldStatus = null,
+                    oldStatus = existing?.status,
                     newStatus = "DELETED",
-                    oldDate = null,
+                    oldDate = existing?.dueDate,
                     newDate = null,
-                    priority = null,
-                    reminderEnabled = null,
+                    priority = existing?.priority,
+                    reminderEnabled = existing?.reminderEnabled,
                     performedBy = performedBy,
-                    notes = "Deleted by admin"
+                    notes = "Deleted by admin",
+                    isSynced = false
                 ))
+                
+                if (existing != null) {
+                    syncRepository.enqueue("REMINDER_OVERRIDE", existing.id.toString(), SyncOperation.DELETE, SyncPriority.LOW)
+                }
+                syncRepository.enqueue("REMINDER_AUDIT", auditId.toString(), SyncOperation.CREATE, SyncPriority.LOW)
             }
             triggerImmediateCheck()
-            syncWithRemote()
         }
     }
 
@@ -406,9 +401,9 @@ class ReminderRepositoryImpl @Inject constructor(
             isSynced = false
         )
         
-        reminderDao.insertOrUpdate(reminder)
+        val id = reminderDao.insertOrUpdate(reminder)
 
-        reminderAuditDao.insertAudit(
+        val auditId = reminderAuditDao.insertAudit(
             ReminderAuditEntity(
                 patientId = req.patientId,
                 originalVisitId = req.originalVisitId,
@@ -426,28 +421,13 @@ class ReminderRepositoryImpl @Inject constructor(
                 isSynced = false
             )
         )
+        
+        syncRepository.enqueue("REMINDER_OVERRIDE", id.toString(), SyncOperation.UPDATE, SyncPriority.MEDIUM)
+        syncRepository.enqueue("REMINDER_AUDIT", auditId.toString(), SyncOperation.CREATE, SyncPriority.LOW)
     }
 
     override suspend fun syncWithRemote() {
-        syncMutex.withLock {
-            withContext(Dispatchers.IO) {
-                try {
-                    val unsyncedAudits = reminderAuditDao.getUnsyncedAudits()
-                    for (audit in unsyncedAudits) {
-                        firestore.collection("reminder_audits").document(audit.auditId.toString()).set(audit).await()
-                        reminderAuditDao.markSynced(audit.auditId)
-                    }
-
-                    val unsyncedReminders = reminderDao.getUnsyncedReminders()
-                    for (reminder in unsyncedReminders) {
-                        firestore.collection("reminder_overrides").document(reminder.id.toString()).set(reminder).await()
-                        reminderDao.markSynced(reminder.id)
-                    }
-                } catch (e: Exception) {
-                    android.util.Log.e("ReminderSync", "Remote sync failed", e)
-                }
-            }
-        }
+        // Now handled via SyncRepository and SyncWorker
     }
 
     override suspend fun markCompleted(id: Long, timestamp: Long) {
@@ -456,7 +436,7 @@ class ReminderRepositoryImpl @Inject constructor(
             if (existing != null) {
                 reminderDao.updateStatus(id, ReminderStatus.COMPLETED.name, true, timestamp)
                 
-                reminderAuditDao.insertAudit(ReminderAuditEntity(
+                val auditId = reminderAuditDao.insertAudit(ReminderAuditEntity(
                     patientId = existing.patientId,
                     originalVisitId = existing.originalVisitId,
                     vaccineName = existing.vaccineName,
@@ -468,19 +448,20 @@ class ReminderRepositoryImpl @Inject constructor(
                     priority = existing.priority,
                     reminderEnabled = existing.reminderEnabled,
                     performedBy = "SYSTEM_NOTIFICATION",
-                    notes = "Marked completed via notification action"
+                    notes = "Marked completed via notification action",
+                    isSynced = false
                 ))
-                syncWithRemote()
-            } else {
-                // Fallback for missing entity
-                reminderDao.updateStatus(id, ReminderStatus.COMPLETED.name, true, timestamp)
-                syncWithRemote()
+                
+                syncRepository.enqueue("REMINDER_OVERRIDE", id.toString(), SyncOperation.UPDATE, SyncPriority.MEDIUM)
+                syncRepository.enqueue("REMINDER_AUDIT", auditId.toString(), SyncOperation.CREATE, SyncPriority.LOW)
             }
         }
     }
 
     override suspend fun insertReminder(reminder: ReminderEntity): Long {
-        return reminderDao.insertOrUpdate(reminder)
+        val id = reminderDao.insertOrUpdate(reminder)
+        syncRepository.enqueue("REMINDER_OVERRIDE", id.toString(), SyncOperation.CREATE, SyncPriority.MEDIUM)
+        return id
     }
 
     override fun triggerImmediateCheck() {

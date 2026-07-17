@@ -19,6 +19,8 @@ interface PatientLocalDataSource {
     suspend fun deletePatient(id: String)
     suspend fun getUnsyncedPatients(): List<Patient>
     suspend fun markSynced(id: String)
+    fun searchPatients(query: String): Flow<List<Patient>>
+    fun getPatientCount(): Flow<Int>
 }
 
 class PatientLocalDataSourceImpl(private val patientDao: PatientDao) : PatientLocalDataSource {
@@ -42,4 +44,11 @@ class PatientLocalDataSourceImpl(private val patientDao: PatientDao) : PatientLo
 
     override suspend fun markSynced(id: String) = 
         patientDao.markSynced(id)
+
+    override fun searchPatients(query: String): Flow<List<Patient>> {
+        val q = "%$query%"
+        return patientDao.searchPatients(q).map { entities -> entities.map { it.toPatient() } }
+    }
+
+    override fun getPatientCount(): Flow<Int> = patientDao.getPatientCount()
 }

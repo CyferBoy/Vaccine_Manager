@@ -122,8 +122,7 @@ fun DashboardScreen(
                         uiState = uiState,
                         onBorrowed = onBorrowed,
                         onDue = onDue,
-                        onWaste = onWaste,
-                        onSync = onSync
+                        onWaste = onWaste
                     )
                     
                     Spacer(modifier = Modifier.height(40.dp))
@@ -354,13 +353,20 @@ private fun DashboardSmallActionsRow(
     uiState: DashboardUiState,
     onBorrowed: () -> Unit,
     onDue: () -> Unit,
-    onWaste: () -> Unit,
-    onSync: () -> Unit
+    onWaste: () -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        DashboardCardSmall(
+            title = "Borrowed",
+            icon = Icons.Default.SwapHoriz,
+            containerColor = if (isSystemInDarkTheme()) Color(0xFF004D40) else Color(0xFFE0F2F1),
+            contentColor = if (isSystemInDarkTheme()) Color(0xFF80CBC4) else Color(0xFF00695C),
+            modifier = Modifier.weight(1f),
+            onClick = onBorrowed
+        )
         DashboardCardSmall(
             title = "Due",
             icon = Icons.Default.EventNote,
@@ -369,14 +375,6 @@ private fun DashboardSmallActionsRow(
             badge = if (uiState.dueTodayCount > 0) uiState.dueTodayCount.toString() else null,
             modifier = Modifier.weight(1f),
             onClick = onDue
-        )
-        DashboardCardSmall(
-            title = "Cloud Sync",
-            icon = Icons.Default.CloudUpload,
-            containerColor = if (isSystemInDarkTheme()) Color(0xFF37474F) else Color(0xFFE1F5FE),
-            contentColor = if (isSystemInDarkTheme()) Color(0xFFCFD8DC) else Color(0xFF0288D1),
-            modifier = Modifier.weight(1f),
-            onClick = onSync
         )
         DashboardCardSmall(
             title = "Waste",

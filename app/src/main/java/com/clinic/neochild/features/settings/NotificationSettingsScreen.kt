@@ -12,7 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.clinic.neochild.core.common.AppBackground
+import com.clinic.neochild.core.ui.AppBackground
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

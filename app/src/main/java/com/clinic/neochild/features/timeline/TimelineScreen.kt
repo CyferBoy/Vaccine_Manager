@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.clinic.neochild.domain.model.TimelineEvent
 import com.clinic.neochild.domain.model.TimelineEventType
-import com.clinic.neochild.core.common.AppBackground
+import com.clinic.neochild.core.ui.AppBackground
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

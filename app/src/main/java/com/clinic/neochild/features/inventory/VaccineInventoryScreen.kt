@@ -18,7 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.clinic.neochild.domain.model.Vaccine
-import com.clinic.neochild.core.common.*
+import com.clinic.neochild.core.ui.*
 import com.clinic.neochild.core.designsystem.NeoChildTheme
 import com.clinic.neochild.data.remote.mapper.FirestoreMappers
 import com.clinic.neochild.core.utils.PatientUtils.formatDateForDisplay

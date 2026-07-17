@@ -9,14 +9,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.clinic.neochild.domain.model.Patient
 import com.clinic.neochild.domain.model.Vaccination
-import com.clinic.neochild.core.common.AppBackground
 import com.clinic.neochild.core.designsystem.NeoChildTheme
 import kotlinx.coroutines.launch
 

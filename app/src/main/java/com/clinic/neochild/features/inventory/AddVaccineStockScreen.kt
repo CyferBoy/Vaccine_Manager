@@ -13,7 +13,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -21,12 +20,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.clinic.neochild.domain.model.Vaccine
-import com.clinic.neochild.core.common.*
+import com.clinic.neochild.core.ui.*
 import com.clinic.neochild.core.designsystem.NeoChildTheme
 import com.clinic.neochild.data.remote.mapper.FirestoreMappers
 import com.clinic.neochild.core.utils.PatientUtils.formatDateForDisplay
 import com.google.firebase.firestore.FirebaseFirestore
-import java.util.*
 
 @Composable
 fun AddVaccineStockScreen(

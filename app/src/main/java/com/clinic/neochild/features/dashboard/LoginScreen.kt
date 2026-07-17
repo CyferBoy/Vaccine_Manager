@@ -14,12 +14,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.clinic.neochild.R
-import com.clinic.neochild.core.common.AppBackground
-import com.clinic.neochild.core.common.StandardButton
-import com.clinic.neochild.core.common.StandardTextField
+import com.clinic.neochild.core.ui.AppBackground
+import com.clinic.neochild.core.ui.StandardButton
+import com.clinic.neochild.core.ui.StandardTextField
 import com.clinic.neochild.core.designsystem.NeoChildTheme
 
 @Composable

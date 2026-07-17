@@ -25,7 +25,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.clinic.neochild.domain.model.Patient
-import com.clinic.neochild.core.common.*
+import com.clinic.neochild.core.ui.*
 import com.clinic.neochild.core.designsystem.NeoChildTheme
 import com.clinic.neochild.core.utils.PatientUtils.calculateAgeLabel
 

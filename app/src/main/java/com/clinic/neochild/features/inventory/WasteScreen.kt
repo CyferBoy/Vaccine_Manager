@@ -23,7 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.clinic.neochild.domain.model.Vaccine
 import com.clinic.neochild.domain.model.WasteRecord
-import com.clinic.neochild.core.common.*
+import com.clinic.neochild.core.ui.*
 import com.clinic.neochild.core.designsystem.NeoChildTheme
 import com.clinic.neochild.core.constants.Constants
 import com.clinic.neochild.core.utils.PatientUtils.formatDateForDisplay

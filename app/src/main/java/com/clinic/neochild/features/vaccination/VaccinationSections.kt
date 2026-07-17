@@ -1,0 +1,130 @@
+package com.clinic.neochild.features.vaccination
+
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Print
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import com.clinic.neochild.core.constants.Constants
+import com.clinic.neochild.domain.model.Vaccine
+import com.clinic.neochild.core.ui.StandardAutoCompleteField
+import com.clinic.neochild.core.ui.StandardTextField
+import com.clinic.neochild.core.ui.StandardButton
+
+@Composable
+fun VaccineSelectionSection(
+    inventory: List<Vaccine>,
+    selectedVaccines: List<String>,
+    onVaccineSelected: (Vaccine) -> Unit,
+    onCustomVaccineAdded: (String) -> Unit,
+    onRemoveVaccine: (Int) -> Unit
+) {
+    var query by rememberSaveable { mutableStateOf("") }
+    var expanded by rememberSaveable { mutableStateOf(false) }
+
+    val filteredInventory = remember(query, inventory) {
+        inventory.filter { it.brandName.contains(query, true) || it.type.contains(query, true) }
+    }
+    val suggestedTypes = remember(query) {
+        Constants.COMMON_VACCINES.filter { it.contains(query, true) }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        StandardAutoCompleteField(
+            value = query,
+            onValueChange = { query = it; expanded = true },
+            label = "Select Vaccine*",
+            placeholder = "Search inventory or suggestions...",
+            expanded = expanded && query.isNotBlank(),
+            onExpandedChange = { expanded = it },
+            dropdownContent = {
+                if (filteredInventory.isNotEmpty()) {
+                    Text("Inventory", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(8.dp), color = MaterialTheme.colorScheme.primary)
+                    filteredInventory.forEach { v ->
+                        DropdownMenuItem(
+                            text = { Text("${v.brandName} (Stock: ${v.stock})") },
+                            onClick = { onVaccineSelected(v); query = ""; expanded = false }
+                        )
+                    }
+                }
+                if (suggestedTypes.isNotEmpty()) {
+                    Text("Suggestions", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(8.dp))
+                    suggestedTypes.forEach { type ->
+                        DropdownMenuItem(text = { Text(type) }, onClick = { onCustomVaccineAdded(type); query = ""; expanded = false })
+                    }
+                }
+                if (query.isNotBlank()) {
+                    DropdownMenuItem(text = { Text("Add Custom: \"$query\"") }, onClick = { onCustomVaccineAdded(query); query = ""; expanded = false })
+                }
+            }
+        )
+
+        Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            selectedVaccines.forEachIndexed { index, name ->
+                InputChip(
+                    selected = true,
+                    onClick = { },
+                    label = { Text(name) },
+                    trailingIcon = { Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp).clickable { onRemoveVaccine(index) }) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun PaymentSection(
+    cash: String, online: String, total: Double, cost: String, withFees: Boolean, doctorsAcc: Boolean,
+    onCashChange: (String) -> Unit, onOnlineChange: (String) -> Unit, onCostChange: (String) -> Unit,
+    onFeesToggle: (Boolean) -> Unit, onAccToggle: (Boolean) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Payment & Cost", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            StandardTextField(value = cash, onValueChange = onCashChange, label = "Cash", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
+            StandardTextField(value = online, onValueChange = onOnlineChange, label = "Online", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            val totalPaidDisplay = remember(total) { if (total % 1.0 == 0.0) total.toInt().toString() else total.toString() }
+            StandardTextField(value = totalPaidDisplay, onValueChange = {}, label = "Total Paid", readOnly = true, modifier = Modifier.weight(1f))
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Checkbox(checked = withFees, onCheckedChange = onFeesToggle)
+                Text("With Fees", style = MaterialTheme.typography.labelSmall)
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            StandardTextField(value = cost, onValueChange = onCostChange, label = "Actual Cost", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Checkbox(checked = doctorsAcc, onCheckedChange = onAccToggle)
+                Text("Dr. Acc", style = MaterialTheme.typography.labelSmall)
+            }
+        }
+    }
+}
+
+@Composable
+fun ActionButtons(isLoading: Boolean, isEdit: Boolean, onSave: () -> Unit, onSaveAndDownload: () -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        StandardButton(onClick = onSave, isLoading = isLoading, modifier = Modifier.weight(1f)) {
+            Text(if (isEdit) "Update" else "Save")
+        }
+        if (!isEdit) {
+            StandardButton(onClick = onSaveAndDownload, isLoading = isLoading, containerColor = MaterialTheme.colorScheme.secondary, modifier = Modifier.weight(1.5f)) {
+                Icon(Icons.Default.Print, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Save & Download")
+            }
+        }
+    }
+}

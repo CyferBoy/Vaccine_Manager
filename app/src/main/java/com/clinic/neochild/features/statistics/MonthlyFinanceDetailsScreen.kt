@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.clinic.neochild.domain.model.Patient
 import com.clinic.neochild.domain.model.Vaccination
-import com.clinic.neochild.core.common.AppBackground
+import com.clinic.neochild.core.ui.AppBackground
 import com.clinic.neochild.core.designsystem.NeoChildTheme
 import com.clinic.neochild.features.patient.PatientViewModel
 import com.clinic.neochild.core.utils.PatientUtils

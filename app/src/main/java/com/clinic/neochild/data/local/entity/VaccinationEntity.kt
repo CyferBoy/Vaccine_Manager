@@ -33,6 +33,8 @@ data class VaccinationEntity(
     val notes: String = "",
     val rescheduleReason: String = "",
     val performedBy: String = "",
+    val batchNumbers: String = "",
+    val expiryDates: String = "",
     val isSynced: Boolean = true,
     val isDeleted: Boolean = false
 )
@@ -55,7 +57,9 @@ fun VaccinationEntity.toVaccination() = Vaccination(
     source = source,
     notes = notes,
     rescheduleReason = rescheduleReason,
-    performedBy = performedBy
+    performedBy = performedBy,
+    batchNumbers = if (batchNumbers.isBlank()) emptyList() else batchNumbers.split(","),
+    expiryDates = if (expiryDates.isBlank()) emptyList() else expiryDates.split(",")
 )
 
 fun Vaccination.toEntity(isSynced: Boolean = true) = VaccinationEntity(
@@ -77,5 +81,7 @@ fun Vaccination.toEntity(isSynced: Boolean = true) = VaccinationEntity(
     notes = notes,
     rescheduleReason = rescheduleReason,
     performedBy = performedBy,
+    batchNumbers = batchNumbers.joinToString(","),
+    expiryDates = expiryDates.joinToString(","),
     isSynced = isSynced
 )

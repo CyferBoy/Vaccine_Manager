@@ -96,7 +96,7 @@ class SyncRepositoryImpl @Inject constructor(
             "VACCINATION" -> database.vaccinationDao().getVaccinationById(item.entityId)?.toVaccination()
             "WASTE" -> database.wasteDao().getWasteById(item.entityId)?.toDomain()
             "REMINDER_OVERRIDE" -> database.reminderDao().getReminderById(item.entityId.toLong())
-            "REMINDER_AUDIT" -> database.reminderAuditDao().getUnsyncedAudits().find { it.auditId.toString() == item.entityId }
+            "REMINDER_AUDIT" -> database.reminderAuditDao().getAuditById(item.entityId.toLong())
             "VACCINE" -> database.vaccineDao().getVaccineById(item.entityId)
             "BATCH" -> database.vaccineDao().getBatchById(item.entityId)
             "TRANSACTION" -> database.vaccineDao().getTransactionById(item.entityId.toLong())

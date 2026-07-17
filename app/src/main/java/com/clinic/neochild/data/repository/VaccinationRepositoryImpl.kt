@@ -9,7 +9,10 @@ import com.clinic.neochild.core.logger.AuditLogger
 import com.clinic.neochild.domain.model.Vaccination
 import com.clinic.neochild.domain.repository.SyncRepository
 import com.clinic.neochild.domain.repository.VaccinationRepository
+import com.clinic.neochild.data.remote.mapper.FirestoreMappers
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -19,6 +22,7 @@ import javax.inject.Singleton
 @Singleton
 class VaccinationRepositoryImpl @Inject constructor(
     private val database: AppDatabase,
+    private val firestore: FirebaseFirestore,
     private val syncRepository: SyncRepository,
     private val auditLogger: AuditLogger
 ) : VaccinationRepository {
@@ -32,6 +36,15 @@ class VaccinationRepositoryImpl @Inject constructor(
         vaccinationDao.getVaccinationsForPatient(patientId).map { list -> list.map { it.toVaccination() } }
 
     override suspend fun refreshVaccinations() {
+        withContext(Dispatchers.IO) {
+            try {
+                val snapshot = firestore.collection("vaccinations").get().await()
+                val vaccinations = snapshot.documents.mapNotNull { FirestoreMappers.toVaccination(it) }
+                vaccinationDao.insertVaccinations(vaccinations.map { it.toEntity() })
+            } catch (e: Exception) {
+                // Error handling
+            }
+        }
     }
 
     override suspend fun addVaccination(vaccination: Vaccination) {
@@ -94,5 +107,9 @@ class VaccinationRepositoryImpl @Inject constructor(
     override fun getMonthlyCount(pattern: String): Flow<Int> = vaccinationDao.getMonthlyCount(pattern)
     override fun getMonthlyRevenue(pattern: String): Flow<Double?> = vaccinationDao.getMonthlyRevenue(pattern)
     override fun getVaccineNamesForMonth(pattern: String): Flow<List<String>> = vaccinationDao.getVaccineNamesForMonth(pattern)
+
+    override suspend fun transferVaccinations(duplicateId: String, masterId: String) {
+        vaccinationDao.updatePatientId(duplicateId, masterId)
+    }
 }
 

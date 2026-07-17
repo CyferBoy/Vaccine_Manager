@@ -429,6 +429,11 @@ class ReminderRepositoryImpl @Inject constructor(
         return id
     }
 
+    override suspend fun transferReminders(duplicateId: String, masterId: String) {
+        reminderDao.updatePatientId(duplicateId, masterId)
+        reminderAuditDao.updatePatientId(duplicateId, masterId)
+    }
+
     override fun triggerImmediateCheck() {
         reminderScheduler.runNow()
         WidgetUtils.updateWidget(context)

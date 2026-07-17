@@ -6,6 +6,9 @@ enum class InventoryTransactionType {
     RETURN,
     EXPIRED,
     DAMAGED,
+    COLD_CHAIN_FAILURE,
+    CONTAMINATED,
+    OTHER,
     MANUAL_ADJUSTMENT
 }
 

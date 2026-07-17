@@ -42,15 +42,15 @@ class AddVaccinationViewModel @Inject constructor(
 
     private fun observeInventory() {
         viewModelScope.launch {
-            inventoryRepository.getAllVaccines().collect { entities ->
-                val vaccines = entities.map { entity ->
+            inventoryRepository.getInventoryItems().collect { items ->
+                val vaccines = items.map { item ->
                     Vaccine(
-                        id = entity.id,
-                        type = entity.type,
-                        brandName = entity.brandName,
-                        companyName = entity.companyName,
-                        stock = 0, // Stock calculation can be complex, or use another repository method
-                        batchNumber = "",
+                        id = item.id,
+                        type = item.type,
+                        brandName = item.brandName,
+                        companyName = item.company,
+                        stock = item.stock,
+                        batchNumber = "", // Individual batch info is handled in deduction logic
                         expiryDate = "",
                         mrp = 0.0,
                         netRate = 0.0

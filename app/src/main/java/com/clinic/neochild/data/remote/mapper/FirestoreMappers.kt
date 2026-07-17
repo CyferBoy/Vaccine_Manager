@@ -2,6 +2,8 @@ package com.clinic.neochild.data.remote.mapper
 
 import com.clinic.neochild.core.model.BorrowedVaccine
 
+import com.clinic.neochild.data.local.entity.VaccineBatchEntity
+import com.clinic.neochild.data.local.entity.VaccineEntity
 import com.clinic.neochild.domain.model.*
 import com.google.firebase.firestore.DocumentSnapshot
 
@@ -26,6 +28,7 @@ object FirestoreMappers {
             WasteRecord(
                 id = doc.id,
                 vaccineId = doc.getString("vaccineId") ?: "",
+                batchId = doc.getString("batchId") ?: "",
                 brandName = doc.getString("brandName") ?: "",
                 batchNumber = doc.getString("batchNumber") ?: "",
                 expiryDate = doc.getString("expiryDate") ?: "",
@@ -88,6 +91,41 @@ object FirestoreMappers {
                 expiryDate = doc.getString("expiryDate") ?: "",
                 mrp = doc.getDouble("mrp") ?: 0.0,
                 netRate = doc.getDouble("netRate") ?: 0.0
+            )
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    fun toVaccineEntity(doc: DocumentSnapshot): VaccineEntity? {
+        return try {
+            VaccineEntity(
+                id = doc.id,
+                type = doc.getString("type") ?: "",
+                brandName = doc.getString("brandName") ?: "",
+                companyName = doc.getString("companyName") ?: "",
+                lowStockThreshold = doc.getLong("lowStockThreshold")?.toInt() ?: 5
+            )
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    fun toVaccineBatchEntity(doc: DocumentSnapshot): VaccineBatchEntity? {
+        return try {
+            VaccineBatchEntity(
+                batchId = doc.id,
+                vaccineId = doc.getString("vaccineId") ?: "",
+                batchNumber = doc.getString("batchNumber") ?: "",
+                manufacturer = doc.getString("manufacturer") ?: "",
+                purchaseDate = doc.getString("purchaseDate") ?: "",
+                expiryDate = doc.getString("expiryDate") ?: "",
+                purchaseQuantity = doc.getLong("purchaseQuantity")?.toInt() ?: 0,
+                remainingQuantity = doc.getLong("remainingQuantity")?.toInt() ?: 0,
+                supplier = doc.getString("supplier") ?: "",
+                purchaseCost = doc.getDouble("purchaseCost") ?: 0.0,
+                sellingPrice = doc.getDouble("sellingPrice") ?: 0.0,
+                status = doc.getString("status") ?: "ACTIVE"
             )
         } catch (_: Exception) {
             null

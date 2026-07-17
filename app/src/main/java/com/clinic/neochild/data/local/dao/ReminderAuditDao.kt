@@ -14,6 +14,12 @@ interface ReminderAuditDao {
     @Query("SELECT * FROM reminder_audits WHERE patientId = :patientId ORDER BY timestamp DESC")
     fun getAuditsForPatient(patientId: String): Flow<List<ReminderAuditEntity>>
 
+    @Query("UPDATE reminder_audits SET patientId = :masterId, isSynced = 0 WHERE patientId = :duplicateId")
+    suspend fun updatePatientId(duplicateId: String, masterId: String)
+
+    @Query("SELECT * FROM reminder_audits WHERE auditId = :id LIMIT 1")
+    suspend fun getAuditById(id: Long): ReminderAuditEntity?
+
     @Query("SELECT * FROM reminder_audits WHERE isSynced = 0")
     suspend fun getUnsyncedAudits(): List<ReminderAuditEntity>
 

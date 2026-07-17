@@ -18,6 +18,9 @@ interface VaccineDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertVaccine(vaccine: VaccineEntity)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertVaccines(vaccines: List<VaccineEntity>)
+
     // Batches
     @Query("SELECT * FROM vaccine_batches WHERE vaccineId = :vaccineId AND isDeleted = 0 AND remainingQuantity > 0 ORDER BY expiryDate ASC")
     suspend fun getActiveBatchesByExpiry(vaccineId: String): List<VaccineBatchEntity>
@@ -31,8 +34,14 @@ interface VaccineDao {
     @Query("SELECT * FROM vaccine_batches WHERE batchId = :batchId LIMIT 1")
     suspend fun getBatchById(batchId: String): VaccineBatchEntity?
 
+    @Query("SELECT * FROM vaccine_batches WHERE vaccineId = :vaccineId AND batchNumber = :batchNumber AND isDeleted = 0 LIMIT 1")
+    suspend fun getBatchByNumber(vaccineId: String, batchNumber: String): VaccineBatchEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertBatch(batch: VaccineBatchEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertBatches(batches: List<VaccineBatchEntity>)
 
     @Update
     suspend fun updateBatch(batch: VaccineBatchEntity)
@@ -43,6 +52,9 @@ interface VaccineDao {
 
     @Query("SELECT * FROM inventory_transactions WHERE vaccineId = :vaccineId ORDER BY timestamp DESC")
     fun getTransactionsForVaccine(vaccineId: String): Flow<List<InventoryTransactionEntity>>
+
+    @Query("UPDATE inventory_transactions SET patientId = :masterId WHERE patientId = :duplicateId")
+    suspend fun updatePatientIdInTransactions(duplicateId: String, masterId: String)
 
     @Query("SELECT * FROM inventory_transactions WHERE transactionId = :id LIMIT 1")
     suspend fun getTransactionById(id: Long): InventoryTransactionEntity?

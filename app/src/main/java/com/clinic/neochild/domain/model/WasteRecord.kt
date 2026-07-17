@@ -3,6 +3,7 @@ package com.clinic.neochild.domain.model
 data class WasteRecord(
     val id: String = "",
     val vaccineId: String = "",
+    val batchId: String = "",
     val brandName: String = "",
     val batchNumber: String = "",
     val expiryDate: String = "",

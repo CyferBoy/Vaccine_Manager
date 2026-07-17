@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.Flow
 interface InventoryRepository {
     fun getInventoryItems(): Flow<List<InventoryItem>>
     fun getAllVaccines(): Flow<List<VaccineEntity>>
+    fun getAllBatches(): Flow<List<VaccineBatchEntity>>
     fun getVaccineBatches(vaccineId: String): Flow<List<VaccineBatchEntity>>
     fun getInventoryTransactions(vaccineId: String): Flow<List<InventoryTransactionEntity>>
     
@@ -28,10 +29,30 @@ interface InventoryRepository {
         patientId: String? = null
     )
 
+    suspend fun deductStockFromBatch(
+        batchId: String,
+        quantity: Int,
+        user: String,
+        transactionType: InventoryTransactionType,
+        notes: String? = null
+    )
+
+    suspend fun addStockToBatch(
+        batchId: String,
+        quantity: Int,
+        user: String,
+        transactionType: InventoryTransactionType,
+        notes: String? = null
+    )
+
     suspend fun adjustStock(
         batchId: String, 
         newQuantity: Int, 
         user: String, 
         reason: String
     )
+
+    suspend fun transferPatientTransactions(duplicateId: String, masterId: String)
+
+    suspend fun refreshInventory()
 }

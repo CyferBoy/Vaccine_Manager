@@ -15,6 +15,9 @@ interface WasteDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertWaste(waste: WasteEntity)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertWasteRecords(waste: List<WasteEntity>)
+
     @Query("UPDATE waste_records SET isDeleted = 1, isSynced = 0 WHERE id = :id")
     suspend fun deleteWaste(id: String)
 

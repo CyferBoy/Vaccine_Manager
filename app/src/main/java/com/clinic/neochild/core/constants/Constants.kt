@@ -12,10 +12,11 @@ object Constants {
     // Standard date format used across the entire app (e.g., 9 May 2026)
     const val DATE_FORMAT = "d MMM yyyy"
     
-    // Pre-defined list of common vaccines for suggestions in the Add Vaccination screen
+    // Pre-defined list of common vaccine brands for suggestions in the Add Vaccination screen
     val COMMON_VACCINES = listOf(
-        "BCG", "Hepatitis B (HepB)", "OPV", "IPV", "Pentavalent (Penta)", "Rotavirus (RV)", "PCV", "fIPV", "Vitamin A", 
-        "DPT Booster", "Measles-Rubella (MR)", "JE", "TD", "Flu (Influenza)", "Typhoid", "MMR", "Chickenpox (Varicella)", 
-        "Hepatitis A (HepA)", "HPV", "Meningococcal", "Cholera", "Rabies"
+        "Pentaxim", "Hexaxim", "Rotavac", "Rotasiil", "MMR", "Varilrix", "Pneumosil", "Synflorix", 
+        "SII BCG", "Hepatitis B", "OPV", "IPV", "Penta", "Rotavirus", "PCV", "fIPV", "Vitamin A", 
+        "DPT Booster", "Measles-Rubella (MR)", "JE", "TD", "Flu (Influenza)", "Typhoid", 
+        "Chickenpox", "Hepatitis A", "HPV", "Meningococcal", "Cholera", "Rabies"
     )
 }

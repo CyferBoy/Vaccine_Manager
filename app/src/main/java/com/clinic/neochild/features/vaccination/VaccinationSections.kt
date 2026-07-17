@@ -34,9 +34,11 @@ fun VaccineSelectionSection(
     var expanded by rememberSaveable { mutableStateOf(false) }
 
     val filteredInventory = remember(query, inventory) {
-        inventory.filter { it.brandName.contains(query, true) || it.type.contains(query, true) }
+        inventory.filter { 
+            it.brandName.contains(query, true) || it.type.contains(query, true) 
+        }.sortedByDescending { it.brandName.contains(query, true) }
     }
-    val suggestedTypes = remember(query) {
+    val suggestedBrands = remember(query) {
         Constants.COMMON_VACCINES.filter { it.contains(query, true) }
     }
 
@@ -45,23 +47,31 @@ fun VaccineSelectionSection(
             value = query,
             onValueChange = { query = it; expanded = true },
             label = "Select Vaccine*",
-            placeholder = "Search inventory or suggestions...",
+            placeholder = "Search inventory or brands...",
             expanded = expanded && query.isNotBlank(),
             onExpandedChange = { expanded = it },
             dropdownContent = {
                 if (filteredInventory.isNotEmpty()) {
-                    Text("Inventory", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(8.dp), color = MaterialTheme.colorScheme.primary)
+                    Text("In Stock", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(8.dp), color = MaterialTheme.colorScheme.primary)
                     filteredInventory.forEach { v ->
                         DropdownMenuItem(
-                            text = { Text("${v.brandName} (Stock: ${v.stock})") },
+                            text = { 
+                                Column {
+                                    Text(v.brandName)
+                                    if (v.type.contains(query, true) && !v.brandName.contains(query, true)) {
+                                        Text(v.type, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                            },
+                            trailingIcon = { Text("Stock: ${v.stock}", style = MaterialTheme.typography.labelSmall) },
                             onClick = { onVaccineSelected(v); query = ""; expanded = false }
                         )
                     }
                 }
-                if (suggestedTypes.isNotEmpty()) {
-                    Text("Suggestions", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(8.dp))
-                    suggestedTypes.forEach { type ->
-                        DropdownMenuItem(text = { Text(type) }, onClick = { onCustomVaccineAdded(type); query = ""; expanded = false })
+                if (suggestedBrands.isNotEmpty()) {
+                    Text("Common Brands", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(8.dp))
+                    suggestedBrands.forEach { brand ->
+                        DropdownMenuItem(text = { Text(brand) }, onClick = { onCustomVaccineAdded(brand); query = ""; expanded = false })
                     }
                 }
                 if (query.isNotBlank()) {

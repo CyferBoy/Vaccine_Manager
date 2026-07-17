@@ -27,6 +27,9 @@ interface VaccinationDao {
     @Query("SELECT * FROM vaccinations WHERE isSynced = 0")
     suspend fun getUnsyncedVaccinations(): List<VaccinationEntity>
 
+    @Query("UPDATE vaccinations SET patientId = :masterId, isSynced = 0 WHERE patientId = :duplicateId")
+    suspend fun updatePatientId(duplicateId: String, masterId: String)
+
     @Query("UPDATE vaccinations SET isSynced = 1 WHERE id = :id")
     suspend fun markSynced(id: String)
 

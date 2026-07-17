@@ -8,6 +8,7 @@ import com.clinic.neochild.domain.model.WasteRecord
 data class WasteEntity(
     @PrimaryKey val id: String,
     val vaccineId: String,
+    val batchId: String,
     val brandName: String,
     val batchNumber: String,
     val expiryDate: String,
@@ -21,6 +22,7 @@ data class WasteEntity(
 fun WasteEntity.toDomain() = WasteRecord(
     id = id,
     vaccineId = vaccineId,
+    batchId = batchId,
     brandName = brandName,
     batchNumber = batchNumber,
     expiryDate = expiryDate,
@@ -32,6 +34,7 @@ fun WasteEntity.toDomain() = WasteRecord(
 fun WasteRecord.toEntity(isSynced: Boolean = false) = WasteEntity(
     id = id,
     vaccineId = vaccineId,
+    batchId = batchId,
     brandName = brandName,
     batchNumber = batchNumber,
     expiryDate = expiryDate,

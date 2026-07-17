@@ -18,4 +18,5 @@ interface VaccinationRepository {
     fun getMonthlyCount(pattern: String): Flow<Int>
     fun getMonthlyRevenue(pattern: String): Flow<Double?>
     fun getVaccineNamesForMonth(pattern: String): Flow<List<String>>
+    suspend fun transferVaccinations(duplicateId: String, masterId: String)
 }

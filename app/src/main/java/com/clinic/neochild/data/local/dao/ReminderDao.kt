@@ -27,6 +27,9 @@ interface ReminderDao {
     @Query("SELECT * FROM reminders WHERE patientId = :patientId ORDER BY dueDate ASC")
     fun getFollowUpsForPatient(patientId: String): Flow<List<ReminderEntity>>
 
+    @Query("UPDATE reminders SET patientId = :masterId, isSynced = 0 WHERE patientId = :duplicateId")
+    suspend fun updatePatientId(duplicateId: String, masterId: String)
+
     @Query("DELETE FROM reminders WHERE patientId = :patientId AND originalVisitId = :visitId AND vaccineName = :vaccineName")
     suspend fun deleteReminder(patientId: String, visitId: String, vaccineName: String)
 

@@ -59,6 +59,7 @@ interface ReminderRepository {
     // Legacy support
     suspend fun markCompleted(id: Long, timestamp: Long = System.currentTimeMillis())
     suspend fun insertReminder(reminder: ReminderEntity): Long
+    suspend fun transferReminders(duplicateId: String, masterId: String)
 }
 
 data class ReminderStats(

@@ -28,7 +28,6 @@ fun AddVaccinationContent(
     inventory: List<Vaccine>,
     selectedVaccines: List<String>,
     onVaccineSelected: (Vaccine) -> Unit,
-    onCustomVaccineAdded: (String) -> Unit,
     onRemoveVaccine: (Int) -> Unit,
     nextBrandSearch: String,
     onNextBrandChange: (String) -> Unit,
@@ -91,7 +90,6 @@ fun AddVaccinationContent(
                     inventory = inventory,
                     selectedVaccines = selectedVaccines,
                     onVaccineSelected = onVaccineSelected,
-                    onCustomVaccineAdded = onCustomVaccineAdded,
                     onRemoveVaccine = onRemoveVaccine
                 )
 
@@ -147,7 +145,6 @@ private fun AddVaccinationPreview() {
             inventory = emptyList(),
             selectedVaccines = listOf("BCG", "HepB"),
             onVaccineSelected = {},
-            onCustomVaccineAdded = {},
             onRemoveVaccine = {},
             nextBrandSearch = "",
             onNextBrandChange = {},

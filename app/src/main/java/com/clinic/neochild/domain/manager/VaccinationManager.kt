@@ -3,6 +3,7 @@ package com.clinic.neochild.domain.manager
 import androidx.room.withTransaction
 import com.clinic.neochild.data.local.database.AppDatabase
 import com.clinic.neochild.data.local.dao.VaccineDao
+import com.clinic.neochild.core.logger.AuditLogger
 import com.clinic.neochild.domain.model.*
 import com.clinic.neochild.domain.repository.*
 import com.clinic.neochild.core.utils.PatientUtils
@@ -24,7 +25,8 @@ class VaccinationManager @Inject constructor(
     private val vaccinationRepository: VaccinationRepository,
     private val inventoryRepository: InventoryRepository,
     private val reminderRepository: ReminderRepository,
-    private val vaccineDao: VaccineDao
+    private val vaccineDao: VaccineDao,
+    private val auditLogger: AuditLogger
 ) {
     /**
      * Completes a vaccination event with explicit parameters.
@@ -59,6 +61,13 @@ class VaccinationManager @Inject constructor(
             requirement?.let {
                 reminderRepository.markRequirementSatisfied(it, user)
             }
+
+            // 4. Audit Logging
+            auditLogger.logAction(
+                action = if (isNew) "Vaccination Added" else "Vaccination Updated",
+                patientId = vaccination.patientId,
+                details = "${vaccination.vaccineNames.joinToString(", ")} recorded by $user"
+            )
         }
     }
 

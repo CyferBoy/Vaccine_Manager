@@ -1,12 +1,16 @@
 package com.clinic.neochild.features.vaccination
 
 import android.widget.Toast
+import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import kotlinx.coroutines.launch
+import com.clinic.neochild.domain.model.Vaccine
 import com.clinic.neochild.features.patient.PatientViewModel
 import com.clinic.neochild.core.constants.Constants
 import com.clinic.neochild.core.utils.ReceiptManager
@@ -30,6 +34,9 @@ fun AddVaccinationScreen(
     val scope = rememberCoroutineScope()
 
     var showFollowUpDialog by remember { mutableStateOf(false) }
+    var showBatchSelectionDialog by remember { mutableStateOf(false) }
+    var batchesToSelectFrom by remember { mutableStateOf<List<com.clinic.neochild.data.local.entity.VaccineBatchEntity>>(emptyList()) }
+    var currentVaccineSelecting by remember { mutableStateOf<Vaccine?>(null) }
 
     // Form State
     var patientId by rememberSaveable { mutableStateOf(initialPatientId) }
@@ -114,6 +121,41 @@ fun AddVaccinationScreen(
         )
     }
 
+    if (showBatchSelectionDialog && currentVaccineSelecting != null) {
+        AlertDialog(
+            onDismissRequest = { showBatchSelectionDialog = false },
+            title = { Text("Select Batch for ${currentVaccineSelecting?.brandName}") },
+            text = {
+                Column {
+                    Text("Multiple batches found. FEFO (First Expiry, First Out) suggests the first one.", style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    batchesToSelectFrom.forEach { batch ->
+                        DropdownMenuItem(
+                            text = { 
+                                Column {
+                                    Text("Batch: ${batch.batchNumber} (Stock: ${batch.remainingQuantity})")
+                                    Text("Expires: ${batch.expiryDate}", style = MaterialTheme.typography.labelSmall)
+                                }
+                            },
+                            onClick = {
+                                val v = currentVaccineSelecting!!
+                                selectedVaccines = selectedVaccines + v.brandName
+                                batchNumbers = batchNumbers + batch.batchNumber
+                                expiryDates = expiryDates + batch.expiryDate
+                                selectedVaccineIds = selectedVaccineIds + v.id
+                                showBatchSelectionDialog = false
+                            }
+                        )
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showBatchSelectionDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
     AddVaccinationContent(
         isEdit = vaccinationId != null,
         onBack = onBack,
@@ -124,17 +166,21 @@ fun AddVaccinationScreen(
         selectedVaccines = selectedVaccines,
         onVaccineSelected = { v ->
             if (!selectedVaccines.contains(v.brandName)) {
-                selectedVaccines = selectedVaccines + v.brandName
-                batchNumbers = batchNumbers + v.batchNumber
-                expiryDates = expiryDates + v.expiryDate
-                selectedVaccineIds = selectedVaccineIds + v.id
-            }
-        },
-        onCustomVaccineAdded = { name ->
-            if (!selectedVaccines.contains(name)) {
-                selectedVaccines = selectedVaccines + name
-                batchNumbers = batchNumbers + ""
-                expiryDates = expiryDates + ""
+                val batches = uiState.activeBatches[v.id] ?: emptyList()
+                if (batches.size == 1) {
+                    val batch = batches[0]
+                    selectedVaccines = selectedVaccines + v.brandName
+                    batchNumbers = batchNumbers + batch.batchNumber
+                    expiryDates = expiryDates + batch.expiryDate
+                    selectedVaccineIds = selectedVaccineIds + v.id
+                } else if (batches.size > 1) {
+                    currentVaccineSelecting = v
+                    batchesToSelectFrom = batches
+                    showBatchSelectionDialog = true
+                } else {
+                    // Fallback if stock sync is slightly off but dropdown allowed click
+                    Toast.makeText(context, "No active batches for ${v.brandName}", Toast.LENGTH_SHORT).show()
+                }
             }
         },
         onRemoveVaccine = { index ->

@@ -24,7 +24,8 @@ import javax.inject.Singleton
 class InventoryRepositoryImpl @Inject constructor(
     private val database: AppDatabase,
     private val firestore: FirebaseFirestore,
-    private val syncRepository: SyncRepository
+    private val syncRepository: SyncRepository,
+    private val auditLogger: com.clinic.neochild.core.logger.AuditLogger
 ) : InventoryRepository {
 
     private val vaccineDao = database.vaccineDao()
@@ -229,6 +230,8 @@ class InventoryRepositoryImpl @Inject constructor(
             vaccineDao.insertTransaction(transaction)
             
             syncRepository.enqueue("BATCH", batchId, SyncOperation.UPDATE, SyncPriority.MEDIUM)
+
+            auditLogger.logAction("Stock modified", null, "Batch: ${batch.batchNumber}, New Qty: $newQuantity, Reason: $reason")
         }
     }
 

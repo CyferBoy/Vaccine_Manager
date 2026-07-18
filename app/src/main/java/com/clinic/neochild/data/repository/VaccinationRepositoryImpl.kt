@@ -64,11 +64,12 @@ class VaccinationRepositoryImpl @Inject constructor(
             priority = SyncPriority.HIGH
         )
         
-        val auditAction = if (existing == null) "ADD_VACCINATION" else "UPDATE_VACCINATION"
-        auditLogger.logAction(auditAction, vaccination.id, "Patient: ${vaccination.patientId}")
+        val auditAction = if (existing == null) "Vaccination Added" else "Vaccination Updated"
+        auditLogger.logAction(auditAction, vaccination.patientId, "Vaccines: ${vaccination.vaccineNames.joinToString(", ")}")
     }
 
     override suspend fun deleteVaccination(id: String) {
+        val existing = vaccinationDao.getVaccinationById(id)
         vaccinationDao.deleteVaccination(id)
         
         syncRepository.enqueue(
@@ -78,7 +79,7 @@ class VaccinationRepositoryImpl @Inject constructor(
             priority = SyncPriority.MEDIUM
         )
         
-        auditLogger.logAction("DELETE_VACCINATION", id)
+        auditLogger.logAction("Vaccine Deleted", existing?.patientId, "Vaccines: ${existing?.vaccineNames ?: "Unknown"}")
     }
 
     override suspend fun markAsDone(id: String) {
@@ -95,7 +96,7 @@ class VaccinationRepositoryImpl @Inject constructor(
                     priority = SyncPriority.MEDIUM
                 )
                 
-                auditLogger.logAction("MARK_DONE_VACCINATION", id)
+                auditLogger.logAction("Reminder Completed", current.patientId, "Vaccines: ${current.vaccineNames}")
             }
         }
     }

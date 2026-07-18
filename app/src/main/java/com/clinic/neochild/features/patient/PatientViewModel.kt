@@ -2,8 +2,10 @@ package com.clinic.neochild.features.patient
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.clinic.neochild.data.local.entity.AuditLogEntity
 import com.clinic.neochild.domain.model.Patient
 import com.clinic.neochild.domain.model.Vaccination
+import com.clinic.neochild.domain.repository.PatientRepository
 import com.clinic.neochild.domain.usecase.patient.DeletePatientUseCase
 import com.clinic.neochild.domain.usecase.patient.GetPatientByIdUseCase
 import com.clinic.neochild.domain.usecase.patient.GetPatientsUseCase
@@ -29,7 +31,8 @@ class PatientViewModel @Inject constructor(
     private val saveVaccinationUseCase: SaveVaccinationUseCase,
     private val deleteVaccinationUseCase: DeleteVaccinationUseCase,
     private val completeVaccinationUseCase: CompleteVaccinationUseCase,
-    private val refreshDataUseCase: RefreshDataUseCase
+    private val refreshDataUseCase: RefreshDataUseCase,
+    private val patientRepository: PatientRepository
 ) : ViewModel() {
     
     val allPatients: StateFlow<List<Patient>>
@@ -106,5 +109,9 @@ class PatientViewModel @Inject constructor(
             val user = FirebaseAuth.getInstance().currentUser?.email ?: "Unknown"
             completeVaccinationUseCase.satisfyExisting(vaccination.id, user)
         }
+    }
+
+    fun getAuditLogs(patientId: String): Flow<List<AuditLogEntity>> {
+        return patientRepository.getAuditLogs(patientId)
     }
 }

@@ -47,6 +47,7 @@ class PatientRepositoryImpl @Inject constructor(
     }
 
     override suspend fun addPatient(patient: Patient) {
+        val existing = patientDao.getPatientById(patient.id)
         // 1. Save locally FIRST
         patientDao.insertPatient(patient.toEntity())
         
@@ -54,11 +55,15 @@ class PatientRepositoryImpl @Inject constructor(
         syncRepository.enqueue(
             entityName = "PATIENT",
             entityId = patient.id,
-            operation = SyncOperation.CREATE,
+            operation = if (existing == null) SyncOperation.CREATE else SyncOperation.UPDATE,
             priority = SyncPriority.HIGH
         )
         
-        auditLogger.logAction("ADD_PATIENT", patient.id, "Name: ${patient.name}")
+        auditLogger.logAction(
+            action = if (existing == null) "Created Patient" else "Updated Patient",
+            patientId = patient.id,
+            details = "Name: ${patient.name}"
+        )
     }
 
     override suspend fun deletePatient(id: String) {
@@ -73,7 +78,7 @@ class PatientRepositoryImpl @Inject constructor(
             priority = SyncPriority.MEDIUM
         )
         
-        auditLogger.logAction("DELETE_PATIENT", id)
+        auditLogger.logAction("Patient Deleted", id)
     }
 
     override fun searchPatients(query: String): Flow<List<Patient>> {
@@ -81,5 +86,9 @@ class PatientRepositoryImpl @Inject constructor(
     }
 
     override fun getPatientCount(): Flow<Int> = patientDao.getPatientCount()
+
+    override fun getAuditLogs(patientId: String): Flow<List<com.clinic.neochild.data.local.entity.AuditLogEntity>> {
+        return database.auditLogDao().getLogsForPatient(patientId)
+    }
 }
 

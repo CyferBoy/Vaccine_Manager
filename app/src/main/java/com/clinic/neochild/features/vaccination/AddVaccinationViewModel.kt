@@ -2,6 +2,7 @@ package com.clinic.neochild.features.vaccination
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.clinic.neochild.data.local.entity.VaccineBatchEntity
 import com.clinic.neochild.domain.model.Vaccination
 import com.clinic.neochild.domain.model.Vaccine
 import com.clinic.neochild.domain.usecase.vaccination.CompleteVaccinationUseCase
@@ -17,6 +18,7 @@ import javax.inject.Inject
 data class AddVaccinationUiState(
     val isLoading: Boolean = false,
     val inventory: List<Vaccine> = emptyList(),
+    val activeBatches: Map<String, List<VaccineBatchEntity>> = emptyMap(),
     val error: String? = null,
     val isSaved: Boolean = false,
     val savedVaccination: Vaccination? = null
@@ -42,7 +44,10 @@ class AddVaccinationViewModel @Inject constructor(
 
     private fun observeInventory() {
         viewModelScope.launch {
-            inventoryRepository.getInventoryItems().collect { items ->
+            combine(
+                inventoryRepository.getInventoryItems(),
+                inventoryRepository.getAllBatches()
+            ) { items, allBatches ->
                 val vaccines = items.map { item ->
                     Vaccine(
                         id = item.id,
@@ -50,14 +55,25 @@ class AddVaccinationViewModel @Inject constructor(
                         brandName = item.brandName,
                         companyName = item.company,
                         stock = item.stock,
-                        batchNumber = "", // Individual batch info is handled in deduction logic
+                        batchNumber = "",
                         expiryDate = "",
                         mrp = 0.0,
                         netRate = 0.0
                     )
-                }
-                _uiState.value = _uiState.value.copy(inventory = vaccines)
-            }
+                }.sortedBy { it.brandName }
+
+                val batchesMap = allBatches
+                    .filter { !it.isDeleted && it.remainingQuantity > 0 }
+                    .groupBy { it.vaccineId }
+                    .mapValues { entry -> 
+                        entry.value.sortedBy { it.expiryDate } // FEFO sorting
+                    }
+
+                _uiState.value = _uiState.value.copy(
+                    inventory = vaccines,
+                    activeBatches = batchesMap
+                )
+            }.collect()
         }
     }
 

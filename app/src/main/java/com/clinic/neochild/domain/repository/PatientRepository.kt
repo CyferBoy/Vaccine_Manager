@@ -1,5 +1,6 @@
 package com.clinic.neochild.domain.repository
 
+import com.clinic.neochild.data.local.entity.AuditLogEntity
 import com.clinic.neochild.domain.model.Patient
 import kotlinx.coroutines.flow.Flow
 
@@ -15,4 +16,5 @@ interface PatientRepository {
     suspend fun deletePatient(id: String)
     fun searchPatients(query: String): Flow<List<Patient>>
     fun getPatientCount(): Flow<Int>
+    fun getAuditLogs(patientId: String): Flow<List<AuditLogEntity>>
 }

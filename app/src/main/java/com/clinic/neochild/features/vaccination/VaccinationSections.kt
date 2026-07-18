@@ -27,7 +27,6 @@ fun VaccineSelectionSection(
     inventory: List<Vaccine>,
     selectedVaccines: List<String>,
     onVaccineSelected: (Vaccine) -> Unit,
-    onCustomVaccineAdded: (String) -> Unit,
     onRemoveVaccine: (Int) -> Unit
 ) {
     var query by rememberSaveable { mutableStateOf("") }
@@ -36,10 +35,7 @@ fun VaccineSelectionSection(
     val filteredInventory = remember(query, inventory) {
         inventory.filter { 
             it.brandName.contains(query, true) || it.type.contains(query, true) 
-        }.sortedByDescending { it.brandName.contains(query, true) }
-    }
-    val suggestedBrands = remember(query) {
-        Constants.COMMON_VACCINES.filter { it.contains(query, true) }
+        }
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -47,35 +43,38 @@ fun VaccineSelectionSection(
             value = query,
             onValueChange = { query = it; expanded = true },
             label = "Select Vaccine*",
-            placeholder = "Search inventory or brands...",
+            placeholder = "Search inventory...",
             expanded = expanded && query.isNotBlank(),
             onExpandedChange = { expanded = it },
             dropdownContent = {
                 if (filteredInventory.isNotEmpty()) {
-                    Text("In Stock", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(8.dp), color = MaterialTheme.colorScheme.primary)
                     filteredInventory.forEach { v ->
+                        val isOutOfStock = v.stock <= 0
                         DropdownMenuItem(
                             text = { 
                                 Column {
-                                    Text(v.brandName)
-                                    if (v.type.contains(query, true) && !v.brandName.contains(query, true)) {
-                                        Text(v.type, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
+                                    Text(
+                                        text = if (isOutOfStock) "${v.brandName} (Out of Stock)" else v.brandName,
+                                        color = if (isOutOfStock) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(v.type, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             },
-                            trailingIcon = { Text("Stock: ${v.stock}", style = MaterialTheme.typography.labelSmall) },
+                            trailingIcon = { 
+                                Text(
+                                    text = "Stock: ${v.stock}", 
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isOutOfStock) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                                ) 
+                            },
+                            enabled = !isOutOfStock,
                             onClick = { onVaccineSelected(v); query = ""; expanded = false }
                         )
                     }
-                }
-                if (suggestedBrands.isNotEmpty()) {
-                    Text("Common Brands", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(8.dp))
-                    suggestedBrands.forEach { brand ->
-                        DropdownMenuItem(text = { Text(brand) }, onClick = { onCustomVaccineAdded(brand); query = ""; expanded = false })
+                } else if (query.isNotBlank()) {
+                    Box(modifier = Modifier.padding(16.dp)) {
+                        Text("No matching vaccines in inventory", style = MaterialTheme.typography.bodySmall)
                     }
-                }
-                if (query.isNotBlank()) {
-                    DropdownMenuItem(text = { Text("Add Custom: \"$query\"") }, onClick = { onCustomVaccineAdded(query); query = ""; expanded = false })
                 }
             }
         )

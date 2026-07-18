@@ -2,25 +2,35 @@ package com.clinic.neochild.features.patient
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import com.clinic.neochild.data.local.entity.AuditLogEntity
 import com.clinic.neochild.domain.model.Patient
 import com.clinic.neochild.domain.model.Vaccination
 import com.clinic.neochild.core.utils.PatientUtils.calculateAgeLabel
 import com.clinic.neochild.core.utils.PatientUtils.formatDateForDisplay
 import com.clinic.neochild.core.designsystem.NeoChildTheme
+import java.text.SimpleDateFormat
+import java.util.*
 
 @Composable
 fun PatientDetailsContent(
@@ -148,6 +158,90 @@ fun InfoRow(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String,
             style = MaterialTheme.typography.bodyMedium,
             color = if (onClick != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
         )
+    }
+}
+
+@Composable
+fun AuditLogDialog(
+    show: Boolean,
+    onDismiss: () -> Unit,
+    logs: List<AuditLogEntity>
+) {
+    if (!show) return
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.8f),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Audit Log", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "Close")
+                    }
+                }
+                
+                Divider()
+                
+                if (logs.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("No audit logs found.")
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        contentPadding = PaddingValues(vertical = 16.dp)
+                    ) {
+                        items(logs) { log ->
+                            AuditLogItem(log)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AuditLogItem(log: AuditLogEntity) {
+    val date = remember(log.timestamp) { SimpleDateFormat("dd MMM yyyy", Locale.ENGLISH).format(Date(log.timestamp)) }
+    val time = remember(log.timestamp) { SimpleDateFormat("hh:mm a", Locale.ENGLISH).format(Date(log.timestamp)) }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = log.action,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        if (log.details.isNotBlank()) {
+            Text(text = log.details, style = MaterialTheme.typography.bodySmall)
+        }
+        
+        Spacer(modifier = Modifier.height(4.dp))
+        
+        Text(text = "By:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(text = log.staffMember, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+        
+        if (log.device != null) {
+            Text(text = "Device: ${log.device}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+        }
+
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(text = date, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(text = time, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        Divider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
     }
 }
 

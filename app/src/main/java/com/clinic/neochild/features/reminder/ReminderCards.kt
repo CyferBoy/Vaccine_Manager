@@ -104,15 +104,33 @@ fun DuePatientCard(
                 }
                 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Surface(
-                        color = if (vaccination.isDone) Color.LightGray else MaterialTheme.colorScheme.primaryContainer,
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        val displayDate = if (vaccination.nextDueDate.isBlank()) "None" else vaccination.nextDueDate
+                        Surface(
+                            color = if (vaccination.isDone) Color.LightGray else MaterialTheme.colorScheme.primaryContainer,
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(
+                                text = displayDate,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = if (vaccination.isDone) Color.DarkGray else MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                        
+                        val statusText = when {
+                            vaccination.isDone && vaccination.nextDueDate.isBlank() -> "✅ Completed"
+                            vaccination.isDone -> "✅ Done"
+                            else -> "⏰ Due"
+                        }
+                        val statusColor = if (vaccination.isDone) Color(0xFF4CAF50) else MaterialTheme.colorScheme.error
+                        
                         Text(
-                            text = vaccination.nextDueDate,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = if (vaccination.isDone) Color.DarkGray else MaterialTheme.colorScheme.onPrimaryContainer
+                            text = statusText,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = statusColor,
+                            modifier = Modifier.padding(top = 2.dp)
                         )
                     }
                     

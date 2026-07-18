@@ -64,11 +64,6 @@ fun VaccinationRecordCard(
                 Text(text = "Notes: ${vaccination.notes}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
 
-            if (vaccination.performedBy.isNotBlank()) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(text = "Added by: ${vaccination.performedBy}", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Light)
-            }
-
             Spacer(modifier = Modifier.height(8.dp))
             VaccinationCardDates(vaccination)
         }
@@ -146,17 +141,29 @@ fun PaymentInfoColumn(vaccination: Vaccination) {
 
 @Composable
 fun VaccinationCardDates(vaccination: Vaccination) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         Column {
             Text(text = "DATE GIVEN", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             val dateGivenDisplay = remember(vaccination.dateGiven) { formatDateForDisplay(vaccination.dateGiven) }
             Text(text = dateGivenDisplay, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
         }
-        if (vaccination.nextDueDate.isNotBlank()) {
-            Column(horizontalAlignment = Alignment.End) {
-                Text(text = "NEXT DUE DATE", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                val nextDueDateDisplay = remember(vaccination.nextDueDate) { formatDateForDisplay(vaccination.nextDueDate) }
-                Text(text = nextDueDateDisplay, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.primary)
+        
+        Column(horizontalAlignment = Alignment.End) {
+            Text(text = "NEXT DUE DATE", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val nextDueDateDisplay = if (vaccination.nextDueDate.isBlank()) "None" else formatDateForDisplay(vaccination.nextDueDate)
+                Text(
+                    text = nextDueDateDisplay, 
+                    style = MaterialTheme.typography.bodySmall, 
+                    fontWeight = FontWeight.Medium, 
+                    color = if (vaccination.nextDueDate.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                if (vaccination.isDone) {
+                    Text(text = "✅ Done", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color(0xFF4CAF50))
+                } else {
+                    Text(text = "⏰ Due", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                }
             }
         }
     }

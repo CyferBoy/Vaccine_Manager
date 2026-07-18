@@ -36,6 +36,8 @@ fun PatientDetailsScreen(
     }
 
     var vaccinationToDelete by remember { mutableStateOf<Vaccination?>(null) }
+    var showAuditLog by remember { mutableStateOf(false) }
+    var menuExpanded by remember { mutableStateOf(false) }
 
     DeleteConfirmationDialog(
         show = vaccinationToDelete != null,
@@ -47,6 +49,15 @@ fun PatientDetailsScreen(
         title = "Delete Vaccination",
         message = "Are you sure you want to delete this vaccination record?"
     )
+
+    if (showAuditLog) {
+        val auditLogs by viewModel.getAuditLogs(patientId).collectAsState(initial = emptyList())
+        AuditLogDialog(
+            show = showAuditLog,
+            onDismiss = { showAuditLog = false },
+            logs = auditLogs
+        )
+    }
 
     AppBackground {
         Scaffold(
@@ -60,8 +71,31 @@ fun PatientDetailsScreen(
                         }
                     },
                     actions = {
-                        IconButton(onClick = { onNavigateToTimeline(patientId) }) {
-                            Icon(Icons.Default.History, contentDescription = "Timeline", tint = MaterialTheme.colorScheme.onPrimary)
+                        Box {
+                            IconButton(onClick = { menuExpanded = true }) {
+                                Icon(Icons.Default.MoreVert, contentDescription = "More", tint = MaterialTheme.colorScheme.onPrimary)
+                            }
+                            DropdownMenu(
+                                expanded = menuExpanded,
+                                onDismissRequest = { menuExpanded = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Audit Log") },
+                                    leadingIcon = { Icon(Icons.Default.History, contentDescription = null) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        showAuditLog = true
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Timeline") },
+                                    leadingIcon = { Icon(Icons.Default.Timeline, contentDescription = null) },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onNavigateToTimeline(patientId)
+                                    }
+                                )
+                            }
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(

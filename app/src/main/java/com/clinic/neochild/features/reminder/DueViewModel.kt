@@ -105,10 +105,10 @@ class DueViewModel @Inject constructor(
         }
     }
 
-    fun rescheduleVaccination(vaccination: Vaccination, newDate: String, reason: String) {
+    fun rescheduleVaccination(vaccination: Vaccination, newDate: String, reminderDate: String, reason: String) {
         viewModelScope.launch {
             val req = findMatchingRequirement(vaccination) ?: return@launch
-            reminderRepository.reschedule(req, newDate, reason, currentUserEmail)
+            reminderRepository.reschedule(req, newDate, reminderDate, reason, currentUserEmail)
         }
     }
 

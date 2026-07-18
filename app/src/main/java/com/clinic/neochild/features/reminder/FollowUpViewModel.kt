@@ -80,7 +80,7 @@ class FollowUpViewModel @Inject constructor(
 
     fun reschedule(reminder: ReminderEntity, newDate: String, reason: String) {
         viewModelScope.launch {
-            reminderRepository.reschedule(reminder.toPendingRequirement(), newDate, reason, currentUserEmail)
+            reminderRepository.reschedule(reminder.toPendingRequirement(), newDate, newDate, reason, currentUserEmail)
         }
     }
 

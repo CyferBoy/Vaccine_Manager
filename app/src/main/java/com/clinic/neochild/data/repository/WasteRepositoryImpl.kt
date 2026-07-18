@@ -26,7 +26,8 @@ class WasteRepositoryImpl @Inject constructor(
     private val database: AppDatabase,
     private val firestore: FirebaseFirestore,
     private val inventoryRepository: InventoryRepository,
-    private val syncRepository: SyncRepository
+    private val syncRepository: SyncRepository,
+    private val auditLogger: com.clinic.neochild.core.logger.AuditLogger
 ) : WasteRepository {
 
     private val wasteDao = database.wasteDao()
@@ -58,6 +59,8 @@ class WasteRepositoryImpl @Inject constructor(
                 operation = SyncOperation.CREATE,
                 priority = SyncPriority.MEDIUM
             )
+
+            auditLogger.logAction("Waste recorded", null, "${record.brandName} x${record.quantity} - ${record.reason}")
         }
     }
 

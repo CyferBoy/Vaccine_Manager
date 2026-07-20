@@ -13,6 +13,9 @@ interface DueReminderDao {
     @Query("SELECT * FROM due_reminders WHERE patientId = :patientId AND originalVisitId = :visitId AND vaccineName = :vaccineName AND isDeleted = 0 LIMIT 1")
     suspend fun getDueReminder(patientId: String, visitId: String, vaccineName: String): DueReminderEntity?
 
+    @Query("SELECT * FROM due_reminders WHERE id = :id LIMIT 1")
+    suspend fun getDueReminderById(id: Long): DueReminderEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertDueReminder(reminder: DueReminderEntity): Long
 
@@ -29,22 +32,43 @@ interface DueReminderDao {
     @Query("SELECT * FROM completed_reminders WHERE isDeleted = 0 ORDER BY completionDate DESC")
     fun getAllCompletedReminders(): Flow<List<CompletedReminderEntity>>
 
+    @Query("SELECT * FROM completed_reminders WHERE id = :id LIMIT 1")
+    suspend fun getCompletedReminderById(id: Long): CompletedReminderEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCompletedReminder(reminder: CompletedReminderEntity): Long
+
+    @Query("DELETE FROM completed_reminders WHERE patientId = :patientId AND originalVisitId = :visitId AND vaccineName = :vaccineName")
+    suspend fun deleteCompletedReminder(patientId: String, visitId: String, vaccineName: String)
 
     // Dismissed Reminders
     @Query("SELECT * FROM dismissed_reminders WHERE isDeleted = 0 ORDER BY dismissalDate DESC")
     fun getAllDismissedReminders(): Flow<List<DismissedReminderEntity>>
 
+    @Query("SELECT * FROM dismissed_reminders WHERE id = :id LIMIT 1")
+    suspend fun getDismissedReminderById(id: Long): DismissedReminderEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertDismissedReminder(reminder: DismissedReminderEntity): Long
+
+    @Query("DELETE FROM dismissed_reminders WHERE patientId = :patientId AND originalVisitId = :visitId AND vaccineName = :vaccineName")
+    suspend fun deleteDismissedReminder(patientId: String, visitId: String, vaccineName: String)
 
     // External Reminders
     @Query("SELECT * FROM external_reminders WHERE isDeleted = 0 ORDER BY dueDate ASC")
     fun getAllExternalReminders(): Flow<List<ExternalReminderEntity>>
 
+    @Query("SELECT * FROM external_reminders WHERE id = :id LIMIT 1")
+    suspend fun getExternalReminderById(id: Long): ExternalReminderEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertExternalReminder(reminder: ExternalReminderEntity): Long
+
+    @Query("DELETE FROM external_reminders WHERE patientId = :patientId AND originalVisitId = :visitId AND vaccineName = :vaccineName")
+    suspend fun deleteExternalReminder(patientId: String, visitId: String, vaccineName: String)
+
+    @Query("DELETE FROM reminders WHERE patientId = :patientId AND originalVisitId = :visitId AND vaccineName = :vaccineName")
+    suspend fun deleteOldReminder(patientId: String, visitId: String, vaccineName: String)
 
     // Common
     @Query("SELECT * FROM due_reminders WHERE patientId = :patientId AND isDeleted = 0")
@@ -60,7 +84,16 @@ interface DueReminderDao {
     fun getExternalRemindersForPatient(patientId: String): Flow<List<ExternalReminderEntity>>
 
     @Transaction
-    suspend fun moveDueToCompleted(reminder: DueReminderEntity, completedBy: String, notes: String? = null) {
+    suspend fun clearAllStates(patientId: String, visitId: String, vaccineName: String) {
+        deleteDueReminder(patientId, visitId, vaccineName)
+        deleteCompletedReminder(patientId, visitId, vaccineName)
+        deleteDismissedReminder(patientId, visitId, vaccineName)
+        deleteExternalReminder(patientId, visitId, vaccineName)
+        deleteOldReminder(patientId, visitId, vaccineName)
+    }
+
+    @Transaction
+    suspend fun moveDueToCompleted(reminder: DueReminderEntity, completedBy: String, notes: String? = null): Long {
         val completed = CompletedReminderEntity(
             patientId = reminder.patientId,
             originalVisitId = reminder.originalVisitId,
@@ -70,12 +103,12 @@ interface DueReminderDao {
             completedBy = completedBy,
             notes = notes ?: reminder.notes
         )
-        insertCompletedReminder(completed)
-        deleteDueReminder(reminder.patientId, reminder.originalVisitId, reminder.vaccineName)
+        clearAllStates(reminder.patientId, reminder.originalVisitId, reminder.vaccineName)
+        return insertCompletedReminder(completed)
     }
 
     @Transaction
-    suspend fun moveDueToDismissed(reminder: DueReminderEntity, dismissedBy: String, reason: String? = null) {
+    suspend fun moveDueToDismissed(reminder: DueReminderEntity, dismissedBy: String, reason: String? = null): Long {
         val dismissed = DismissedReminderEntity(
             patientId = reminder.patientId,
             originalVisitId = reminder.originalVisitId,
@@ -85,12 +118,12 @@ interface DueReminderDao {
             dismissedBy = dismissedBy,
             reason = reason
         )
-        insertDismissedReminder(dismissed)
-        deleteDueReminder(reminder.patientId, reminder.originalVisitId, reminder.vaccineName)
+        clearAllStates(reminder.patientId, reminder.originalVisitId, reminder.vaccineName)
+        return insertDismissedReminder(dismissed)
     }
 
     @Transaction
-    suspend fun moveDueToExternal(reminder: DueReminderEntity, source: String, externalDate: String, recordedBy: String, notes: String? = null) {
+    suspend fun moveDueToExternal(reminder: DueReminderEntity, source: String, externalDate: String, recordedBy: String, notes: String? = null): Long {
         val external = ExternalReminderEntity(
             patientId = reminder.patientId,
             originalVisitId = reminder.originalVisitId,
@@ -101,7 +134,7 @@ interface DueReminderDao {
             recordedBy = recordedBy,
             notes = notes ?: reminder.notes
         )
-        insertExternalReminder(external)
-        deleteDueReminder(reminder.patientId, reminder.originalVisitId, reminder.vaccineName)
+        clearAllStates(reminder.patientId, reminder.originalVisitId, reminder.vaccineName)
+        return insertExternalReminder(external)
     }
 }

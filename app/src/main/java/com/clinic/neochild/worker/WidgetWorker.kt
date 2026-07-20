@@ -9,6 +9,8 @@ import com.clinic.neochild.data.local.entity.WidgetDueEntity
 import com.clinic.neochild.domain.repository.ReminderRepository
 import com.clinic.neochild.domain.repository.PatientRepository
 import com.clinic.neochild.core.utils.PatientUtils
+import com.clinic.neochild.core.utils.DateClassifier
+import com.clinic.neochild.core.utils.DateCategory
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.flow.first
@@ -29,21 +31,21 @@ class WidgetWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         return try {
-            val dueList = reminderRepository.getDueList().first().take(20)
+            val dueList = reminderRepository.getDueList().first()
+                .sortedBy { DateClassifier.getSortWeight(it.nextDueDate) }
+                .take(20)
+            
             val patients = patientRepository.allPatients.first().associateBy { it.id }
             
-            val today = Calendar.getInstance().apply {
-                set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
-            }.time
-
             val widgetItems = dueList.map { vacc ->
                 val patient = patients[vacc.patientId]
-                val dueDate = PatientUtils.parseDate(vacc.nextDueDate) ?: Date()
+                val category = DateClassifier.classify(vacc.nextDueDate)
+                
                 WidgetDueEntity(
                     patientName = patient?.name ?: "Unknown",
                     vaccineName = vacc.nxtVaccineNames.joinToString(", "),
-                    dueDate = vacc.nextDueDate,
-                    isOverdue = dueDate.before(today)
+                    dueDate = DateClassifier.formatDisplay(vacc.nextDueDate),
+                    isOverdue = category is DateCategory.Overdue || category is DateCategory.Yesterday
                 )
             }
 

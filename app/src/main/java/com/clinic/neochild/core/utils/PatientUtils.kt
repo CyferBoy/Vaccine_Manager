@@ -153,51 +153,39 @@ object PatientUtils {
     }
 
     /**
-     * Legacy Logic: Filters pending vaccinations based on a string filter (e.g., "Overdue", "Today").
-     * Note: This is now partially superseded by ReminderEngine but kept for UI compatibility.
+     * Unified Logic: Filters pending vaccinations based on a string filter (e.g., "Overdue", "Today").
      */
     fun filterVaccinationsByPeriod(
         pendingVaccinations: List<Vaccination>,
         filter: String,
     ): List<Vaccination> {
-        val calendar = Calendar.getInstance()
-        calendar[Calendar.HOUR_OF_DAY] = 0
-        calendar[Calendar.MINUTE] = 0
-        calendar[Calendar.SECOND] = 0
-        calendar[Calendar.MILLISECOND] = 0
-        val todayStart = calendar.time
-        
-        val weekEnd = Calendar.getInstance().apply { 
-            add(Calendar.DAY_OF_YEAR, 7)
-            this[Calendar.HOUR_OF_DAY] = 23
-            this[Calendar.MINUTE] = 59
-            this[Calendar.SECOND] = 59
-            this[Calendar.MILLISECOND] = 999 
-        }.time
-
-        val lastMonthCal = Calendar.getInstance().apply { add(Calendar.MONTH, -1) }
-        val lastMonth = lastMonthCal[Calendar.MONTH]
-        val lastMonthYear = lastMonthCal[Calendar.YEAR]
-
         return pendingVaccinations.filter { v ->
-            val dueDate = parseDate(v.nextDueDate) ?: return@filter false
+            val category = DateClassifier.classify(v.nextDueDate)
             when (filter) {
-                "Overdue" -> dueDate.before(todayStart)
-                "Previous Month" -> {
-                    val cal = Calendar.getInstance().apply { time = dueDate }
-                    cal[Calendar.MONTH] == lastMonth && cal[Calendar.YEAR] == lastMonthYear
+                "Overdue" -> category is DateCategory.Overdue || category is DateCategory.Yesterday
+                "Yesterday" -> category is DateCategory.Yesterday
+                "Today" -> category is DateCategory.Today
+                "Tomorrow" -> category is DateCategory.Tomorrow
+                "This Week" -> {
+                    val date = parseDate(v.nextDueDate)
+                    if (date == null) false else {
+                        val cal = Calendar.getInstance()
+                        val today = cal.timeInMillis
+                        cal.add(Calendar.DAY_OF_YEAR, 7)
+                        val weekEnd = cal.timeInMillis
+                        date.time in today..weekEnd
+                    }
                 }
-                "Today" -> dueDate == todayStart
-                "This Week" -> (dueDate == todayStart || dueDate.after(todayStart)) && (dueDate == weekEnd || dueDate.before(weekEnd))
-                "Upcoming" -> dueDate.after(weekEnd)
-                else -> false
+                "Upcoming" -> {
+                    val date = parseDate(v.nextDueDate)
+                    if (date == null) false else {
+                        val cal = Calendar.getInstance()
+                        cal.add(Calendar.DAY_OF_YEAR, 7)
+                        date.after(cal.time)
+                    }
+                }
+                else -> true
             }
-        }.let { list ->
-            if (filter == "Overdue" || filter == "Previous Month") {
-                list.sortedByDescending { parseDate(it.nextDueDate) }
-            } else {
-                list.sortedBy { parseDate(it.nextDueDate) }
-            }
-        }
+        }.sortedBy { DateClassifier.getSortWeight(it.nextDueDate) }
     }
 }

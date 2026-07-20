@@ -12,6 +12,7 @@ import com.clinic.neochild.core.model.SyncOperation
 import com.clinic.neochild.core.model.SyncPriority
 import com.clinic.neochild.domain.repository.InventoryRepository
 import com.clinic.neochild.domain.repository.SyncRepository
+import com.clinic.neochild.core.utils.InventoryUtils
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.tasks.await
@@ -98,9 +99,12 @@ class InventoryRepositoryImpl @Inject constructor(
     ) {
         database.withTransaction {
             var remainingToDeduct = quantity
-            val activeBatches = vaccineDao.getActiveBatchesByExpiry(vaccineId)
+            val allActiveBatches = vaccineDao.getActiveBatchesByExpiry(vaccineId)
+            
+            // Filter out expired batches for administration
+            val validBatches = allActiveBatches.filter { !InventoryUtils.isExpired(it.expiryDate) }
 
-            for (batch in activeBatches) {
+            for (batch in validBatches) {
                 if (remainingToDeduct <= 0) break
 
                 val deductFromThisBatch = minOf(batch.remainingQuantity, remainingToDeduct)
@@ -131,7 +135,12 @@ class InventoryRepositoryImpl @Inject constructor(
             }
 
             if (remainingToDeduct > 0) {
-                throw IllegalStateException("Insufficient stock for vaccine $vaccineId")
+                val expiredCount = allActiveBatches.size - validBatches.size
+                if (expiredCount > 0 && validBatches.isEmpty()) {
+                    throw IllegalStateException("All available batches for this vaccine have expired. Cannot proceed with vaccination.")
+                } else {
+                    throw IllegalStateException("Insufficient non-expired stock for vaccine $vaccineId. Available: ${quantity - remainingToDeduct}, Requested: $quantity")
+                }
             }
         }
     }
@@ -147,6 +156,10 @@ class InventoryRepositoryImpl @Inject constructor(
             val batch = vaccineDao.getBatchById(batchId)
                 ?: throw IllegalStateException("Batch not found: $batchId")
             
+            if (transactionType == InventoryTransactionType.VACCINATION && InventoryUtils.isExpired(batch.expiryDate)) {
+                throw IllegalStateException("This vaccine batch expired on ${batch.expiryDate}. Please select another batch.")
+            }
+
             if (batch.remainingQuantity < quantity) {
                 throw IllegalStateException("Insufficient stock in batch ${batch.batchNumber}. Available: ${batch.remainingQuantity}, Requested: $quantity")
             }

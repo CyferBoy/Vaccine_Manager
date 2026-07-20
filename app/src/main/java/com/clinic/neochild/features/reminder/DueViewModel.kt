@@ -11,6 +11,8 @@ import com.clinic.neochild.domain.repository.ReminderRepository
 import com.clinic.neochild.domain.usecase.patient.GetPatientsUseCase
 import com.clinic.neochild.domain.usecase.vaccination.CompleteVaccinationUseCase
 import com.clinic.neochild.core.utils.PatientUtils
+import com.clinic.neochild.core.utils.DateClassifier
+import com.clinic.neochild.core.utils.DateCategory
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -64,13 +66,9 @@ class DueViewModel @Inject constructor(
             PatientUtils.filterVaccinationsByPeriod(dueVaccinations, filter)
         }
         
-        val todayStart = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
-        }.time
-        
         val overdue = dueVaccinations.count { 
-            val date = PatientUtils.parseDate(it.nextDueDate)
-            date != null && date.before(todayStart)
+            val cat = DateClassifier.classify(it.nextDueDate)
+            cat is DateCategory.Overdue || cat is DateCategory.Yesterday
         }
 
         DueUiState(

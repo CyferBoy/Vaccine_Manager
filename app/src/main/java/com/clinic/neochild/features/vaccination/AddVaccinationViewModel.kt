@@ -2,6 +2,7 @@ package com.clinic.neochild.features.vaccination
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.clinic.neochild.core.utils.InventoryUtils
 import com.clinic.neochild.data.local.entity.VaccineBatchEntity
 import com.clinic.neochild.domain.model.Vaccination
 import com.clinic.neochild.domain.model.Vaccine
@@ -9,6 +10,7 @@ import com.clinic.neochild.domain.usecase.vaccination.CompleteVaccinationUseCase
 import com.clinic.neochild.domain.usecase.vaccination.GetVaccinationsUseCase
 import com.clinic.neochild.domain.repository.InventoryRepository
 import com.clinic.neochild.domain.repository.ReminderRepository
+import com.clinic.neochild.features.settings.NotificationSettingsManager
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -19,6 +21,8 @@ data class AddVaccinationUiState(
     val isLoading: Boolean = false,
     val inventory: List<Vaccine> = emptyList(),
     val activeBatches: Map<String, List<VaccineBatchEntity>> = emptyMap(),
+    val showExpiredBatches: Boolean = false,
+    val lowStockThreshold: Int = 5,
     val error: String? = null,
     val isSaved: Boolean = false,
     val savedVaccination: Vaccination? = null
@@ -29,7 +33,8 @@ class AddVaccinationViewModel @Inject constructor(
     private val inventoryRepository: InventoryRepository,
     private val completeVaccinationUseCase: CompleteVaccinationUseCase,
     private val getVaccinationsUseCase: GetVaccinationsUseCase,
-    private val reminderRepository: ReminderRepository
+    private val reminderRepository: ReminderRepository,
+    private val settingsManager: NotificationSettingsManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AddVaccinationUiState())
@@ -37,6 +42,9 @@ class AddVaccinationViewModel @Inject constructor(
 
     private val _vaccination = MutableStateFlow<Vaccination?>(null)
     val vaccination: StateFlow<Vaccination?> = _vaccination.asStateFlow()
+
+    private val _showExpiredBatches = MutableStateFlow(false)
+    val showExpiredBatches = _showExpiredBatches.asStateFlow()
 
     init {
         observeInventory()
@@ -46,8 +54,10 @@ class AddVaccinationViewModel @Inject constructor(
         viewModelScope.launch {
             combine(
                 inventoryRepository.getInventoryItems(),
-                inventoryRepository.getAllBatches()
-            ) { items, allBatches ->
+                inventoryRepository.getAllBatches(),
+                _showExpiredBatches,
+                settingsManager.settingsFlow
+            ) { items, allBatches, showExpired, settings ->
                 val vaccines = items.map { item ->
                     Vaccine(
                         id = item.id,
@@ -63,7 +73,11 @@ class AddVaccinationViewModel @Inject constructor(
                 }.sortedBy { it.brandName }
 
                 val batchesMap = allBatches
-                    .filter { !it.isDeleted && it.remainingQuantity > 0 }
+                    .filter { batch -> 
+                        !batch.isDeleted && 
+                        batch.remainingQuantity > 0 && 
+                        (showExpired || !InventoryUtils.isExpired(batch.expiryDate))
+                    }
                     .groupBy { it.vaccineId }
                     .mapValues { entry -> 
                         entry.value.sortedBy { it.expiryDate } // FEFO sorting
@@ -71,10 +85,16 @@ class AddVaccinationViewModel @Inject constructor(
 
                 _uiState.value = _uiState.value.copy(
                     inventory = vaccines,
-                    activeBatches = batchesMap
+                    activeBatches = batchesMap,
+                    showExpiredBatches = showExpired,
+                    lowStockThreshold = settings.lowStockThreshold
                 )
             }.collect()
         }
+    }
+
+    fun toggleShowExpiredBatches(show: Boolean) {
+        _showExpiredBatches.value = show
     }
 
     fun loadVaccination(id: String) {

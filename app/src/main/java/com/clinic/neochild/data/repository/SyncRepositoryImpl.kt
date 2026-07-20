@@ -68,6 +68,10 @@ class SyncRepositoryImpl @Inject constructor(
             "PATIENT" -> "patients"
             "VACCINATION" -> "vaccinations"
             "WASTE" -> "waste"
+            "DUE_REMINDER" -> "due_reminders"
+            "COMPLETED_REMINDER" -> "completed_reminders"
+            "DISMISSED_REMINDER" -> "dismissed_reminders"
+            "EXTERNAL_REMINDER" -> "external_reminders"
             "REMINDER_OVERRIDE" -> "reminder_overrides"
             "REMINDER_AUDIT" -> "reminder_audits"
             "VACCINE" -> "vaccines"
@@ -95,6 +99,10 @@ class SyncRepositoryImpl @Inject constructor(
             "PATIENT" -> database.patientDao().getPatientById(item.entityId)?.toPatient()
             "VACCINATION" -> database.vaccinationDao().getVaccinationById(item.entityId)?.toVaccination()
             "WASTE" -> database.wasteDao().getWasteById(item.entityId)?.toDomain()
+            "DUE_REMINDER" -> database.dueReminderDao().getDueReminderById(item.entityId.toLong())
+            "COMPLETED_REMINDER" -> database.dueReminderDao().getCompletedReminderById(item.entityId.toLong())
+            "DISMISSED_REMINDER" -> database.dueReminderDao().getDismissedReminderById(item.entityId.toLong())
+            "EXTERNAL_REMINDER" -> database.dueReminderDao().getExternalReminderById(item.entityId.toLong())
             "REMINDER_OVERRIDE" -> database.reminderDao().getReminderById(item.entityId.toLong())
             "REMINDER_AUDIT" -> database.reminderAuditDao().getAuditById(item.entityId.toLong())
             "VACCINE" -> database.vaccineDao().getVaccineById(item.entityId)

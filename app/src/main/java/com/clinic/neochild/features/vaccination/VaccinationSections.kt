@@ -17,6 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.clinic.neochild.core.constants.Constants
+import com.clinic.neochild.core.utils.InventoryUtils
 import com.clinic.neochild.domain.model.Vaccine
 import com.clinic.neochild.core.ui.StandardAutoCompleteField
 import com.clinic.neochild.core.ui.StandardTextField
@@ -25,6 +26,7 @@ import com.clinic.neochild.core.ui.StandardButton
 @Composable
 fun VaccineSelectionSection(
     inventory: List<Vaccine>,
+    lowStockThreshold: Int = 5,
     selectedVaccines: List<String>,
     onVaccineSelected: (Vaccine) -> Unit,
     onRemoveVaccine: (Int) -> Unit
@@ -50,13 +52,31 @@ fun VaccineSelectionSection(
                 if (filteredInventory.isNotEmpty()) {
                     filteredInventory.forEach { v ->
                         val isOutOfStock = v.stock <= 0
+                        val isLowStock = !isOutOfStock && v.stock <= lowStockThreshold
+
                         DropdownMenuItem(
                             text = { 
                                 Column {
-                                    Text(
-                                        text = if (isOutOfStock) "${v.brandName} (Out of Stock)" else v.brandName,
-                                        color = if (isOutOfStock) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
-                                    )
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = if (isOutOfStock) "${v.brandName} (Out of Stock)" else v.brandName,
+                                            color = if (isOutOfStock) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                                        )
+                                        if (isLowStock) {
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Surface(
+                                                color = MaterialTheme.colorScheme.errorContainer,
+                                                shape = androidx.compose.foundation.shape.CircleShape
+                                            ) {
+                                                Text(
+                                                    text = "Low Stock",
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                                )
+                                            }
+                                        }
+                                    }
                                     Text(v.type, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             },
@@ -64,7 +84,7 @@ fun VaccineSelectionSection(
                                 Text(
                                     text = "Stock: ${v.stock}", 
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = if (isOutOfStock) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                                    color = if (isOutOfStock || isLowStock) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
                                 ) 
                             },
                             enabled = !isOutOfStock,

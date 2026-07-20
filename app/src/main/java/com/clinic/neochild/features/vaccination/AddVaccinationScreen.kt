@@ -5,11 +5,15 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import kotlinx.coroutines.launch
+import com.clinic.neochild.core.utils.InventoryUtils
 import com.clinic.neochild.domain.model.Vaccine
 import com.clinic.neochild.features.patient.PatientViewModel
 import com.clinic.neochild.core.constants.Constants
@@ -127,23 +131,50 @@ fun AddVaccinationScreen(
             title = { Text("Select Batch for ${currentVaccineSelecting?.brandName}") },
             text = {
                 Column {
-                    Text("Multiple batches found. FEFO (First Expiry, First Out) suggests the first one.", style = MaterialTheme.typography.bodySmall)
+                    Text("Select an active batch. FEFO (First Expiry, First Out) prioritizes earliest valid expiry.", style = MaterialTheme.typography.bodySmall)
+                    
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = uiState.showExpiredBatches, onCheckedChange = { viewModel.toggleShowExpiredBatches(it) })
+                        Text("Show Expired Batches", style = MaterialTheme.typography.labelMedium)
+                    }
+
                     Spacer(modifier = Modifier.height(8.dp))
+                    
                     batchesToSelectFrom.forEach { batch ->
+                        val isExpired = InventoryUtils.isExpired(batch.expiryDate)
+                        val isNearExpiry = !isExpired && InventoryUtils.isNearExpiry(batch.expiryDate)
+                        
                         DropdownMenuItem(
                             text = { 
                                 Column {
-                                    Text("Batch: ${batch.batchNumber} (Stock: ${batch.remainingQuantity})")
-                                    Text("Expires: ${batch.expiryDate}", style = MaterialTheme.typography.labelSmall)
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = "Batch: ${batch.batchNumber}",
+                                            color = if (isExpired) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                                        )
+                                        if (isExpired) {
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("(EXPIRED)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                                        } else if (isNearExpiry) {
+                                            val days = InventoryUtils.getDaysUntilExpiry(batch.expiryDate)
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(" (⚠ Expires in $days days)", style = MaterialTheme.typography.labelSmall, color = Color(0xFFFFA000))
+                                        }
+                                    }
+                                    Text("Expires: ${batch.expiryDate} | Stock: ${batch.remainingQuantity}", style = MaterialTheme.typography.labelSmall)
                                 }
                             },
                             onClick = {
-                                val v = currentVaccineSelecting!!
-                                selectedVaccines = selectedVaccines + v.brandName
-                                batchNumbers = batchNumbers + batch.batchNumber
-                                expiryDates = expiryDates + batch.expiryDate
-                                selectedVaccineIds = selectedVaccineIds + v.id
-                                showBatchSelectionDialog = false
+                                if (isExpired) {
+                                    Toast.makeText(context, "Cannot select expired batch for vaccination", Toast.LENGTH_LONG).show()
+                                } else {
+                                    val v = currentVaccineSelecting!!
+                                    selectedVaccines = selectedVaccines + v.brandName
+                                    batchNumbers = batchNumbers + batch.batchNumber
+                                    expiryDates = expiryDates + batch.expiryDate
+                                    selectedVaccineIds = selectedVaccineIds + v.id
+                                    showBatchSelectionDialog = false
+                                }
                             }
                         )
                     }
@@ -163,22 +194,31 @@ fun AddVaccinationScreen(
         onPatientIdChange = { if (initialPatientId.isEmpty()) patientId = it },
         isPatientIdEnabled = initialPatientId.isEmpty(),
         inventory = uiState.inventory,
+        lowStockThreshold = uiState.lowStockThreshold,
         selectedVaccines = selectedVaccines,
         onVaccineSelected = { v ->
             if (!selectedVaccines.contains(v.brandName)) {
-                val batches = uiState.activeBatches[v.id] ?: emptyList()
-                if (batches.size == 1) {
-                    val batch = batches[0]
+                val allBatches = uiState.activeBatches[v.id] ?: emptyList()
+                val validBatches = allBatches.filter { !InventoryUtils.isExpired(it.expiryDate) }
+
+                if (validBatches.size == 1) {
+                    val batch = validBatches[0]
                     selectedVaccines = selectedVaccines + v.brandName
                     batchNumbers = batchNumbers + batch.batchNumber
                     expiryDates = expiryDates + batch.expiryDate
                     selectedVaccineIds = selectedVaccineIds + v.id
-                } else if (batches.size > 1) {
+                    
+                    if (InventoryUtils.isNearExpiry(batch.expiryDate)) {
+                        val days = InventoryUtils.getDaysUntilExpiry(batch.expiryDate)
+                        Toast.makeText(context, "Warning: Selected batch expires in $days days", Toast.LENGTH_SHORT).show()
+                    }
+                } else if (validBatches.size > 1 || (uiState.showExpiredBatches && allBatches.isNotEmpty())) {
                     currentVaccineSelecting = v
-                    batchesToSelectFrom = batches
+                    batchesToSelectFrom = allBatches
                     showBatchSelectionDialog = true
+                } else if (allBatches.any { InventoryUtils.isExpired(it.expiryDate) }) {
+                    Toast.makeText(context, "All available batches for ${v.brandName} have expired!", Toast.LENGTH_LONG).show()
                 } else {
-                    // Fallback if stock sync is slightly off but dropdown allowed click
                     Toast.makeText(context, "No active batches for ${v.brandName}", Toast.LENGTH_SHORT).show()
                 }
             }

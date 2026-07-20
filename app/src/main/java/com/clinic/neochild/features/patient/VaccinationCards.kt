@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import com.clinic.neochild.domain.model.Patient
 import com.clinic.neochild.domain.model.Vaccination
+import com.clinic.neochild.core.utils.DateClassifier
 import com.clinic.neochild.core.utils.PatientUtils.cleanVaccineName
 import com.clinic.neochild.core.utils.PatientUtils.formatDateForDisplay
 import com.clinic.neochild.core.utils.ReceiptManager
@@ -151,7 +152,7 @@ fun VaccinationCardDates(vaccination: Vaccination) {
         Column(horizontalAlignment = Alignment.End) {
             Text(text = "NEXT DUE DATE", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                val nextDueDateDisplay = if (vaccination.nextDueDate.isBlank()) "None" else formatDateForDisplay(vaccination.nextDueDate)
+                val nextDueDateDisplay = if (vaccination.nextDueDate.isBlank()) "None" else DateClassifier.formatDisplay(vaccination.nextDueDate)
                 Text(
                     text = nextDueDateDisplay, 
                     style = MaterialTheme.typography.bodySmall, 
@@ -162,7 +163,16 @@ fun VaccinationCardDates(vaccination: Vaccination) {
                 if (vaccination.isDone) {
                     Text(text = "✅ Done", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color(0xFF4CAF50))
                 } else {
-                    Text(text = "⏰ Due", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
+                    val isActuallyOverdue = !vaccination.isDone && vaccination.nextDueDate.isNotBlank() && 
+                        (DateClassifier.classify(vaccination.nextDueDate) is com.clinic.neochild.core.utils.DateCategory.Overdue || 
+                         DateClassifier.classify(vaccination.nextDueDate) is com.clinic.neochild.core.utils.DateCategory.Yesterday)
+                    
+                    Text(
+                        text = if (isActuallyOverdue) "⏰ Overdue" else "⏰ Due", 
+                        style = MaterialTheme.typography.labelSmall, 
+                        fontWeight = FontWeight.Bold, 
+                        color = if (isActuallyOverdue) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                    )
                 }
             }
         }

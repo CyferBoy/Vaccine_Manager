@@ -15,6 +15,7 @@ import com.clinic.neochild.core.ui.AppBackground
 @Composable
 fun DueScreen(
     onBack: () -> Unit,
+    onNavigateToAddVaccination: (String, String) -> Unit,
     viewModel: DueViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -50,7 +51,9 @@ fun DueScreen(
                         initialFilter = uiState.selectedFilter,
                         onFilterChanged = viewModel::updateFilter,
                         onSearchQueryChanged = viewModel::updateSearchQuery,
-                        onMarkAsDone = viewModel::markAsDone,
+                        onMarkAsDone = { v -> 
+                            onNavigateToAddVaccination(v.patientId, v.nxtVaccineNames.firstOrNull() ?: "")
+                        },
                         onDismissReminder = viewModel::dismissReminder,
                         onReschedule = viewModel::rescheduleVaccination,
                         onVaccinatedElsewhere = viewModel::markVaccinatedElsewhere

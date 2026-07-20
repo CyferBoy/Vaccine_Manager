@@ -46,7 +46,7 @@ fun VaccineSelectionSection(
             onValueChange = { query = it; expanded = true },
             label = "Select Vaccine*",
             placeholder = "Search inventory...",
-            expanded = expanded && query.isNotBlank(),
+            expanded = expanded,
             onExpandedChange = { expanded = it },
             dropdownContent = {
                 if (filteredInventory.isNotEmpty()) {

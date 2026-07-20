@@ -4,7 +4,6 @@ import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -25,6 +24,7 @@ import java.util.*
 @Composable
 fun AddVaccinationScreen(
     initialPatientId: String = "", 
+    initialVaccineName: String? = null,
     vaccinationId: String? = null,
     onBack: () -> Unit = {},
     onScheduleFollowUp: (String, String, List<String>) -> Unit = { _, _, _ -> },
@@ -33,7 +33,6 @@ fun AddVaccinationScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val allPatients by patientViewModel.allPatients.collectAsState()
-    val existingVaccination by viewModel.vaccination.collectAsState()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -42,23 +41,12 @@ fun AddVaccinationScreen(
     var batchesToSelectFrom by remember { mutableStateOf<List<com.clinic.neochild.data.local.entity.VaccineBatchEntity>>(emptyList()) }
     var currentVaccineSelecting by remember { mutableStateOf<Vaccine?>(null) }
 
-    // Form State
-    var patientId by rememberSaveable { mutableStateOf(initialPatientId) }
-    var selectedVaccines by remember { mutableStateOf<List<String>>(emptyList()) }
-    var selectedVaccineIds by remember { mutableStateOf<List<String>>(emptyList()) }
-    var batchNumbers by remember { mutableStateOf<List<String>>(emptyList()) }
-    var expiryDates by remember { mutableStateOf<List<String>>(emptyList()) }
-    var nextBrandSearch by rememberSaveable { mutableStateOf("") }
-    
-    val today = remember { SimpleDateFormat(Constants.DATE_FORMAT, Locale.ENGLISH).format(Date()) }
-    var dateGiven by rememberSaveable { mutableStateOf(today) }
-    var nextDueDate by rememberSaveable { mutableStateOf("") }
-    
-    var cost by rememberSaveable { mutableStateOf("") }
-    var cashAmount by rememberSaveable { mutableStateOf("") }
-    var onlineAmount by rememberSaveable { mutableStateOf("") }
-    var withFees by rememberSaveable { mutableStateOf(false) }
-    var doctorsAcc by rememberSaveable { mutableStateOf(false) }
+    // Initialize initial data
+    LaunchedEffect(initialPatientId) {
+        if (initialPatientId.isNotEmpty()) {
+            viewModel.onPatientIdChange(initialPatientId)
+        }
+    }
 
     LaunchedEffect(vaccinationId) {
         if (vaccinationId != null) {
@@ -66,30 +54,27 @@ fun AddVaccinationScreen(
         }
     }
 
-    LaunchedEffect(existingVaccination) {
-        existingVaccination?.let { v ->
-            patientId = v.patientId
-            selectedVaccines = v.vaccineNames
-            batchNumbers = v.batchNumbers
-            expiryDates = v.expiryDates
-            nextBrandSearch = v.nxtVaccineNames.joinToString(", ")
-            dateGiven = v.dateGiven
-            nextDueDate = v.nextDueDate
-            cost = if (v.cost % 1.0 == 0.0) v.cost.toInt().toString() else v.cost.toString()
-            cashAmount = if (v.cashAmount % 1.0 == 0.0) v.cashAmount.toInt().toString() else v.cashAmount.toString()
-            onlineAmount = if (v.onlineAmount % 1.0 == 0.0) v.onlineAmount.toInt().toString() else v.onlineAmount.toString()
-            withFees = v.withFees
-            doctorsAcc = v.doctorsAcc
-        }
+    LaunchedEffect(viewModel.vaccination.collectAsState().value) {
+        viewModel.vaccination.value?.let { viewModel.prefillForm(it) }
     }
 
-    val totalPaid = remember(cashAmount, onlineAmount) {
-        (cashAmount.toDoubleOrNull() ?: 0.0) + (onlineAmount.toDoubleOrNull() ?: 0.0)
+    LaunchedEffect(Unit) {
+        val today = SimpleDateFormat(Constants.DATE_FORMAT, Locale.ENGLISH).format(Date())
+        viewModel.initializeDates(today)
     }
 
-    LaunchedEffect(totalPaid) {
-        if (totalPaid > 0) {
-            cost = if (totalPaid % 1.0 == 0.0) totalPaid.toInt().toString() else totalPaid.toString()
+    // Auto-trigger batch selection if initial vaccine provided
+    LaunchedEffect(initialVaccineName, uiState.inventory) {
+        if (vaccinationId == null && initialVaccineName != null && uiState.selectedVaccines.isEmpty() && uiState.inventory.isNotEmpty()) {
+            val matching = uiState.inventory.find { it.brandName.equals(initialVaccineName, ignoreCase = true) }
+            if (matching != null) {
+                val allBatches = uiState.activeBatches[matching.id] ?: emptyList()
+                if (allBatches.isNotEmpty()) {
+                    currentVaccineSelecting = matching
+                    batchesToSelectFrom = allBatches
+                    showBatchSelectionDialog = true
+                }
+            }
         }
     }
 
@@ -142,7 +127,8 @@ fun AddVaccinationScreen(
                     
                     batchesToSelectFrom.forEach { batch ->
                         val isExpired = InventoryUtils.isExpired(batch.expiryDate)
-                        val isNearExpiry = !isExpired && InventoryUtils.isNearExpiry(batch.expiryDate)
+                        val isExpiringToday = !isExpired && InventoryUtils.isExpiringToday(batch.expiryDate)
+                        val isNearExpiry = !isExpired && !isExpiringToday && InventoryUtils.isNearExpiry(batch.expiryDate)
                         
                         DropdownMenuItem(
                             text = { 
@@ -150,11 +136,14 @@ fun AddVaccinationScreen(
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Text(
                                             text = "Batch: ${batch.batchNumber}",
-                                            color = if (isExpired) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                                            color = if (isExpired || isExpiringToday) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
                                         )
                                         if (isExpired) {
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("(EXPIRED)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                                        } else if (isExpiringToday) {
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("(EXPIRES TODAY)", style = MaterialTheme.typography.labelSmall, color = Color(0xFFD32F2F), fontWeight = FontWeight.Bold)
                                         } else if (isNearExpiry) {
                                             val days = InventoryUtils.getDaysUntilExpiry(batch.expiryDate)
                                             Spacer(modifier = Modifier.width(4.dp))
@@ -168,11 +157,7 @@ fun AddVaccinationScreen(
                                 if (isExpired) {
                                     Toast.makeText(context, "Cannot select expired batch for vaccination", Toast.LENGTH_LONG).show()
                                 } else {
-                                    val v = currentVaccineSelecting!!
-                                    selectedVaccines = selectedVaccines + v.brandName
-                                    batchNumbers = batchNumbers + batch.batchNumber
-                                    expiryDates = expiryDates + batch.expiryDate
-                                    selectedVaccineIds = selectedVaccineIds + v.id
+                                    viewModel.onVaccineSelected(currentVaccineSelecting!!, batch)
                                     showBatchSelectionDialog = false
                                 }
                             }
@@ -190,75 +175,56 @@ fun AddVaccinationScreen(
     AddVaccinationContent(
         isEdit = vaccinationId != null,
         onBack = onBack,
-        patientId = patientId,
-        onPatientIdChange = { if (initialPatientId.isEmpty()) patientId = it },
+        patientId = uiState.patientId,
+        onPatientIdChange = viewModel::onPatientIdChange,
         isPatientIdEnabled = initialPatientId.isEmpty(),
         inventory = uiState.inventory,
         lowStockThreshold = uiState.lowStockThreshold,
-        selectedVaccines = selectedVaccines,
+        selectedVaccines = uiState.selectedVaccines,
         onVaccineSelected = { v ->
-            if (!selectedVaccines.contains(v.brandName)) {
+            if (!uiState.selectedVaccines.contains(v.brandName)) {
                 val allBatches = uiState.activeBatches[v.id] ?: emptyList()
-                val validBatches = allBatches.filter { !InventoryUtils.isExpired(it.expiryDate) }
-
-                if (validBatches.size == 1) {
-                    val batch = validBatches[0]
-                    selectedVaccines = selectedVaccines + v.brandName
-                    batchNumbers = batchNumbers + batch.batchNumber
-                    expiryDates = expiryDates + batch.expiryDate
-                    selectedVaccineIds = selectedVaccineIds + v.id
-                    
-                    if (InventoryUtils.isNearExpiry(batch.expiryDate)) {
-                        val days = InventoryUtils.getDaysUntilExpiry(batch.expiryDate)
-                        Toast.makeText(context, "Warning: Selected batch expires in $days days", Toast.LENGTH_SHORT).show()
-                    }
-                } else if (validBatches.size > 1 || (uiState.showExpiredBatches && allBatches.isNotEmpty())) {
+                if (allBatches.isNotEmpty()) {
                     currentVaccineSelecting = v
                     batchesToSelectFrom = allBatches
                     showBatchSelectionDialog = true
-                } else if (allBatches.any { InventoryUtils.isExpired(it.expiryDate) }) {
-                    Toast.makeText(context, "All available batches for ${v.brandName} have expired!", Toast.LENGTH_LONG).show()
                 } else {
                     Toast.makeText(context, "No active batches for ${v.brandName}", Toast.LENGTH_SHORT).show()
                 }
             }
         },
-        onRemoveVaccine = { index ->
-            selectedVaccines = selectedVaccines.toMutableList().apply { removeAt(index) }
-            batchNumbers = batchNumbers.toMutableList().apply { removeAt(index) }
-            expiryDates = expiryDates.toMutableList().apply { removeAt(index) }
-        },
-        nextBrandSearch = nextBrandSearch,
-        onNextBrandChange = { nextBrandSearch = it },
-        dateGiven = dateGiven,
-        onDateGivenChange = { dateGiven = it },
-        nextDueDate = nextDueDate,
-        onNextDueDateChange = { nextDueDate = it },
-        cashAmount = cashAmount,
-        onCashChange = { cashAmount = it },
-        onlineAmount = onlineAmount,
-        onOnlineChange = { onlineAmount = it },
-        totalPaid = totalPaid,
-        cost = cost,
-        onCostChange = { cost = it },
-        withFees = withFees,
-        onFeesToggle = { withFees = it },
-        doctorsAcc = doctorsAcc,
-        onAccToggle = { doctorsAcc = it },
+        onRemoveVaccine = viewModel::onRemoveVaccine,
+        nextBrandSearch = uiState.nextBrandSearch,
+        onNextBrandChange = viewModel::onNextBrandChange,
+        dateGiven = uiState.dateGiven,
+        onDateGivenChange = viewModel::onDateGivenChange,
+        nextDueDate = uiState.nextDueDate,
+        onNextDueDateChange = viewModel::onNextDueDateChange,
+        cashAmount = uiState.cashAmount,
+        onCashChange = viewModel::onCashChange,
+        onlineAmount = uiState.onlineAmount,
+        onOnlineChange = viewModel::onOnlineChange,
+        totalPaid = uiState.totalPaid,
+        cost = uiState.cost,
+        onCostChange = viewModel::onCostChange,
+        withFees = uiState.withFees,
+        onFeesToggle = viewModel::onFeesToggle,
+        doctorsAcc = uiState.doctorsAcc,
+        onAccToggle = viewModel::onAccToggle,
         isLoading = uiState.isLoading,
         onSave = {
-            if (VaccinationValidator.validateForm(context, patientId, selectedVaccines)) {
+            if (VaccinationValidator.validateForm(context, uiState.patientId, uiState.selectedVaccines)) {
                 val user = FirebaseAuth.getInstance().currentUser?.email ?: "Unknown"
-                val v = VaccinationValidator.createVaccination(vaccinationId, patientId, selectedVaccines, nextBrandSearch, dateGiven, nextDueDate, cost, cashAmount, onlineAmount, totalPaid, withFees, doctorsAcc, batchNumbers, expiryDates, user)
-                viewModel.saveVaccination(v, vaccinationId == null, selectedVaccineIds) {}
+                val v = VaccinationValidator.createVaccination(vaccinationId, uiState.patientId, uiState.selectedVaccines, uiState.nextBrandSearch, uiState.dateGiven, uiState.nextDueDate, uiState.cost, uiState.cashAmount, uiState.onlineAmount, uiState.totalPaid, uiState.withFees, uiState.doctorsAcc, uiState.batchNumbers, uiState.expiryDates, user)
+                viewModel.saveVaccination(v, vaccinationId == null, uiState.selectedVaccineIds) {}
             }
         },
         onSaveAndDownload = {
-            val patient = allPatients.find { it.id == patientId }
-            if (VaccinationValidator.validateForm(context, patientId, selectedVaccines) && patient != null) {
+            val patient = allPatients.find { it.id == uiState.patientId }
+            if (VaccinationValidator.validateForm(context, uiState.patientId, uiState.selectedVaccines) && patient != null) {
                 val user = FirebaseAuth.getInstance().currentUser?.email ?: "Unknown"
-                val v = VaccinationValidator.createVaccination(vaccinationId, patientId, selectedVaccines, nextBrandSearch, dateGiven, nextDueDate, cost, cashAmount, onlineAmount, totalPaid, withFees, doctorsAcc, batchNumbers, expiryDates, user)
-                viewModel.saveVaccination(v, vaccinationId == null, selectedVaccineIds) {
+                val v = VaccinationValidator.createVaccination(vaccinationId, uiState.patientId, uiState.selectedVaccines, uiState.nextBrandSearch, uiState.dateGiven, uiState.nextDueDate, uiState.cost, uiState.cashAmount, uiState.onlineAmount, uiState.totalPaid, uiState.withFees, uiState.doctorsAcc, uiState.batchNumbers, uiState.expiryDates, user)
+                viewModel.saveVaccination(v, vaccinationId == null, uiState.selectedVaccineIds) {
                     scope.launch {
                         ReceiptManager.downloadReceipt(context, patient, v)
                     }

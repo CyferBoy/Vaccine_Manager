@@ -89,12 +89,8 @@ class DueViewModel @Inject constructor(
         _searchQuery.value = query
     }
 
-    fun markAsDone(vaccination: Vaccination) {
-        viewModelScope.launch {
-            val req = findMatchingRequirement(vaccination) ?: return@launch
-            completeVaccinationUseCase.fromRequirement(req, currentUserEmail)
-        }
-    }
+    // Removed markAsDone background action to satisfy "no automatic entry" requirement.
+    // UI now navigates to Add Vaccination screen.
 
     fun dismissReminder(vaccination: Vaccination, reason: String) {
         viewModelScope.launch {

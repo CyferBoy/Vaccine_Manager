@@ -116,24 +116,19 @@ class VaccineWidget : GlanceAppWidget() {
             modifier = GlanceModifier.fillMaxWidth().padding(vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = GlanceModifier.defaultWeight()) {
-                Text(
-                    text = item.patientName,
-                    style = TextStyle(fontSize = 12.sp, color = textColorProvider),
-                    maxLines = 1
-                )
-                Text(
-                    text = item.vaccineName,
-                    style = TextStyle(fontSize = 10.sp, color = otherDateColor),
-                    maxLines = 1
-                )
-            }
+            Text(
+                text = item.patientName,
+                modifier = GlanceModifier.defaultWeight(),
+                style = TextStyle(fontSize = 12.sp, color = textColorProvider),
+                maxLines = 1
+            )
             
             Text(
                 text = item.dueDate,
                 style = TextStyle(
                     fontSize = 11.sp,
-                    color = if (item.isOverdue) overdueColor else otherDateColor
+                    color = if (item.isOverdue) overdueColor else otherDateColor,
+                    fontWeight = if (item.isOverdue) FontWeight.Bold else FontWeight.Normal
                 )
             )
         }

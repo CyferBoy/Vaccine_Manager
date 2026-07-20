@@ -1,6 +1,8 @@
 package com.clinic.neochild.domain.manager
 
 import com.clinic.neochild.core.utils.PatientUtils
+import com.clinic.neochild.core.utils.DateClassifier
+import com.clinic.neochild.core.utils.DateCategory
 import com.clinic.neochild.domain.model.ClinicStats
 import com.clinic.neochild.domain.model.InventoryItem
 import com.clinic.neochild.domain.repository.*
@@ -39,7 +41,7 @@ class ClinicStatsManager @Inject constructor(
             vaccinationRepository.getTodayOnline(todayStr),
             vaccinationRepository.getMonthlyCount(monthPattern),
             vaccinationRepository.getMonthlyRevenue(monthPattern),
-            reminderRepository.getDashboardStats(),
+            reminderRepository.getDueList(), // Use full list to re-calculate stats consistently
             inventoryRepository.getInventoryItems(),
             vaccinationRepository.getVaccineNamesForMonth(monthPattern)
         ) { args ->
@@ -56,11 +58,18 @@ class ClinicStatsManager @Inject constructor(
             @Suppress("UNCHECKED_CAST")
             val monthlyRevenue = args[5] as? Double ?: 0.0
             @Suppress("UNCHECKED_CAST")
-            val reminderStats = args[6] as ReminderStats
+            val dueVaccinations = args[6] as List<com.clinic.neochild.domain.model.Vaccination>
             @Suppress("UNCHECKED_CAST")
             val inventory = args[7] as List<InventoryItem>
             @Suppress("UNCHECKED_CAST")
             val vaccineNamesList = args[8] as List<String>
+
+            val todayCal = DateClassifier.getTodayStart()
+            val dueToday = dueVaccinations.count { DateClassifier.classify(it.nextDueDate, todayCal) is DateCategory.Today }
+            val overdue = dueVaccinations.count { 
+                val cat = DateClassifier.classify(it.nextDueDate, todayCal)
+                cat is DateCategory.Overdue || cat is DateCategory.Yesterday
+            }
 
             val topVaccines = calculateTopVaccines(vaccineNamesList)
 
@@ -71,8 +80,8 @@ class ClinicStatsManager @Inject constructor(
                 todayOnline = todayOnline,
                 monthlyVaccinations = monthlyCount,
                 monthlyRevenue = monthlyRevenue,
-                dueToday = reminderStats.dueToday,
-                overdue = reminderStats.overdue,
+                dueToday = dueToday,
+                overdue = overdue,
                 lowStockCount = inventory.count { it.stock <= it.threshold },
                 topVaccines = topVaccines
             )

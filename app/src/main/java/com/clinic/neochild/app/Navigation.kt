@@ -203,7 +203,12 @@ fun AppNavigation(
         }
 
         composable(Routes.DUE) {
-            DueScreen(onBack = { navController.popBackStack() })
+            DueScreen(
+                onBack = { navController.popBackStack() },
+                onNavigateToAddVaccination = { patientId, vaccineName ->
+                    navController.navigate("add_vaccine_with_details/$patientId/$vaccineName")
+                }
+            )
         }
 
         composable(Routes.WASTE) {
@@ -221,6 +226,22 @@ fun AppNavigation(
             val vaccineId = backStackEntry.arguments?.getString("vaccineId")
             AddVaccineStockScreen(
                 vaccineId = vaccineId,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = "add_vaccine_with_details/{patientId}/{vaccineName}",
+            arguments = listOf(
+                navArgument("patientId") { type = NavType.StringType },
+                navArgument("vaccineName") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val patientId = backStackEntry.arguments?.getString("patientId") ?: ""
+            val vaccineName = backStackEntry.arguments?.getString("vaccineName") ?: ""
+            AddVaccinationScreen(
+                initialPatientId = patientId,
+                initialVaccineName = vaccineName,
                 onBack = { navController.popBackStack() }
             )
         }

@@ -91,7 +91,7 @@ object PatientUtils {
      */
     fun parseDate(dateStr: String): Date? {
         if (dateStr.isBlank()) return null
-        val formats = listOf(Constants.DATE_FORMAT, "d/M/yyyy", "dd/MM/yyyy", "yyyy-MM-dd")
+        val formats = listOf(Constants.DATE_FORMAT, "d/M/yyyy", "dd/MM/yyyy", "yyyy-MM-dd", "yyyy-MM-dd HH:mm:ss")
         for (format in formats) {
             try {
                 val sdf = SimpleDateFormat(format, Locale.ENGLISH)
@@ -99,6 +99,7 @@ object PatientUtils {
                 return sdf.parse(dateStr)
             } catch (_: Exception) {}
         }
+        android.util.Log.e("PatientUtils", "Failed to parse date: $dateStr")
         return null
     }
 

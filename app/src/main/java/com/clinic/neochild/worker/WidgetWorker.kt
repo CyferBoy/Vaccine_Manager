@@ -41,10 +41,19 @@ class WidgetWorker @AssistedInject constructor(
                 val patient = patients[vacc.patientId]
                 val category = DateClassifier.classify(vacc.nextDueDate)
                 
+                // Match original MMM d format for future dates, specific labels for others
+                val displayDate = when (category) {
+                    is DateCategory.Today -> "Today"
+                    is DateCategory.Yesterday -> "Yesterday"
+                    is DateCategory.Tomorrow -> "Tomorrow"
+                    is DateCategory.Overdue -> PatientUtils.formatDateForDisplay(vacc.nextDueDate)
+                    is DateCategory.Future -> PatientUtils.formatDateForDisplay(vacc.nextDueDate)
+                }
+
                 WidgetDueEntity(
                     patientName = patient?.name ?: "Unknown",
                     vaccineName = vacc.nxtVaccineNames.joinToString(", "),
-                    dueDate = DateClassifier.formatDisplay(vacc.nextDueDate),
+                    dueDate = displayDate,
                     isOverdue = category is DateCategory.Overdue || category is DateCategory.Yesterday
                 )
             }

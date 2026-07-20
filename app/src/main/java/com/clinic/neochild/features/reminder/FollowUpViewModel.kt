@@ -72,11 +72,7 @@ class FollowUpViewModel @Inject constructor(
         }
     }
 
-    fun markAsDone(reminder: ReminderEntity) {
-        viewModelScope.launch {
-            completeVaccinationUseCase.fromRequirement(reminder.toPendingRequirement(), currentUserEmail)
-        }
-    }
+    // Removed markAsDone background action to satisfy "no automatic entry" requirement.
 
     fun reschedule(reminder: ReminderEntity, newDate: String, reason: String) {
         viewModelScope.launch {

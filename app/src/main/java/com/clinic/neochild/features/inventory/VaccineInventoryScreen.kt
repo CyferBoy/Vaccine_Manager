@@ -248,10 +248,16 @@ private fun VaccineGroupCard(
                     if (earliestBatch != null) {
                         val statusText = when {
                             InventoryUtils.isExpired(earliestBatch.expiryDate) -> "⚠ Expired"
+                            InventoryUtils.isExpiringToday(earliestBatch.expiryDate) -> "⚠ Expires TODAY"
                             InventoryUtils.isNearExpiry(earliestBatch.expiryDate) -> "⚠ Near Expiry (${InventoryUtils.getDaysUntilExpiry(earliestBatch.expiryDate)} days)"
                             else -> "Exp: ${formatDateForDisplay(earliestBatch.expiryDate)}"
                         }
-                        Text(text = statusText, style = MaterialTheme.typography.bodyMedium, color = if (InventoryUtils.isExpired(earliestBatch.expiryDate)) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+                        val statusColor = when {
+                            InventoryUtils.isExpired(earliestBatch.expiryDate) -> MaterialTheme.colorScheme.error
+                            InventoryUtils.isExpiringToday(earliestBatch.expiryDate) -> Color(0xFFD32F2F) // Deep Red
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                        Text(text = statusText, style = MaterialTheme.typography.bodyMedium, color = statusColor)
                     }
                     
                     if (expanded) {
@@ -299,18 +305,22 @@ private fun VaccineGroupDetails(batches: List<Vaccine>, onMenuRequest: (String) 
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 val isExpired = InventoryUtils.isExpired(vaccine.expiryDate)
-                val isNearExpiry = !isExpired && InventoryUtils.isNearExpiry(vaccine.expiryDate)
+                val isExpiringToday = !isExpired && InventoryUtils.isExpiringToday(vaccine.expiryDate)
+                val isNearExpiry = !isExpired && !isExpiringToday && InventoryUtils.isNearExpiry(vaccine.expiryDate)
                 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = "Batch: ${vaccine.batchNumber}", 
                         style = MaterialTheme.typography.bodyMedium, 
                         fontWeight = FontWeight.Bold,
-                        color = if (isExpired) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                        color = if (isExpired || isExpiringToday) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
                     )
                     if (isExpired) {
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("(EXPIRED)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                    } else if (isExpiringToday) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("(EXPIRES TODAY)", style = MaterialTheme.typography.labelSmall, color = Color(0xFFD32F2F), fontWeight = FontWeight.Bold)
                     } else if (isNearExpiry) {
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("(Near Expiry)", style = MaterialTheme.typography.labelSmall, color = Color(0xFFFFA000))

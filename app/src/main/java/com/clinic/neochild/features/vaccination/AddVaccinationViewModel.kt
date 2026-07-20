@@ -25,7 +25,23 @@ data class AddVaccinationUiState(
     val lowStockThreshold: Int = 5,
     val error: String? = null,
     val isSaved: Boolean = false,
-    val savedVaccination: Vaccination? = null
+    val savedVaccination: Vaccination? = null,
+    
+    // Form State
+    val patientId: String = "",
+    val selectedVaccines: List<String> = emptyList(),
+    val selectedVaccineIds: List<String> = emptyList(),
+    val batchNumbers: List<String> = emptyList(),
+    val expiryDates: List<String> = emptyList(),
+    val nextBrandSearch: String = "",
+    val dateGiven: String = "",
+    val nextDueDate: String = "",
+    val cost: String = "",
+    val cashAmount: String = "",
+    val onlineAmount: String = "",
+    val totalPaid: Double = 0.0,
+    val withFees: Boolean = false,
+    val doctorsAcc: Boolean = false
 )
 
 @HiltViewModel
@@ -48,6 +64,10 @@ class AddVaccinationViewModel @Inject constructor(
 
     init {
         observeInventory()
+    }
+
+    fun toggleShowExpiredBatches(show: Boolean) {
+        _showExpiredBatches.value = show
     }
 
     private fun observeInventory() {
@@ -93,8 +113,104 @@ class AddVaccinationViewModel @Inject constructor(
         }
     }
 
-    fun toggleShowExpiredBatches(show: Boolean) {
-        _showExpiredBatches.value = show
+    fun onPatientIdChange(id: String) {
+        _uiState.update { it.copy(patientId = id) }
+    }
+
+    fun onVaccineSelected(vaccine: Vaccine, batch: VaccineBatchEntity) {
+        _uiState.update { state ->
+            state.copy(
+                selectedVaccines = state.selectedVaccines + vaccine.brandName,
+                selectedVaccineIds = state.selectedVaccineIds + vaccine.id,
+                batchNumbers = state.batchNumbers + batch.batchNumber,
+                expiryDates = state.expiryDates + batch.expiryDate
+            )
+        }
+    }
+
+    fun onRemoveVaccine(index: Int) {
+        _uiState.update { state ->
+            state.copy(
+                selectedVaccines = state.selectedVaccines.toMutableList().apply { removeAt(index) },
+                selectedVaccineIds = state.selectedVaccineIds.toMutableList().apply { removeAt(index) },
+                batchNumbers = state.batchNumbers.toMutableList().apply { removeAt(index) },
+                expiryDates = state.expiryDates.toMutableList().apply { removeAt(index) }
+            )
+        }
+    }
+
+    fun onNextBrandChange(brand: String) {
+        _uiState.update { it.copy(nextBrandSearch = brand) }
+    }
+
+    fun onDateGivenChange(date: String) {
+        _uiState.update { it.copy(dateGiven = date) }
+    }
+
+    fun onNextDueDateChange(date: String) {
+        _uiState.update { it.copy(nextDueDate = date) }
+    }
+
+    fun onCashChange(amount: String) {
+        _uiState.update { state ->
+            val cash = amount.toDoubleOrNull() ?: 0.0
+            val online = state.onlineAmount.toDoubleOrNull() ?: 0.0
+            val total = cash + online
+            state.copy(
+                cashAmount = amount,
+                totalPaid = total,
+                cost = if (total > 0) (if (total % 1.0 == 0.0) total.toInt().toString() else total.toString()) else state.cost
+            )
+        }
+    }
+
+    fun onOnlineChange(amount: String) {
+        _uiState.update { state ->
+            val online = amount.toDoubleOrNull() ?: 0.0
+            val cash = state.cashAmount.toDoubleOrNull() ?: 0.0
+            val total = cash + online
+            state.copy(
+                onlineAmount = amount,
+                totalPaid = total,
+                cost = if (total > 0) (if (total % 1.0 == 0.0) total.toInt().toString() else total.toString()) else state.cost
+            )
+        }
+    }
+
+    fun onCostChange(amount: String) {
+        _uiState.update { it.copy(cost = amount) }
+    }
+
+    fun onFeesToggle(enabled: Boolean) {
+        _uiState.update { it.copy(withFees = enabled) }
+    }
+
+    fun onAccToggle(enabled: Boolean) {
+        _uiState.update { it.copy(doctorsAcc = enabled) }
+    }
+
+    fun prefillForm(v: Vaccination) {
+        _uiState.update { it.copy(
+            patientId = v.patientId,
+            selectedVaccines = v.vaccineNames,
+            batchNumbers = v.batchNumbers,
+            expiryDates = v.expiryDates,
+            nextBrandSearch = v.nxtVaccineNames.joinToString(", "),
+            dateGiven = v.dateGiven,
+            nextDueDate = v.nextDueDate,
+            cost = if (v.cost % 1.0 == 0.0) v.cost.toInt().toString() else v.cost.toString(),
+            cashAmount = if (v.cashAmount % 1.0 == 0.0) v.cashAmount.toInt().toString() else v.cashAmount.toString(),
+            onlineAmount = if (v.onlineAmount % 1.0 == 0.0) v.onlineAmount.toInt().toString() else v.onlineAmount.toString(),
+            totalPaid = v.totalPaid,
+            withFees = v.withFees,
+            doctorsAcc = v.doctorsAcc
+        ) }
+    }
+
+    fun initializeDates(today: String) {
+        if (_uiState.value.dateGiven.isEmpty()) {
+            _uiState.update { it.copy(dateGiven = today) }
+        }
     }
 
     fun loadVaccination(id: String) {

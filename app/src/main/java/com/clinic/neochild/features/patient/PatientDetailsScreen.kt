@@ -36,6 +36,7 @@ fun PatientDetailsScreen(
     }
 
     var vaccinationToDelete by remember { mutableStateOf<Vaccination?>(null) }
+    var vaccinationToMarkDone by remember { mutableStateOf<Vaccination?>(null) }
     var showAuditLog by remember { mutableStateOf(false) }
     var menuExpanded by remember { mutableStateOf(false) }
 
@@ -49,6 +50,23 @@ fun PatientDetailsScreen(
         title = "Delete Vaccination",
         message = "Are you sure you want to delete this vaccination record?"
     )
+
+    if (vaccinationToMarkDone != null) {
+        AlertDialog(
+            onDismissRequest = { vaccinationToMarkDone = null },
+            title = { Text("Mark as Done") },
+            text = { Text("Are you sure you want to mark this vaccination as done?") },
+            confirmButton = {
+                Button(onClick = {
+                    vaccinationToMarkDone?.let { viewModel.markAsDone(it) }
+                    vaccinationToMarkDone = null
+                }) { Text("Confirm") }
+            },
+            dismissButton = {
+                TextButton(onClick = { vaccinationToMarkDone = null }) { Text("Cancel") }
+            }
+        )
+    }
 
     if (showAuditLog) {
         val auditLogs by viewModel.getAuditLogs(patientId).collectAsState(initial = emptyList())
@@ -126,7 +144,7 @@ fun PatientDetailsScreen(
                     vaccinations = patientVaccinations,
                     onEditVaccination = onEditVaccination,
                     onDeleteVaccination = { vaccinationToDelete = it },
-                    onMarkAsDone = { viewModel.markAsDone(it) }
+                    onMarkAsDone = { vaccinationToMarkDone = it }
                 )
             }
         }

@@ -25,6 +25,7 @@ fun FollowUpManagementScreen(
     patientId: String,
     patientName: String,
     onBack: () -> Unit,
+    onNavigateToAddVaccination: (String, String) -> Unit,
     viewModel: FollowUpViewModel = hiltViewModel()
 ) {
     val followUps by viewModel.getPatientFollowUps(patientId).collectAsState(initial = emptyList())
@@ -102,7 +103,10 @@ fun FollowUpManagementScreen(
         FollowUpActionBottomSheet(
             reminder = selectedFollowUp!!,
             onDismiss = { showActionSheet = false },
-            onComplete = { viewModel.markAsDone(it); showActionSheet = false },
+            onComplete = { reminder ->
+                onNavigateToAddVaccination(reminder.patientId, reminder.vaccineName)
+                showActionSheet = false 
+            },
             onDismissReminder = { viewModel.dismissReminder(it, "Staff dismissed"); showActionSheet = false },
             onRestore = { viewModel.restoreReminder(it); showActionSheet = false },
             onDelete = { viewModel.deleteReminder(it); showActionSheet = false }

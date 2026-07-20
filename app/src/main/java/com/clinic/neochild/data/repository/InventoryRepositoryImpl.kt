@@ -66,6 +66,11 @@ class InventoryRepositoryImpl @Inject constructor(
         syncRepository.enqueue("VACCINE", vaccine.id, SyncOperation.CREATE, SyncPriority.MEDIUM)
     }
 
+    override suspend fun updateVaccineDefinition(vaccine: VaccineEntity) {
+        vaccineDao.insertVaccine(vaccine)
+        syncRepository.enqueue("VACCINE", vaccine.id, SyncOperation.UPDATE, SyncPriority.MEDIUM)
+    }
+
     override suspend fun addBatch(batch: VaccineBatchEntity, user: String) {
         database.withTransaction {
             val currentTotal = vaccineDao.getTotalStockForVaccine(batch.vaccineId) ?: 0
@@ -86,6 +91,30 @@ class InventoryRepositoryImpl @Inject constructor(
             // Queue Sync
             syncRepository.enqueue("BATCH", batch.batchId, SyncOperation.CREATE, SyncPriority.MEDIUM)
             // Transactions could also be synced if needed for remote audit
+        }
+    }
+
+    override suspend fun deleteBatch(batchId: String, user: String) {
+        database.withTransaction {
+            val batch = vaccineDao.getBatchById(batchId) ?: return@withTransaction
+            val currentTotal = vaccineDao.getTotalStockForVaccine(batch.vaccineId) ?: 0
+            
+            val updatedBatch = batch.copy(isDeleted = true)
+            vaccineDao.updateBatch(updatedBatch)
+            
+            val transaction = InventoryTransactionEntity(
+                vaccineId = batch.vaccineId,
+                batchId = batch.batchId,
+                transactionType = InventoryTransactionType.MANUAL_ADJUSTMENT.name,
+                quantity = -batch.remainingQuantity,
+                previousQuantity = currentTotal,
+                currentQuantity = currentTotal - batch.remainingQuantity,
+                user = user,
+                notes = "Batch Deleted: ${batch.batchNumber}"
+            )
+            vaccineDao.insertTransaction(transaction)
+            
+            syncRepository.enqueue("BATCH", batchId, SyncOperation.UPDATE, SyncPriority.MEDIUM)
         }
     }
 

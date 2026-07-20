@@ -15,7 +15,9 @@ interface InventoryRepository {
     fun getInventoryTransactions(vaccineId: String): Flow<List<InventoryTransactionEntity>>
     
     suspend fun addVaccineDefinition(vaccine: VaccineEntity)
+    suspend fun updateVaccineDefinition(vaccine: VaccineEntity)
     suspend fun addBatch(batch: VaccineBatchEntity, user: String)
+    suspend fun deleteBatch(batchId: String, user: String)
     
     /**
      * Deduct stock using FEFO (First Expiry First Out)

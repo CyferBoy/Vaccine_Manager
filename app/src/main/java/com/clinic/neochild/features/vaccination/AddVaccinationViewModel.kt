@@ -90,7 +90,8 @@ class AddVaccinationViewModel @Inject constructor(
                         mrp = 0.0,
                         netRate = 0.0
                     )
-                }.sortedBy { it.brandName }
+                }.filter { it.stock > 0 } // Only show vaccines available in inventory
+                 .sortedBy { it.brandName }
 
                 val batchesMap = allBatches
                     .filter { batch -> 

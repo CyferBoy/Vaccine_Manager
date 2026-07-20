@@ -18,6 +18,7 @@ import com.clinic.neochild.features.reminder.DueScreen
 import com.clinic.neochild.features.statistics.MonthlyFinanceDetailsScreen
 import com.clinic.neochild.features.statistics.StatisticsScreen
 import com.clinic.neochild.features.inventory.AddVaccineStockScreen
+import com.clinic.neochild.features.search.SearchScreen
 import com.clinic.neochild.features.vaccination.AddVaccinationScreen
 import com.clinic.neochild.features.inventory.BorrowedScreen
 import com.clinic.neochild.features.inventory.VaccineInventoryScreen
@@ -77,6 +78,9 @@ fun AppNavigation(
                 onSync = {
                     navController.navigate(Routes.SYNC)
                 },
+                onSearch = {
+                    navController.navigate(Routes.SEARCH)
+                },
                 onLogout = {
                     navController.navigate(Routes.LOGIN) {
                         popUpTo(Routes.DASHBOARD) { inclusive = true }
@@ -95,6 +99,15 @@ fun AppNavigation(
 
         composable(Routes.MANAGE_STAFF) {
             ManageStaffScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(Routes.SEARCH) {
+            SearchScreen(
+                onBack = { navController.popBackStack() },
+                onPatientClick = { patientId ->
+                    navController.navigate("patient_details/$patientId")
+                }
+            )
         }
 
         composable(Routes.ADD_PATIENT) {
@@ -225,7 +238,7 @@ fun AppNavigation(
         ) { backStackEntry ->
             val vaccineId = backStackEntry.arguments?.getString("vaccineId")
             AddVaccineStockScreen(
-                vaccineId = vaccineId,
+                batchId = vaccineId,
                 onBack = { navController.popBackStack() }
             )
         }

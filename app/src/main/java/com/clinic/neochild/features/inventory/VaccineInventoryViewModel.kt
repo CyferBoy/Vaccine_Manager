@@ -33,21 +33,19 @@ class VaccineInventoryViewModel @Inject constructor(
         viewModelScope.launch {
             combine(
                 inventoryRepository.getInventoryItems(),
-                inventoryRepository.getAllBatches(),
                 settingsManager.settingsFlow
-            ) { items, allBatches, settings ->
-                val vaccines = allBatches.filter { !it.isDeleted }.map { batch ->
-                    val def = items.find { it.id == batch.vaccineId }
+            ) { items, settings ->
+                val vaccines = items.map { item ->
                     Vaccine(
-                        id = batch.batchId,
-                        type = def?.type ?: "Unknown",
-                        brandName = def?.brandName ?: "Unknown",
-                        companyName = def?.company ?: "",
-                        stock = batch.remainingQuantity,
-                        batchNumber = batch.batchNumber,
-                        expiryDate = batch.expiryDate,
-                        mrp = batch.sellingPrice,
-                        netRate = batch.purchaseCost.toDouble()
+                        id = item.id,
+                        type = item.type,
+                        brandName = item.brandName,
+                        companyName = item.company,
+                        stock = item.stock,
+                        batchNumber = "",
+                        expiryDate = "",
+                        mrp = 0.0,
+                        netRate = 0.0
                     )
                 }.sortedBy { it.brandName.lowercase() }
 

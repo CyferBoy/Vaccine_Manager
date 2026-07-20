@@ -33,6 +33,7 @@ fun DashboardScreen(
     onLogout: () -> Unit = {},
     onSettings: () -> Unit = {},
     onSync: () -> Unit = {},
+    onSearch: () -> Unit = {},
     authViewModel: AuthViewModel = hiltViewModel(),
     dashboardViewModel: DashboardViewModel = hiltViewModel()
 ) {
@@ -59,6 +60,7 @@ fun DashboardScreen(
                     onManageStaff = onManageStaff,
                     onSettings = onSettings,
                     onSync = onSync,
+                    onSearch = onSearch,
                     onLogout = {
                         authViewModel.logout()
                         onLogout()

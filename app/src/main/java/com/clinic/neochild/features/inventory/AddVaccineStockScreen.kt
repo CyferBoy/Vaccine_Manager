@@ -19,18 +19,20 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.clinic.neochild.domain.model.Vaccine
 import com.clinic.neochild.core.ui.*
 import com.clinic.neochild.core.designsystem.NeoChildTheme
-import com.clinic.neochild.data.remote.mapper.FirestoreMappers
-import com.clinic.neochild.core.utils.PatientUtils.formatDateForDisplay
-import com.google.firebase.firestore.FirebaseFirestore
 
 @Composable
 fun AddVaccineStockScreen(
-    vaccineId: String? = null, 
-    onBack: () -> Unit = {}
+    batchId: String? = null,
+    onBack: () -> Unit = {},
+    viewModel: AddVaccineStockViewModel = hiltViewModel()
 ) {
+    val uiState by viewModel.uiState.collectAsState()
+    val editingBatch by viewModel.editingBatch.collectAsState()
+    
     // Form State - using rememberSaveable
     var vaccineType by rememberSaveable { mutableStateOf("") }
     var brandName by rememberSaveable { mutableStateOf("") }
@@ -41,40 +43,47 @@ fun AddVaccineStockScreen(
     var mrp by rememberSaveable { mutableStateOf("") }
     var netRate by rememberSaveable { mutableStateOf("") }
     
-    var allVaccines by remember { mutableStateOf<List<Vaccine>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    LaunchedEffect(batchId) {
+        if (batchId != null) {
+            viewModel.loadBatch(batchId)
+        }
+    }
+
+    LaunchedEffect(editingBatch, uiState.allVaccines) {
+        editingBatch?.let { b ->
+            val def = uiState.allVaccines.find { it.id == b.vaccineId }
+            vaccineType = def?.type ?: ""
+            brandName = def?.brandName ?: ""
+            companyName = b.manufacturer
+            stock = b.remainingQuantity.toString()
+            batchNumber = b.batchNumber
+            expiryDate = b.expiryDate
+            mrp = b.sellingPrice.toString()
+            netRate = b.purchaseCost.toString()
+        }
+    }
+
+    LaunchedEffect(uiState.isSaved) {
+        if (uiState.isSaved) {
+            Toast.makeText(context, "Inventory updated", Toast.LENGTH_SHORT).show()
+            viewModel.resetSaveState()
+            onBack()
+        }
+    }
+
+    LaunchedEffect(uiState.error) {
+        uiState.error?.let {
+            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+            viewModel.resetSaveState()
+        }
+    }
+
     var showDeleteDialog by rememberSaveable { mutableStateOf(false) }
 
-    val context = LocalContext.current
-    val db = FirebaseFirestore.getInstance()
-    
-    LaunchedEffect(Unit) {
-        db.collection("inventory").get().addOnSuccessListener { result ->
-            allVaccines = result.documents.mapNotNull { FirestoreMappers.toVaccine(it) }
-        }
-    }
-    
-    LaunchedEffect(vaccineId) {
-        if (vaccineId != null) {
-            isLoading = true
-            db.collection("inventory").document(vaccineId).get().addOnSuccessListener { doc ->
-                FirestoreMappers.toVaccine(doc)?.let { v ->
-                    vaccineType = v.type
-                    brandName = v.brandName
-                    companyName = v.companyName
-                    stock = v.stock.toString()
-                    batchNumber = v.batchNumber
-                    expiryDate = formatDateForDisplay(v.expiryDate)
-                    mrp = v.mrp.toString()
-                    netRate = v.netRate.toString()
-                }
-                isLoading = false
-            }.addOnFailureListener { isLoading = false }
-        }
-    }
-
     AddVaccineStockContent(
-        isEdit = vaccineId != null,
+        isEdit = batchId != null,
         onBack = onBack,
         vaccineType = vaccineType,
         onTypeChange = { vaccineType = it },
@@ -92,54 +101,36 @@ fun AddVaccineStockScreen(
         onMrpChange = { mrp = it },
         netRate = netRate,
         onNetRateChange = { netRate = it },
-        allVaccines = allVaccines,
-        isLoading = isLoading,
+        allVaccines = uiState.allVaccines,
+        isLoading = uiState.isLoading,
         onDeleteRequest = { showDeleteDialog = true },
         onSave = {
-            if (vaccineType.isBlank() || brandName.isBlank() || stock.isBlank()) {
-                Toast.makeText(context, "Type, Brand and Quantity are required", Toast.LENGTH_SHORT).show()
+            if (vaccineType.isBlank() || brandName.isBlank() || stock.isBlank() || batchNumber.isBlank() || expiryDate.isBlank()) {
+                Toast.makeText(context, "Please fill all required fields", Toast.LENGTH_SHORT).show()
                 return@AddVaccineStockContent
             }
-            isLoading = true
-            val stockInt = stock.toIntOrNull() ?: 0
-            val mrpDouble = mrp.toDoubleOrNull() ?: 0.0
-            val netRateDouble = netRate.toDoubleOrNull() ?: 0.0
             
-            val existingMatch = allVaccines.find { 
-                it.brandName.equals(brandName, true) && it.batchNumber.equals(batchNumber, true) 
-            }
-            
-            val docRef = if (vaccineId != null) db.collection("inventory").document(vaccineId)
-                         else if (existingMatch != null) db.collection("inventory").document(existingMatch.id)
-                         else db.collection("inventory").document()
-
-            val vaccine = Vaccine(docRef.id, vaccineType, brandName, companyName, stockInt, batchNumber, expiryDate, mrpDouble, netRateDouble)
-            docRef.set(vaccine).addOnSuccessListener {
-                isLoading = false
-                Toast.makeText(context, "Inventory updated", Toast.LENGTH_SHORT).show()
-                onBack()
-            }.addOnFailureListener {
-                isLoading = false
-                Toast.makeText(context, "Error: ${it.message}", Toast.LENGTH_LONG).show()
-            }
+            viewModel.saveStock(
+                editingBatchId = batchId,
+                type = vaccineType,
+                brandName = brandName,
+                companyName = companyName,
+                batchNumber = batchNumber,
+                quantity = stock.toIntOrNull() ?: 0,
+                expiryDate = expiryDate,
+                mrp = mrp.toDoubleOrNull() ?: 0.0,
+                netRate = netRate.toDoubleOrNull() ?: 0.0
+            )
         }
     )
 
-    if (showDeleteDialog && vaccineId != null) {
+    if (showDeleteDialog && batchId != null) {
         DeleteConfirmationDialog(
             show = true,
             onDismiss = { showDeleteDialog = false },
             onConfirm = {
                 showDeleteDialog = false
-                isLoading = true
-                db.collection("inventory").document(vaccineId).delete().addOnSuccessListener {
-                    isLoading = false
-                    Toast.makeText(context, "Batch deleted", Toast.LENGTH_SHORT).show()
-                    onBack()
-                }.addOnFailureListener {
-                    isLoading = false
-                    Toast.makeText(context, "Error: ${it.message}", Toast.LENGTH_SHORT).show()
-                }
+                viewModel.deleteBatch(batchId)
             },
             title = "Delete Batch",
             message = "Are you sure you want to delete this batch?"

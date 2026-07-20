@@ -38,7 +38,6 @@ fun AddVaccinationScreen(
 
     var showFollowUpDialog by remember { mutableStateOf(false) }
     var showBatchSelectionDialog by remember { mutableStateOf(false) }
-    var batchesToSelectFrom by remember { mutableStateOf<List<com.clinic.neochild.data.local.entity.VaccineBatchEntity>>(emptyList()) }
     var currentVaccineSelecting by remember { mutableStateOf<Vaccine?>(null) }
 
     // Initialize initial data
@@ -68,12 +67,8 @@ fun AddVaccinationScreen(
         if (vaccinationId == null && initialVaccineName != null && uiState.selectedVaccines.isEmpty() && uiState.inventory.isNotEmpty()) {
             val matching = uiState.inventory.find { it.brandName.equals(initialVaccineName, ignoreCase = true) }
             if (matching != null) {
-                val allBatches = uiState.activeBatches[matching.id] ?: emptyList()
-                if (allBatches.isNotEmpty()) {
-                    currentVaccineSelecting = matching
-                    batchesToSelectFrom = allBatches
-                    showBatchSelectionDialog = true
-                }
+                currentVaccineSelecting = matching
+                showBatchSelectionDialog = true
             }
         }
     }
@@ -111,6 +106,8 @@ fun AddVaccinationScreen(
     }
 
     if (showBatchSelectionDialog && currentVaccineSelecting != null) {
+        val batches = uiState.activeBatches[currentVaccineSelecting?.id] ?: emptyList()
+        
         AlertDialog(
             onDismissRequest = { showBatchSelectionDialog = false },
             title = { Text("Select Batch for ${currentVaccineSelecting?.brandName}") },
@@ -125,7 +122,11 @@ fun AddVaccinationScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
                     
-                    batchesToSelectFrom.forEach { batch ->
+                    if (batches.isEmpty()) {
+                        Text("No active batches available.", color = MaterialTheme.colorScheme.error)
+                    }
+
+                    batches.forEach { batch ->
                         val isExpired = InventoryUtils.isExpired(batch.expiryDate)
                         val isExpiringToday = !isExpired && InventoryUtils.isExpiringToday(batch.expiryDate)
                         val isNearExpiry = !isExpired && !isExpiringToday && InventoryUtils.isNearExpiry(batch.expiryDate)
@@ -183,14 +184,8 @@ fun AddVaccinationScreen(
         selectedVaccines = uiState.selectedVaccines,
         onVaccineSelected = { v ->
             if (!uiState.selectedVaccines.contains(v.brandName)) {
-                val allBatches = uiState.activeBatches[v.id] ?: emptyList()
-                if (allBatches.isNotEmpty()) {
-                    currentVaccineSelecting = v
-                    batchesToSelectFrom = allBatches
-                    showBatchSelectionDialog = true
-                } else {
-                    Toast.makeText(context, "No active batches for ${v.brandName}", Toast.LENGTH_SHORT).show()
-                }
+                currentVaccineSelecting = v
+                showBatchSelectionDialog = true
             }
         },
         onRemoveVaccine = viewModel::onRemoveVaccine,

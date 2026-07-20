@@ -23,6 +23,7 @@ fun DashboardTopBar(
     onManageStaff: () -> Unit,
     onSettings: () -> Unit,
     onSync: () -> Unit,
+    onSearch: () -> Unit,
     onLogout: () -> Unit
 ) {
     var profileMenuExpanded by remember { mutableStateOf(false) }
@@ -30,6 +31,9 @@ fun DashboardTopBar(
     TopAppBar(
         title = { Text("Neo Child Clinic", fontWeight = FontWeight.SemiBold) },
         actions = {
+            IconButton(onClick = onSearch) {
+                Icon(Icons.Default.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.onBackground)
+            }
             Box {
                 IconButton(onClick = { profileMenuExpanded = true }) {
                     Surface(

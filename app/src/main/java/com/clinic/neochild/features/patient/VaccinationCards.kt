@@ -18,6 +18,7 @@ import androidx.lifecycle.lifecycleScope
 import com.clinic.neochild.domain.model.Patient
 import com.clinic.neochild.domain.model.Vaccination
 import com.clinic.neochild.core.utils.DateClassifier
+import com.clinic.neochild.core.utils.DateCategory
 import com.clinic.neochild.core.utils.PatientUtils.cleanVaccineName
 import com.clinic.neochild.core.utils.PatientUtils.formatDateForDisplay
 import com.clinic.neochild.core.utils.ReceiptManager
@@ -163,9 +164,9 @@ fun VaccinationCardDates(vaccination: Vaccination) {
                 if (vaccination.isDone) {
                     Text(text = "✅ Done", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color(0xFF4CAF50))
                 } else {
-                    val isActuallyOverdue = !vaccination.isDone && vaccination.nextDueDate.isNotBlank() && 
-                        (DateClassifier.classify(vaccination.nextDueDate) is com.clinic.neochild.core.utils.DateCategory.Overdue || 
-                         DateClassifier.classify(vaccination.nextDueDate) is com.clinic.neochild.core.utils.DateCategory.Yesterday)
+                    val category = if (vaccination.nextDueDate.isNotBlank()) DateClassifier.classify(vaccination.nextDueDate) else null
+                    val isActuallyOverdue = !vaccination.isDone && category != null && 
+                        (category is DateCategory.Overdue || category is DateCategory.Yesterday)
                     
                     Text(
                         text = if (isActuallyOverdue) "⏰ Overdue" else "⏰ Due", 

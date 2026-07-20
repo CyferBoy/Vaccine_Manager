@@ -63,7 +63,7 @@ fun VaccineInventoryScreen(
         show = vaccineToDelete != null,
         onDismiss = { vaccineToDelete = null },
         onConfirm = {
-            vaccineToDelete?.id?.let { deleteFirestoreDocument(context, "inventory", it) }
+            vaccineToDelete?.let { viewModel.deleteBatch(it) }
             vaccineToDelete = null
         },
         title = "Delete Vaccine",

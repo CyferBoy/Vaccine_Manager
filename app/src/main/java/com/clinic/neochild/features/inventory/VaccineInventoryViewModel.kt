@@ -59,4 +59,16 @@ class VaccineInventoryViewModel @Inject constructor(
             }
         }
     }
+
+    fun deleteBatch(vaccine: Vaccine) {
+        viewModelScope.launch {
+            try {
+                val user = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.email ?: "Unknown"
+                // The Vaccine model's id is actually the batchId in the inventory list
+                inventoryRepository.deleteBatch(vaccine.id, user)
+            } catch (_: Exception) {
+                // Handle error
+            }
+        }
+    }
 }

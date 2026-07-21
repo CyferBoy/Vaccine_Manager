@@ -37,7 +37,8 @@ class VaccinationManager @Inject constructor(
         user: String,
         isNew: Boolean = true,
         selectedVaccineIds: List<String> = emptyList(),
-        requirement: PendingRequirement? = null
+        requirement: PendingRequirement? = null,
+        selectedBatchIds: List<String> = emptyList()
     ) {
         database.withTransaction {
             // 1. Add/Update Vaccination Record
@@ -45,15 +46,28 @@ class VaccinationManager @Inject constructor(
 
             // 2. Inventory Management (Only for new vaccinations to prevent duplicate deduction)
             if (isNew) {
-                selectedVaccineIds.forEach { vaccineId ->
-                    inventoryRepository.deductStock(
-                        vaccineId = vaccineId,
-                        quantity = 1,
-                        user = user,
-                        transactionType = InventoryTransactionType.VACCINATION,
-                        vaccinationId = vaccination.id,
-                        patientId = vaccination.patientId
-                    )
+                if (selectedBatchIds.isNotEmpty()) {
+                    // Deduct from specific batches if provided
+                    selectedBatchIds.forEach { batchId ->
+                        inventoryRepository.deductStockFromBatch(
+                            batchId = batchId,
+                            quantity = 1,
+                            user = user,
+                            transactionType = InventoryTransactionType.VACCINATION
+                        )
+                    }
+                } else {
+                    // Fallback to FEFO by vaccineId
+                    selectedVaccineIds.forEach { vaccineId ->
+                        inventoryRepository.deductStock(
+                            vaccineId = vaccineId,
+                            quantity = 1,
+                            user = user,
+                            transactionType = InventoryTransactionType.VACCINATION,
+                            vaccinationId = vaccination.id,
+                            patientId = vaccination.patientId
+                        )
+                    }
                 }
             }
 

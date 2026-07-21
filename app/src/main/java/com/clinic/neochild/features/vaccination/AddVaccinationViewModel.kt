@@ -31,6 +31,7 @@ data class AddVaccinationUiState(
     val patientId: String = "",
     val selectedVaccines: List<String> = emptyList(),
     val selectedVaccineIds: List<String> = emptyList(),
+    val selectedBatchIds: List<String> = emptyList(),
     val batchNumbers: List<String> = emptyList(),
     val expiryDates: List<String> = emptyList(),
     val nextBrandSearch: String = "",
@@ -90,7 +91,7 @@ class AddVaccinationViewModel @Inject constructor(
                         mrp = 0.0,
                         netRate = 0.0
                     )
-                }.filter { it.stock > 0 } // Only show vaccines available in inventory
+                }.filter { it.stock > 0 }
                  .sortedBy { it.brandName }
 
                 val batchesMap = allBatches
@@ -104,12 +105,14 @@ class AddVaccinationViewModel @Inject constructor(
                         entry.value.sortedBy { it.expiryDate } // FEFO sorting
                     }
 
-                _uiState.value = _uiState.value.copy(
-                    inventory = vaccines,
-                    activeBatches = batchesMap,
-                    showExpiredBatches = showExpired,
-                    lowStockThreshold = settings.lowStockThreshold
-                )
+                _uiState.update { 
+                    it.copy(
+                        inventory = vaccines,
+                        activeBatches = batchesMap,
+                        showExpiredBatches = showExpired,
+                        lowStockThreshold = settings.lowStockThreshold
+                    )
+                }
             }.collect()
         }
     }
@@ -123,6 +126,7 @@ class AddVaccinationViewModel @Inject constructor(
             state.copy(
                 selectedVaccines = state.selectedVaccines + vaccine.brandName,
                 selectedVaccineIds = state.selectedVaccineIds + vaccine.id,
+                selectedBatchIds = state.selectedBatchIds + batch.batchId,
                 batchNumbers = state.batchNumbers + batch.batchNumber,
                 expiryDates = state.expiryDates + batch.expiryDate
             )
@@ -134,6 +138,7 @@ class AddVaccinationViewModel @Inject constructor(
             state.copy(
                 selectedVaccines = state.selectedVaccines.toMutableList().apply { removeAt(index) },
                 selectedVaccineIds = state.selectedVaccineIds.toMutableList().apply { removeAt(index) },
+                selectedBatchIds = state.selectedBatchIds.toMutableList().apply { removeAt(index) },
                 batchNumbers = state.batchNumbers.toMutableList().apply { removeAt(index) },
                 expiryDates = state.expiryDates.toMutableList().apply { removeAt(index) }
             )
@@ -226,13 +231,14 @@ class AddVaccinationViewModel @Inject constructor(
         vaccination: Vaccination,
         isNew: Boolean,
         selectedVaccineIds: List<String>,
+        selectedBatchIds: List<String>,
         onSuccess: () -> Unit
     ) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             try {
                 val user = FirebaseAuth.getInstance().currentUser?.email ?: "Unknown"
-                completeVaccinationUseCase(vaccination, isNew, selectedVaccineIds, user)
+                completeVaccinationUseCase(vaccination, isNew, selectedVaccineIds, user, selectedBatchIds = selectedBatchIds)
                 _uiState.value = _uiState.value.copy(isSaved = true, savedVaccination = vaccination)
                 onSuccess()
             } catch (e: Exception) {

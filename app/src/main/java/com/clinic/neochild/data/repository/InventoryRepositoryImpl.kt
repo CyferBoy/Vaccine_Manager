@@ -37,15 +37,16 @@ class InventoryRepositoryImpl @Inject constructor(
             vaccineDao.getAllBatches()
         ) { definitions, batches ->
             definitions.map { def ->
-                val stock = batches.filter { it.vaccineId == def.id && !it.isDeleted }
-                    .sumOf { it.remainingQuantity }
+                val vaccineBatches = batches.filter { it.vaccineId == def.id }
+                val stock = vaccineBatches.sumOf { it.remainingQuantity }
                 com.clinic.neochild.domain.model.InventoryItem(
                     id = def.id,
                     brandName = def.brandName,
                     stock = stock,
                     threshold = def.lowStockThreshold,
                     type = def.type,
-                    company = def.companyName
+                    company = def.companyName,
+                    batches = vaccineBatches
                 )
             }
         }

@@ -35,18 +35,38 @@ class VaccineInventoryViewModel @Inject constructor(
                 inventoryRepository.getInventoryItems(),
                 settingsManager.settingsFlow
             ) { items, settings ->
-                val vaccines = items.map { item ->
-                    Vaccine(
-                        id = item.id,
-                        type = item.type,
-                        brandName = item.brandName,
-                        companyName = item.company,
-                        stock = item.stock,
-                        batchNumber = "",
-                        expiryDate = "",
-                        mrp = 0.0,
-                        netRate = 0.0
-                    )
+                val vaccines = items.flatMap { item ->
+                    if (item.batches.isEmpty()) {
+                        // Still show vaccines with 0 stock as a placeholder if needed, 
+                        // or just skip. The UI currently shows groups based on this list.
+                        listOf(
+                            Vaccine(
+                                id = item.id, // This will be the vaccineId
+                                type = item.type,
+                                brandName = item.brandName,
+                                companyName = item.company,
+                                stock = 0,
+                                batchNumber = "No Stock",
+                                expiryDate = "",
+                                mrp = 0.0,
+                                netRate = 0.0
+                            )
+                        )
+                    } else {
+                        item.batches.map { batch ->
+                            Vaccine(
+                                id = batch.batchId, // Now it's the BATCH ID
+                                type = item.type,
+                                brandName = item.brandName,
+                                companyName = item.company,
+                                stock = batch.remainingQuantity,
+                                batchNumber = batch.batchNumber,
+                                expiryDate = batch.expiryDate,
+                                mrp = batch.sellingPrice,
+                                netRate = batch.purchaseCost
+                            )
+                        }
+                    }
                 }.sortedBy { it.brandName.lowercase() }
 
                 VaccineInventoryUiState(

@@ -212,7 +212,7 @@ fun AddVaccinationScreen(
             if (VaccinationValidator.validateForm(context, uiState.patientId, uiState.selectedVaccines)) {
                 val user = FirebaseAuth.getInstance().currentUser?.email ?: "Unknown"
                 val v = VaccinationValidator.createVaccination(vaccinationId, uiState.patientId, uiState.selectedVaccines, uiState.nextBrandSearch, uiState.dateGiven, uiState.nextDueDate, uiState.cost, uiState.cashAmount, uiState.onlineAmount, uiState.totalPaid, uiState.withFees, uiState.doctorsAcc, uiState.batchNumbers, uiState.expiryDates, user)
-                viewModel.saveVaccination(v, vaccinationId == null, uiState.selectedVaccineIds) {}
+                viewModel.saveVaccination(v, vaccinationId == null, uiState.selectedVaccineIds, uiState.selectedBatchIds) {}
             }
         },
         onSaveAndDownload = {
@@ -220,7 +220,7 @@ fun AddVaccinationScreen(
             if (VaccinationValidator.validateForm(context, uiState.patientId, uiState.selectedVaccines) && patient != null) {
                 val user = FirebaseAuth.getInstance().currentUser?.email ?: "Unknown"
                 val v = VaccinationValidator.createVaccination(vaccinationId, uiState.patientId, uiState.selectedVaccines, uiState.nextBrandSearch, uiState.dateGiven, uiState.nextDueDate, uiState.cost, uiState.cashAmount, uiState.onlineAmount, uiState.totalPaid, uiState.withFees, uiState.doctorsAcc, uiState.batchNumbers, uiState.expiryDates, user)
-                viewModel.saveVaccination(v, vaccinationId == null, uiState.selectedVaccineIds) {
+                viewModel.saveVaccination(v, vaccinationId == null, uiState.selectedVaccineIds, uiState.selectedBatchIds) {
                     scope.launch {
                         ReceiptManager.downloadReceipt(context, patient, v)
                     }

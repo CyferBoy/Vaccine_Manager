@@ -100,17 +100,19 @@ fun FollowUpManagementScreen(
     }
 
     if (showActionSheet && selectedFollowUp != null) {
-        FollowUpActionBottomSheet(
-            reminder = selectedFollowUp!!,
-            onDismiss = { showActionSheet = false },
-            onComplete = { reminder ->
-                onNavigateToAddVaccination(reminder.patientId, reminder.vaccineName)
-                showActionSheet = false 
-            },
-            onDismissReminder = { viewModel.dismissReminder(it, "Staff dismissed"); showActionSheet = false },
-            onRestore = { viewModel.restoreReminder(it); showActionSheet = false },
-            onDelete = { viewModel.deleteReminder(it); showActionSheet = false }
-        )
+        selectedFollowUp?.let { followUp ->
+            FollowUpActionBottomSheet(
+                reminder = followUp,
+                onDismiss = { showActionSheet = false },
+                onComplete = { reminder ->
+                    onNavigateToAddVaccination(reminder.patientId, reminder.vaccineName)
+                    showActionSheet = false 
+                },
+                onDismissReminder = { viewModel.dismissReminder(it, "Staff dismissed"); showActionSheet = false },
+                onRestore = { viewModel.restoreReminder(it); showActionSheet = false },
+                onDelete = { viewModel.deleteReminder(it); showActionSheet = false }
+            )
+        }
     }
 }
 

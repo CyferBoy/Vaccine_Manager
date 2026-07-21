@@ -105,7 +105,7 @@ fun DueTab(
         ManageDueBottomSheet(
             onDismiss = { showManageSheet = false },
             onMarkAsDone = { 
-                onMarkAsDone(selectedVaccination!!)
+                selectedVaccination?.let { onMarkAsDone(it) }
                 showManageSheet = false 
             },
             onDismissReminder = {
@@ -138,7 +138,7 @@ fun DueTab(
             },
             confirmButton = {
                 Button(onClick = {
-                    onDismissReminder(selectedVaccination!!, reason)
+                    selectedVaccination?.let { onDismissReminder(it, reason) }
                     showDismissDialog = false
                 }) { Text("Dismiss") }
             },
@@ -152,7 +152,7 @@ fun DueTab(
         RescheduleDialog(
             onDismiss = { showReschedulePicker = false },
             onConfirm = { newDate, reminderDate, reason ->
-                onReschedule(selectedVaccination!!, newDate, reminderDate, reason)
+                selectedVaccination?.let { onReschedule(it, newDate, reminderDate, reason) }
                 showReschedulePicker = false
             }
         )
@@ -162,7 +162,7 @@ fun DueTab(
         VaccinatedElsewhereBottomSheet(
             onDismiss = { showElsewhereSheet = false },
             onSave = { source, date, notes ->
-                onVaccinatedElsewhere(selectedVaccination!!, source, date, notes)
+                selectedVaccination?.let { onVaccinatedElsewhere(it, source, date, notes) }
                 showElsewhereSheet = false
             }
         )

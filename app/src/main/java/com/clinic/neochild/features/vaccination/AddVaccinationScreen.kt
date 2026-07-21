@@ -53,8 +53,9 @@ fun AddVaccinationScreen(
         }
     }
 
-    LaunchedEffect(viewModel.vaccination.collectAsState().value) {
-        viewModel.vaccination.value?.let { viewModel.prefillForm(it) }
+    val currentVaccination by viewModel.vaccination.collectAsState()
+    LaunchedEffect(currentVaccination) {
+        currentVaccination?.let { viewModel.prefillForm(it) }
     }
 
     LaunchedEffect(Unit) {
@@ -158,7 +159,7 @@ fun AddVaccinationScreen(
                                 if (isExpired) {
                                     Toast.makeText(context, "Cannot select expired batch for vaccination", Toast.LENGTH_LONG).show()
                                 } else {
-                                    viewModel.onVaccineSelected(currentVaccineSelecting!!, batch)
+                                    currentVaccineSelecting?.let { viewModel.onVaccineSelected(it, batch) }
                                     showBatchSelectionDialog = false
                                 }
                             }

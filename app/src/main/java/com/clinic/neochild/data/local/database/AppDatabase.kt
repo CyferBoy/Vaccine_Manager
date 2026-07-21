@@ -180,6 +180,7 @@ abstract class AppDatabase : RoomDatabase() {
                 val factory = SupportOpenHelperFactory(passphrase)
                 
                 val dbFile = context.getDatabasePath("neochild_db")
+                
                 if (dbFile.exists()) {
                     try {
                         net.zetetic.database.sqlcipher.SQLiteDatabase.openDatabase(
@@ -190,7 +191,9 @@ abstract class AppDatabase : RoomDatabase() {
                             null
                         ).close()
                     } catch (e: Exception) {
-                        // Handle key mismatches if necessary, but prefer migrations in production.
+                        // Key mismatch or corruption. Since we use EncryptedSharedPreferences for the key,
+                        // if that failed and was reset in SecurityUtils, we must recreate the database.
+                        context.deleteDatabase("neochild_db")
                     }
                 }
 

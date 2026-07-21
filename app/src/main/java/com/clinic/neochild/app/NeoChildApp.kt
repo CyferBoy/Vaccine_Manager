@@ -33,12 +33,18 @@ class NeoChildApp : Application(), Configuration.Provider {
             .build()
 
     override fun onCreate() {
-        super.onCreate()
-        
+        // Initialize Firebase and SQLCipher before Hilt injection (which happens in super.onCreate)
         setupFirebaseAppCheck()
-
+        
         // Manually load SQLCipher native library (Required for version 4.6.1+ and 16KB support)
-        System.loadLibrary("sqlcipher")
+        try {
+            System.loadLibrary("sqlcipher")
+        } catch (e: UnsatisfiedLinkError) {
+            Log.e(TAG, "Failed to load sqlcipher library", e)
+        }
+
+        super.onCreate()
+
         setupSync()
         
         val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default)

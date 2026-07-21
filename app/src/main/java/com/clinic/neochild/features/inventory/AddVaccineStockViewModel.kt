@@ -124,6 +124,19 @@ class AddVaccineStockViewModel @Inject constructor(
         }
     }
 
+    fun deleteBatch(batchId: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            try {
+                val user = FirebaseAuth.getInstance().currentUser?.email ?: "Unknown"
+                inventoryRepository.deleteBatch(batchId, user)
+                _uiState.update { it.copy(isSaved = true, isLoading = false) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = e.message, isLoading = false) }
+            }
+        }
+    }
+
     fun resetSaveState() {
         _uiState.update { it.copy(isSaved = false, error = null) }
     }

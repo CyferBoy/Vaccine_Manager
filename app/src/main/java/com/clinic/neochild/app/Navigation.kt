@@ -184,7 +184,7 @@ fun AppNavigation(
             VaccineInventoryScreen(
                 onBack = { navController.popBackStack() },
                 onAddVaccine = { navController.navigate(Routes.ADD_VACCINE_STOCK) },
-                onEditVaccine = { id ->
+                onEditBatch = { id ->
                     navController.navigate("edit_vaccine_stock/$id")
                 }
             )

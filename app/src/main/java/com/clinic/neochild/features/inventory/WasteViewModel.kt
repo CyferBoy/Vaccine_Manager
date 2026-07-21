@@ -41,21 +41,21 @@ class WasteViewModel @Inject constructor(
 
     val uiState: StateFlow<WasteUiState> = combine(
         wasteRepository.getAllWaste(),
-        inventoryRepository.getAllVaccines(),
-        inventoryRepository.getAllBatches(),
+        inventoryRepository.getInventoryItems(),
         _isSaving,
         _error
-    ) { waste, vaccines, batches, saving, err ->
-        val inventoryItems = batches.filter { !it.isDeleted && it.remainingQuantity > 0 }.map { batch ->
-            val vaccine = vaccines.find { it.id == batch.vaccineId }
-            WasteInventoryItem(
-                vaccineId = batch.vaccineId,
-                batchId = batch.batchId,
-                brandName = vaccine?.brandName ?: "Unknown Vaccine",
-                batchNumber = batch.batchNumber,
-                expiryDate = batch.expiryDate,
-                remainingQuantity = batch.remainingQuantity
-            )
+    ) { waste, inventory, saving, err ->
+        val inventoryItems = inventory.flatMap { item ->
+            item.batches.filter { it.remainingQuantity > 0 }.map { batch ->
+                WasteInventoryItem(
+                    vaccineId = item.id,
+                    batchId = batch.batchId,
+                    brandName = item.brandName,
+                    batchNumber = batch.batchNumber,
+                    expiryDate = batch.expiryDate,
+                    remainingQuantity = batch.remainingQuantity
+                )
+            }
         }
         
         WasteUiState(

@@ -3,6 +3,7 @@ package com.clinic.neochild.features.inventory
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.clinic.neochild.core.model.BorrowedVaccine
+import com.clinic.neochild.domain.model.InventoryItem
 import com.clinic.neochild.domain.model.InventoryTransactionType
 import com.clinic.neochild.domain.repository.InventoryRepository
 import com.clinic.neochild.data.remote.mapper.FirestoreMappers
@@ -18,6 +19,7 @@ import javax.inject.Inject
 
 data class BorrowedUiState(
     val borrowedList: List<BorrowedVaccine> = emptyList(),
+    val inventory: List<InventoryItem> = emptyList(),
     val isLoading: Boolean = false,
     val selectedTab: Int = 0
 )
@@ -33,9 +35,12 @@ class BorrowedViewModel @Inject constructor(
     private val _selectedTab = MutableStateFlow(0)
 
     val uiState: StateFlow<BorrowedUiState> = combine(
-        _borrowedList, _isLoading, _selectedTab
-    ) { borrowed, loading, tab ->
-        BorrowedUiState(borrowed, loading, tab)
+        _borrowedList, 
+        inventoryRepository.getInventoryItems(),
+        _isLoading, 
+        _selectedTab
+    ) { borrowed, inv, loading, tab ->
+        BorrowedUiState(borrowed, inv, loading, tab)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), BorrowedUiState(isLoading = true))
 
     private var borrowedListener: ListenerRegistration? = null

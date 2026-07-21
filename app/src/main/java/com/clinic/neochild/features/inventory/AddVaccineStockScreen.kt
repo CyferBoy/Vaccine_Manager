@@ -22,6 +22,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.clinic.neochild.domain.model.InventoryItem
 import com.clinic.neochild.core.ui.*
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddVaccineStockScreen(
     batchId: String? = null,
@@ -83,9 +84,18 @@ fun AddVaccineStockScreen(
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
-                StandardTopAppBar(
-                    title = if (batchId != null) "Edit Batch" else "Add Stock",
-                    onBack = onBack
+                TopAppBar(
+                    title = { Text(if (batchId != null) "Edit Batch" else "Add Stock") },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                        navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    )
                 )
             },
         ) { paddingValues ->

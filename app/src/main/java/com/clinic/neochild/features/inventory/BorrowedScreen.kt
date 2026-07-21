@@ -21,7 +21,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.clinic.neochild.core.model.BorrowedVaccine
-import com.clinic.neochild.domain.model.Vaccine
+import com.clinic.neochild.domain.model.InventoryItem
 import com.clinic.neochild.core.ui.StandardAutoCompleteField
 import com.clinic.neochild.core.ui.StandardButton
 import com.clinic.neochild.core.ui.StandardTextField
@@ -222,7 +222,7 @@ private fun BorrowedItemCard(
 fun BorrowedEditDialog(
     item: BorrowedVaccine?,
     defaultType: String,
-    inventory: List<Vaccine>,
+    inventory: List<InventoryItem>,
     onDismiss: () -> Unit,
     onSave: (BorrowedVaccine) -> Unit
 ) {
@@ -285,8 +285,9 @@ fun BorrowedEditDialog(
                                 text = { Text("${v.brandName} (${v.type})") },
                                 onClick = {
                                     vaccineName = v.brandName
-                                    batchNumber = v.batchNumber
-                                    expiryDate = v.expiryDate
+                                    val firstBatch = v.batches.firstOrNull()
+                                    batchNumber = firstBatch?.batchNumber ?: ""
+                                    expiryDate = firstBatch?.expiryDate ?: ""
                                     expanded = false
                                 }
                             )

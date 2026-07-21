@@ -2,6 +2,7 @@ package com.clinic.neochild.features.dashboard
 
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
+import com.clinic.neochild.domain.repository.SyncManager
 import com.google.firebase.auth.FirebaseAuth
 import androidx.compose.runtime.State
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -9,7 +10,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class AuthViewModel @Inject constructor(
-    private val auth: FirebaseAuth
+    private val auth: FirebaseAuth,
+    private val syncManager: SyncManager
 ) : ViewModel() {
 
     private val _isLoading = mutableStateOf(false)
@@ -30,6 +32,7 @@ class AuthViewModel @Inject constructor(
         auth.signInWithEmailAndPassword(email, pass)
             .addOnSuccessListener {
                 _isLoading.value = false
+                syncManager.scheduleImmediateSync()
                 onSuccess()
             }
             .addOnFailureListener {

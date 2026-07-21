@@ -36,4 +36,28 @@ class SyncViewModel @Inject constructor(
             syncRepository.clearSyncedItems()
         }
     }
+
+    fun retryItem(queueId: Long) {
+        viewModelScope.launch {
+            syncRepository.retryItem(queueId)
+        }
+    }
+
+    fun deleteItem(queueId: Long) {
+        viewModelScope.launch {
+            syncRepository.deleteQueueItem(queueId)
+        }
+    }
+
+    fun retryAllFailed() {
+        viewModelScope.launch {
+            syncRepository.retryFailedItems()
+        }
+    }
+
+    fun deleteAllFailed() {
+        viewModelScope.launch {
+            syncRepository.deleteAllFailed()
+        }
+    }
 }

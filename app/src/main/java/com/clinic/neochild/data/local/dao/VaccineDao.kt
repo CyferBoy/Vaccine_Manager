@@ -21,6 +21,9 @@ interface VaccineDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertVaccines(vaccines: List<VaccineEntity>)
 
+    @Update
+    suspend fun updateVaccine(vaccine: VaccineEntity)
+
     // Batches
     @Query("SELECT * FROM vaccine_batches WHERE vaccineId = :vaccineId AND isDeleted = 0 AND remainingQuantity > 0 ORDER BY expiryDate ASC")
     suspend fun getActiveBatchesByExpiry(vaccineId: String): List<VaccineBatchEntity>
@@ -30,6 +33,9 @@ interface VaccineDao {
 
     @Query("SELECT * FROM vaccine_batches WHERE vaccineId = :vaccineId AND isDeleted = 0")
     fun getBatchesByVaccine(vaccineId: String): Flow<List<VaccineBatchEntity>>
+
+    @Query("SELECT * FROM vaccine_batches WHERE vaccineId = :vaccineId AND isDeleted = 0")
+    suspend fun getBatchesByVaccineSync(vaccineId: String): List<VaccineBatchEntity>
 
     @Query("SELECT * FROM vaccine_batches WHERE batchId = :batchId LIMIT 1")
     suspend fun getBatchById(batchId: String): VaccineBatchEntity?

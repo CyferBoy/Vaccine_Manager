@@ -184,6 +184,23 @@ class InventoryRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun deleteVaccine(vaccineId: String, user: String) {
+        database.withTransaction {
+            val vaccine = vaccineDao.getVaccineById(vaccineId) ?: return@withTransaction
+            val batches = vaccineDao.getBatchesByVaccineSync(vaccineId)
+            
+            for (batch in batches) {
+                if (!batch.isDeleted) {
+                    deleteBatch(batch.batchId, user)
+                }
+            }
+            
+            vaccineDao.updateVaccine(vaccine.copy(isDeleted = true))
+            auditLogger.logAction("Vaccine Deleted", user, "Vaccine: ${vaccine.brandName}")
+            syncRepository.enqueue("VACCINE", vaccineId, SyncOperation.UPDATE, SyncPriority.MEDIUM)
+        }
+    }
+
     override suspend fun deductStock(
         vaccineId: String,
         quantity: Int,

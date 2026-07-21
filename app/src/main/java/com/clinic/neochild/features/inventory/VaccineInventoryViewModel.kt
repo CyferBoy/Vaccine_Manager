@@ -76,4 +76,13 @@ class VaccineInventoryViewModel @Inject constructor(
             } catch (_: Exception) { }
         }
     }
+
+    fun deleteVaccine(vaccineId: String) {
+        viewModelScope.launch {
+            try {
+                val user = FirebaseAuth.getInstance().currentUser?.email ?: "Unknown"
+                inventoryRepository.deleteVaccine(vaccineId, user)
+            } catch (_: Exception) { }
+        }
+    }
 }

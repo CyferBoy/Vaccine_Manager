@@ -101,6 +101,7 @@ dependencies {
 
     // Security for encryption key management
     implementation(libs.androidx.security.crypto)
+    implementation(libs.androidx.biometric)
 
     // WorkManager for background sync
     implementation(libs.androidx.work.runtime.ktx)

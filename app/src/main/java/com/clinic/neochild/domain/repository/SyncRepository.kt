@@ -18,4 +18,7 @@ interface SyncRepository {
     suspend fun processNextItems()
     suspend fun retryFailedItems()
     suspend fun clearSyncedItems()
+    suspend fun deleteQueueItem(queueId: Long)
+    suspend fun retryItem(queueId: Long)
+    suspend fun deleteAllFailed()
 }

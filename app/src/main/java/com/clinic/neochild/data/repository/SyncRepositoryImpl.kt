@@ -6,6 +6,7 @@ import com.clinic.neochild.core.model.SyncItem
 import com.clinic.neochild.core.model.SyncOperation
 import com.clinic.neochild.core.model.SyncPriority
 import com.clinic.neochild.core.model.SyncStatus
+import com.clinic.neochild.domain.repository.SyncManager
 import com.clinic.neochild.domain.repository.SyncRepository
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.Flow
@@ -17,7 +18,8 @@ import javax.inject.Singleton
 @Singleton
 class SyncRepositoryImpl @Inject constructor(
     private val database: AppDatabase,
-    private val firestore: FirebaseFirestore
+    private val firestore: FirebaseFirestore,
+    private val syncManager: SyncManager
 ) : SyncRepository {
 
     private val syncDao = database.syncQueueDao()
@@ -36,6 +38,7 @@ class SyncRepositoryImpl @Inject constructor(
                 priority = priority.name
             )
         )
+        syncManager.scheduleSync()
     }
 
     override fun getPendingCount(): Flow<Int> = syncDao.getPendingCount()
@@ -51,6 +54,8 @@ class SyncRepositoryImpl @Inject constructor(
         val pending = syncDao.getItemsByStatus(SyncStatus.PENDING.name)
         if (pending.isEmpty()) return
 
+        var hasRetryableError = false
+
         for (item in pending) {
             try {
                 syncDao.updateStatus(item.queueId, SyncStatus.SYNCING.name)
@@ -58,8 +63,20 @@ class SyncRepositoryImpl @Inject constructor(
                 syncDao.updateStatus(item.queueId, SyncStatus.SYNCED.name)
                 syncDao.deleteItem(item) 
             } catch (e: Exception) {
-                syncDao.markFailed(item.queueId, SyncStatus.FAILED.name, e.message ?: "Unknown error")
+                val isNetworkError = e is java.io.IOException || e.message?.contains("network", ignoreCase = true) == true
+                
+                if (isNetworkError && item.retryCount < 5) {
+                    syncDao.incrementRetryCount(item.queueId, e.message ?: "Network error")
+                    syncDao.updateStatus(item.queueId, SyncStatus.PENDING.name)
+                    hasRetryableError = true
+                } else {
+                    syncDao.markFailed(item.queueId, SyncStatus.FAILED.name, e.message ?: "Sync failed")
+                }
             }
+        }
+        
+        if (hasRetryableError) {
+            throw java.io.IOException("Some items failed due to network and need retry")
         }
     }
 
@@ -116,6 +133,26 @@ class SyncRepositoryImpl @Inject constructor(
         val failed = syncDao.getItemsByStatus(SyncStatus.FAILED.name)
         for (item in failed) {
             syncDao.updateStatus(item.queueId, SyncStatus.PENDING.name)
+        }
+        syncManager.scheduleSync()
+    }
+
+    override suspend fun deleteQueueItem(queueId: Long) {
+        val item = syncDao.getItemById(queueId)
+        if (item != null) {
+            syncDao.deleteItem(item)
+        }
+    }
+
+    override suspend fun retryItem(queueId: Long) {
+        syncDao.updateStatus(queueId, SyncStatus.PENDING.name)
+        syncManager.scheduleSync()
+    }
+
+    override suspend fun deleteAllFailed() {
+        val failed = syncDao.getItemsByStatus(SyncStatus.FAILED.name)
+        for (item in failed) {
+            syncDao.deleteItem(item)
         }
     }
 }

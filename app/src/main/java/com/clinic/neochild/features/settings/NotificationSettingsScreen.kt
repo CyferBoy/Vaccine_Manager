@@ -84,6 +84,32 @@ fun NotificationSettingsScreen(
                         checked = settings.syncAlertsEnabled,
                         onCheckedChange = { viewModel.updateSettings(settings.copy(syncAlertsEnabled = it)) }
                     )
+
+                    HorizontalDivider()
+
+                    Text("Security", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+
+                    SettingSwitch(
+                        label = "Biometric Lock",
+                        supportingText = "Use fingerprint or face recognition to unlock app",
+                        checked = settings.biometricLockEnabled,
+                        onCheckedChange = { viewModel.updateSettings(settings.copy(biometricLockEnabled = it)) }
+                    )
+
+                    SettingSwitch(
+                        label = "Always Authenticate",
+                        supportingText = "Request biometric auth every time the app opens",
+                        checked = settings.authOnEveryOpen,
+                        onCheckedChange = { viewModel.updateSettings(settings.copy(authOnEveryOpen = it)) }
+                    )
+
+                    SettingSlider(
+                        label = "Inactivity Period (Days)",
+                        value = settings.inactivityDaysThreshold.toFloat(),
+                        range = 1f..30f,
+                        steps = 29,
+                        onValueChange = { viewModel.updateSettings(settings.copy(inactivityDaysThreshold = it.toInt())) }
+                    )
                 }
             } ?: Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()

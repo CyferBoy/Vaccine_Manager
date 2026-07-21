@@ -33,6 +33,7 @@ interface InventoryRepository {
     )
     
     suspend fun deleteBatch(batchId: String, user: String)
+    suspend fun deleteVaccine(vaccineId: String, user: String)
     
     suspend fun deductStock(
         vaccineId: String, 

@@ -1,8 +1,10 @@
 package com.clinic.neochild.features.inventory
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -34,6 +36,7 @@ fun VaccineInventoryScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var batchToDelete by remember { mutableStateOf<VaccineBatchEntity?>(null) }
+    var vaccineToDelete by remember { mutableStateOf<InventoryItem?>(null) }
 
     DeleteConfirmationDialog(
         show = batchToDelete != null,
@@ -46,6 +49,17 @@ fun VaccineInventoryScreen(
         message = "Are you sure you want to delete Batch ${batchToDelete?.batchNumber}?"
     )
 
+    DeleteConfirmationDialog(
+        show = vaccineToDelete != null,
+        onDismiss = { vaccineToDelete = null },
+        onConfirm = {
+            vaccineToDelete?.let { viewModel.deleteVaccine(it.id) }
+            vaccineToDelete = null
+        },
+        title = "Delete Vaccine",
+        message = "Are you sure you want to delete ${vaccineToDelete?.brandName} and all its batches?"
+    )
+
     VaccineInventoryContent(
         uiState = uiState,
         onSearchQueryChange = viewModel::onSearchQueryChange,
@@ -54,7 +68,12 @@ fun VaccineInventoryScreen(
         onBack = onBack,
         onAddVaccine = onAddVaccine,
         onEditBatch = onEditBatch,
-        onDeleteBatch = { batchToDelete = it }
+        onDeleteBatch = { batchToDelete = it },
+        onEditVaccine = { vaccineId -> 
+            val item = uiState.inventory.find { it.id == vaccineId }
+            item?.batches?.firstOrNull()?.let { onEditBatch(it.batchId) }
+        },
+        onDeleteVaccine = { vaccineToDelete = it }
     )
 }
 
@@ -68,7 +87,9 @@ private fun VaccineInventoryContent(
     onBack: () -> Unit,
     onAddVaccine: () -> Unit,
     onEditBatch: (String) -> Unit,
-    onDeleteBatch: (VaccineBatchEntity) -> Unit
+    onDeleteBatch: (VaccineBatchEntity) -> Unit,
+    onEditVaccine: (String) -> Unit,
+    onDeleteVaccine: (InventoryItem) -> Unit
 ) {
     var isSearchActive by remember { mutableStateOf(false) }
 
@@ -113,7 +134,9 @@ private fun VaccineInventoryContent(
                         VaccineItemCard(
                             item = item,
                             onEditBatch = onEditBatch,
-                            onDeleteBatch = onDeleteBatch
+                            onDeleteBatch = onDeleteBatch,
+                            onEditVaccine = onEditVaccine,
+                            onDeleteVaccine = onDeleteVaccine
                         )
                     }
                 }
@@ -122,16 +145,25 @@ private fun VaccineInventoryContent(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun VaccineItemCard(
     item: InventoryItem,
     onEditBatch: (String) -> Unit,
-    onDeleteBatch: (VaccineBatchEntity) -> Unit
+    onDeleteBatch: (VaccineBatchEntity) -> Unit,
+    onEditVaccine: (String) -> Unit,
+    onDeleteVaccine: (InventoryItem) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
+    var menuExpanded by remember { mutableStateOf(false) }
 
     Card(
-        modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = { expanded = !expanded },
+                onLongClick = { menuExpanded = true }
+            ),
         colors = CardDefaults.cardColors(
             containerColor = when {
                 item.hasExpired -> Color(0xFFFFEBEE)
@@ -141,18 +173,59 @@ private fun VaccineItemCard(
         )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(item.brandName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text(item.company, style = MaterialTheme.typography.bodySmall)
+            Box {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(item.brandName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text(item.company, style = MaterialTheme.typography.bodySmall)
+                    }
+                    StockStatusBadge(item)
                 }
-                StockStatusBadge(item)
+
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Edit Vaccine") },
+                        onClick = {
+                            menuExpanded = false
+                            onEditVaccine(item.id)
+                        },
+                        leadingIcon = { Icon(Icons.Default.Edit, null) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Delete Vaccine", color = Color.Red) },
+                        onClick = {
+                            menuExpanded = false
+                            onDeleteVaccine(item)
+                        },
+                        leadingIcon = { Icon(Icons.Default.Delete, null, tint = Color.Red) }
+                    )
+                }
             }
 
             AnimatedVisibility(visible = expanded) {
                 Column(modifier = Modifier.padding(top = 16.dp)) {
                     HorizontalDivider()
                     Spacer(Modifier.height(8.dp))
+                    
+                    // Summary of MRP/Net Rate if batches exist
+                    if (item.batches.isNotEmpty()) {
+                        val latestBatch = item.batches.maxByOrNull { it.purchaseDate }
+                        latestBatch?.let {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Latest MRP: ₹${it.sellingPrice}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                                Text("Latest Net: ₹${it.purchaseCost}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                            }
+                            HorizontalDivider()
+                            Spacer(Modifier.height(8.dp))
+                        }
+                    }
+
                     item.batches.forEach { batch ->
                         BatchRow(batch, onEditBatch, onDeleteBatch)
                     }
@@ -177,6 +250,7 @@ private fun BatchRow(
         Column(modifier = Modifier.weight(1f)) {
             Text("Batch: ${batch.batchNumber}", fontWeight = FontWeight.Bold)
             Text("Exp: ${formatDateForDisplay(batch.expiryDate)} • Qty: ${batch.remainingQuantity}")
+            Text("MRP: ₹${batch.sellingPrice} • Net: ₹${batch.purchaseCost}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
             Text("Mfg: ${batch.manufacturer} • Pur: ${formatDateForDisplay(batch.purchaseDate)}", style = MaterialTheme.typography.labelSmall)
         }
         

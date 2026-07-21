@@ -3,6 +3,7 @@ package com.clinic.neochild.di
 import com.clinic.neochild.data.repository.InventoryRepositoryImpl
 import com.clinic.neochild.data.repository.PatientRepositoryImpl
 import com.clinic.neochild.data.repository.ReminderRepositoryImpl
+import com.clinic.neochild.data.repository.SyncManagerImpl
 import com.clinic.neochild.data.repository.SyncRepositoryImpl
 import com.clinic.neochild.data.repository.VaccinationRepositoryImpl
 import com.clinic.neochild.data.repository.VaccineRepositoryImpl
@@ -10,6 +11,7 @@ import com.clinic.neochild.data.repository.WasteRepositoryImpl
 import com.clinic.neochild.domain.repository.InventoryRepository
 import com.clinic.neochild.domain.repository.PatientRepository
 import com.clinic.neochild.domain.repository.ReminderRepository
+import com.clinic.neochild.domain.repository.SyncManager
 import com.clinic.neochild.domain.repository.SyncRepository
 import com.clinic.neochild.domain.repository.VaccinationRepository
 import com.clinic.neochild.domain.repository.VaccineRepository
@@ -47,6 +49,10 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindSyncRepository(impl: SyncRepositoryImpl): SyncRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindSyncManager(impl: SyncManagerImpl): SyncManager
 
     @Binds
     @Singleton

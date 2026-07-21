@@ -2,17 +2,23 @@ package com.clinic.neochild.features.inventory
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.clinic.neochild.domain.model.Vaccine
+import com.clinic.neochild.domain.model.InventoryFilter
+import com.clinic.neochild.domain.model.InventoryItem
+import com.clinic.neochild.domain.model.InventorySort
 import com.clinic.neochild.domain.repository.InventoryRepository
 import com.clinic.neochild.features.settings.NotificationSettingsManager
+import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class VaccineInventoryUiState(
-    val vaccines: List<Vaccine> = emptyList(),
-    val lowStockThreshold: Int = 5,
+    val inventory: List<InventoryItem> = emptyList(),
+    val searchQuery: String = "",
+    val filter: InventoryFilter = InventoryFilter.ALL,
+    val sort: InventorySort = InventorySort.ALPHABETICAL,
     val isLoading: Boolean = true
 )
 
@@ -22,73 +28,52 @@ class VaccineInventoryViewModel @Inject constructor(
     private val settingsManager: NotificationSettingsManager
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(VaccineInventoryUiState())
-    val uiState: StateFlow<VaccineInventoryUiState> = _uiState.asStateFlow()
+    private val _searchQuery = MutableStateFlow("")
+    private val _filter = MutableStateFlow(InventoryFilter.ALL)
+    private val _sort = MutableStateFlow(InventorySort.ALPHABETICAL)
 
-    init {
-        observeInventory()
-    }
-
-    private fun observeInventory() {
-        viewModelScope.launch {
-            combine(
-                inventoryRepository.getInventoryItems(),
-                settingsManager.settingsFlow
-            ) { items, settings ->
-                val vaccines = items.flatMap { item ->
-                    if (item.batches.isEmpty()) {
-                        // Still show vaccines with 0 stock as a placeholder if needed, 
-                        // or just skip. The UI currently shows groups based on this list.
-                        listOf(
-                            Vaccine(
-                                id = item.id, // This will be the vaccineId
-                                type = item.type,
-                                brandName = item.brandName,
-                                companyName = item.company,
-                                stock = 0,
-                                batchNumber = "No Stock",
-                                expiryDate = "",
-                                mrp = 0.0,
-                                netRate = 0.0
-                            )
-                        )
-                    } else {
-                        item.batches.map { batch ->
-                            Vaccine(
-                                id = batch.batchId, // Now it's the BATCH ID
-                                type = item.type,
-                                brandName = item.brandName,
-                                companyName = item.company,
-                                stock = batch.remainingQuantity,
-                                batchNumber = batch.batchNumber,
-                                expiryDate = batch.expiryDate,
-                                mrp = batch.sellingPrice,
-                                netRate = batch.purchaseCost
-                            )
-                        }
-                    }
-                }.sortedBy { it.brandName.lowercase() }
-
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val uiState: StateFlow<VaccineInventoryUiState> = combine(
+        _searchQuery,
+        _filter,
+        _sort
+    ) { query, filter, sort ->
+        Triple(query, filter, sort)
+    }.flatMapLatest { (query, filter, sort) ->
+        inventoryRepository.getInventoryItems(query, filter, sort)
+            .map { items ->
                 VaccineInventoryUiState(
-                    vaccines = vaccines,
-                    lowStockThreshold = settings.lowStockThreshold,
+                    inventory = items,
+                    searchQuery = query,
+                    filter = filter,
+                    sort = sort,
                     isLoading = false
                 )
-            }.collect {
-                _uiState.value = it
             }
-        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = VaccineInventoryUiState()
+    )
+
+    fun onSearchQueryChange(query: String) {
+        _searchQuery.value = query
     }
 
-    fun deleteBatch(vaccine: Vaccine) {
+    fun onFilterChange(filter: InventoryFilter) {
+        _filter.value = filter
+    }
+
+    fun onSortChange(sort: InventorySort) {
+        _sort.value = sort
+    }
+
+    fun deleteBatch(batchId: String) {
         viewModelScope.launch {
             try {
-                val user = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.email ?: "Unknown"
-                // The Vaccine model's id is actually the batchId in the inventory list
-                inventoryRepository.deleteBatch(vaccine.id, user)
-            } catch (_: Exception) {
-                // Handle error
-            }
+                val user = FirebaseAuth.getInstance().currentUser?.email ?: "Unknown"
+                inventoryRepository.deleteBatch(batchId, user)
+            } catch (_: Exception) { }
         }
     }
 }

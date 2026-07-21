@@ -18,3 +18,6 @@ enum class BatchStatus {
     USED,
     DELETED
 }
+
+enum class InventoryFilter { ALL, LOW_STOCK, NEAR_EXPIRY, EXPIRED, OUT_OF_STOCK, HIDDEN, AVAILABLE }
+enum class InventorySort { ALPHABETICAL, HIGHEST_STOCK, LOWEST_STOCK, EXPIRY, MANUFACTURER, NEWEST, OLDEST }

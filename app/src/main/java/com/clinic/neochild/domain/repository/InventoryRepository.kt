@@ -3,25 +3,37 @@ package com.clinic.neochild.domain.repository
 import com.clinic.neochild.data.local.entity.InventoryTransactionEntity
 import com.clinic.neochild.data.local.entity.VaccineBatchEntity
 import com.clinic.neochild.data.local.entity.VaccineEntity
+import com.clinic.neochild.domain.model.InventoryFilter
 import com.clinic.neochild.domain.model.InventoryItem
+import com.clinic.neochild.domain.model.InventorySort
 import com.clinic.neochild.domain.model.InventoryTransactionType
 import kotlinx.coroutines.flow.Flow
 
 interface InventoryRepository {
-    fun getInventoryItems(): Flow<List<InventoryItem>>
-    fun getAllVaccines(): Flow<List<VaccineEntity>>
-    fun getAllBatches(): Flow<List<VaccineBatchEntity>>
+    fun getInventoryItems(
+        query: String = "",
+        filter: InventoryFilter = InventoryFilter.ALL,
+        sort: InventorySort = InventorySort.ALPHABETICAL
+    ): Flow<List<InventoryItem>>
+    
     fun getVaccineBatches(vaccineId: String): Flow<List<VaccineBatchEntity>>
     fun getInventoryTransactions(vaccineId: String): Flow<List<InventoryTransactionEntity>>
+    suspend fun getBatchById(batchId: String): VaccineBatchEntity?
     
-    suspend fun addVaccineDefinition(vaccine: VaccineEntity)
-    suspend fun updateVaccineDefinition(vaccine: VaccineEntity)
-    suspend fun addBatch(batch: VaccineBatchEntity, user: String)
+    suspend fun addStock(
+        vaccine: VaccineEntity,
+        batch: VaccineBatchEntity,
+        user: String
+    )
+    
+    suspend fun updateBatch(
+        batch: VaccineBatchEntity,
+        user: String,
+        notes: String? = null
+    )
+    
     suspend fun deleteBatch(batchId: String, user: String)
     
-    /**
-     * Deduct stock using FEFO (First Expiry First Out)
-     */
     suspend fun deductStock(
         vaccineId: String, 
         quantity: Int, 
@@ -55,6 +67,5 @@ interface InventoryRepository {
     )
 
     suspend fun transferPatientTransactions(duplicateId: String, masterId: String)
-
     suspend fun refreshInventory()
 }

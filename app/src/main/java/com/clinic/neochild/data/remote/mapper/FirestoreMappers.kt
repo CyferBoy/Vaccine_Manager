@@ -139,6 +139,7 @@ object FirestoreMappers {
                 receiptNumber = doc.getString("receiptNumber") ?: "",
                 patientId = doc.getString("patientId") ?: "",
                 vaccineNames = (doc.get("vaccineNames") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList(),
+                vaccineIds = (doc.get("vaccineIds") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList(),
                 nxtVaccineNames = (doc.get("nxtVaccineNames") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList(),
                 dateGiven = doc.getString("dateGiven") ?: "",
                 nextDueDate = doc.getString("nextDueDate") ?: "",

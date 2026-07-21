@@ -5,6 +5,7 @@ data class Vaccination(
     val receiptNumber: String = "",
     val patientId: String = "",
     val vaccineNames: List<String> = emptyList(),
+    val vaccineIds: List<String> = emptyList(),
     val nxtVaccineNames: List<String> = emptyList(),
     val dateGiven: String = "",
     val nextDueDate: String = "",

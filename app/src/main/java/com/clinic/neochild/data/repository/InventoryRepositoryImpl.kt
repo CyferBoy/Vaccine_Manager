@@ -1,22 +1,25 @@
 package com.clinic.neochild.data.repository
 
 import androidx.room.withTransaction
+import com.clinic.neochild.core.logger.AuditLogger
+import com.clinic.neochild.core.model.SyncOperation
+import com.clinic.neochild.core.model.SyncPriority
+import com.clinic.neochild.core.utils.InventoryUtils
+import com.clinic.neochild.core.utils.PatientUtils.parseDate
 import com.clinic.neochild.data.local.database.AppDatabase
 import com.clinic.neochild.data.local.entity.InventoryTransactionEntity
 import com.clinic.neochild.data.local.entity.VaccineBatchEntity
 import com.clinic.neochild.data.local.entity.VaccineEntity
 import com.clinic.neochild.data.remote.mapper.FirestoreMappers
-import com.google.firebase.firestore.FirebaseFirestore
-import com.clinic.neochild.domain.model.InventoryTransactionType
-import com.clinic.neochild.core.model.SyncOperation
-import com.clinic.neochild.core.model.SyncPriority
+import com.clinic.neochild.domain.model.*
 import com.clinic.neochild.domain.repository.InventoryRepository
 import com.clinic.neochild.domain.repository.SyncRepository
-import com.clinic.neochild.core.utils.InventoryUtils
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -26,58 +29,97 @@ class InventoryRepositoryImpl @Inject constructor(
     private val database: AppDatabase,
     private val firestore: FirebaseFirestore,
     private val syncRepository: SyncRepository,
-    private val auditLogger: com.clinic.neochild.core.logger.AuditLogger
+    private val auditLogger: AuditLogger
 ) : InventoryRepository {
 
     private val vaccineDao = database.vaccineDao()
 
-    override fun getInventoryItems(): Flow<List<com.clinic.neochild.domain.model.InventoryItem>> {
+    override fun getInventoryItems(
+        query: String,
+        filter: InventoryFilter,
+        sort: InventorySort
+    ): Flow<List<InventoryItem>> {
         return combine(
             vaccineDao.getAllVaccines(),
             vaccineDao.getAllBatches()
-        ) { definitions, batches ->
-            definitions.map { def ->
-                val vaccineBatches = batches.filter { it.vaccineId == def.id }
-                val stock = vaccineBatches.sumOf { it.remainingQuantity }
-                com.clinic.neochild.domain.model.InventoryItem(
-                    id = def.id,
-                    brandName = def.brandName,
-                    stock = stock,
-                    threshold = def.lowStockThreshold,
-                    type = def.type,
-                    company = def.companyName,
-                    batches = vaccineBatches
+        ) { vaccines, allBatches ->
+            vaccines.map { vaccine ->
+                val batches = allBatches.filter { it.vaccineId == vaccine.id && !it.isDeleted }
+                val totalStock = batches.sumOf { it.remainingQuantity }
+                
+                val hasExpired = batches.any { InventoryUtils.isExpired(it.expiryDate) }
+                val isNearExpiry = batches.any { InventoryUtils.isNearExpiry(it.expiryDate) }
+                val isLowStock = totalStock > 0 && totalStock <= vaccine.lowStockThreshold
+                val isOutOfStock = totalStock <= 0
+                val activeBatches = batches.filter { it.remainingQuantity > 0 && !InventoryUtils.isExpired(it.expiryDate) }
+
+                InventoryItem(
+                    id = vaccine.id,
+                    brandName = vaccine.brandName,
+                    stock = totalStock,
+                    threshold = vaccine.lowStockThreshold,
+                    type = vaccine.type,
+                    company = vaccine.companyName,
+                    batches = batches.sortedBy { parseDate(it.expiryDate) },
+                    isLowStock = isLowStock,
+                    isNearExpiry = isNearExpiry,
+                    hasExpired = hasExpired,
+                    hasOutofStock = isOutOfStock,
+                    activeBatchesCount = activeBatches.size
                 )
+            }.filter { item ->
+                val matchesQuery = query.isBlank() || 
+                    item.brandName.contains(query, ignoreCase = true) || 
+                    item.company.contains(query, ignoreCase = true)
+                
+                val matchesFilter = when (filter) {
+                    InventoryFilter.ALL -> true
+                    InventoryFilter.LOW_STOCK -> item.isLowStock
+                    InventoryFilter.NEAR_EXPIRY -> item.isNearExpiry
+                    InventoryFilter.EXPIRED -> item.hasExpired
+                    InventoryFilter.OUT_OF_STOCK -> item.hasOutofStock
+                    InventoryFilter.HIDDEN -> false
+                    InventoryFilter.AVAILABLE -> item.activeBatchesCount > 0
+                }
+                
+                matchesQuery && matchesFilter
+            }.sortedWith { a, b ->
+                when (sort) {
+                    InventorySort.ALPHABETICAL -> a.brandName.lowercase().compareTo(b.brandName.lowercase())
+                    InventorySort.HIGHEST_STOCK -> b.stock.compareTo(a.stock)
+                    InventorySort.LOWEST_STOCK -> a.stock.compareTo(b.stock)
+                    InventorySort.EXPIRY -> (a.batches.firstOrNull()?.expiryDate ?: "9999-12-31").compareTo(b.batches.firstOrNull()?.expiryDate ?: "9999-12-31")
+                    InventorySort.MANUFACTURER -> a.company.lowercase().compareTo(b.company.lowercase())
+                    InventorySort.NEWEST -> (b.batches.maxOfOrNull { it.purchaseDate } ?: "").compareTo(a.batches.maxOfOrNull { it.purchaseDate } ?: "")
+                    InventorySort.OLDEST -> (a.batches.minOfOrNull { it.purchaseDate } ?: "").compareTo(b.batches.minOfOrNull { it.purchaseDate } ?: "")
+                }
             }
         }
     }
 
-    override fun getAllVaccines(): Flow<List<VaccineEntity>> = vaccineDao.getAllVaccines()
-
-    override fun getAllBatches(): Flow<List<VaccineBatchEntity>> = vaccineDao.getAllBatches()
-
     override fun getVaccineBatches(vaccineId: String): Flow<List<VaccineBatchEntity>> = 
-        vaccineDao.getBatchesByVaccine(vaccineId)
+        vaccineDao.getBatchesByVaccine(vaccineId).map { batches ->
+            batches.filter { !it.isDeleted }.sortedBy { parseDate(it.expiryDate) }
+        }
 
     override fun getInventoryTransactions(vaccineId: String): Flow<List<InventoryTransactionEntity>> = 
         vaccineDao.getTransactionsForVaccine(vaccineId)
 
-    override suspend fun addVaccineDefinition(vaccine: VaccineEntity) {
-        vaccineDao.insertVaccine(vaccine)
-        syncRepository.enqueue("VACCINE", vaccine.id, SyncOperation.CREATE, SyncPriority.MEDIUM)
-    }
+    override suspend fun getBatchById(batchId: String): VaccineBatchEntity? = 
+        vaccineDao.getBatchById(batchId)
 
-    override suspend fun updateVaccineDefinition(vaccine: VaccineEntity) {
-        vaccineDao.insertVaccine(vaccine)
-        syncRepository.enqueue("VACCINE", vaccine.id, SyncOperation.UPDATE, SyncPriority.MEDIUM)
-    }
-
-    override suspend fun addBatch(batch: VaccineBatchEntity, user: String) {
+    override suspend fun addStock(vaccine: VaccineEntity, batch: VaccineBatchEntity, user: String) {
         database.withTransaction {
+            val existing = vaccineDao.getVaccineById(vaccine.id)
+            if (existing == null) {
+                vaccineDao.insertVaccine(vaccine)
+                syncRepository.enqueue("VACCINE", vaccine.id, SyncOperation.CREATE, SyncPriority.MEDIUM)
+            }
+
             val currentTotal = vaccineDao.getTotalStockForVaccine(batch.vaccineId) ?: 0
             vaccineDao.insertBatch(batch)
-            
-            val transaction = InventoryTransactionEntity(
+
+            vaccineDao.insertTransaction(InventoryTransactionEntity(
                 vaccineId = batch.vaccineId,
                 batchId = batch.batchId,
                 transactionType = InventoryTransactionType.PURCHASE.name,
@@ -85,13 +127,37 @@ class InventoryRepositoryImpl @Inject constructor(
                 previousQuantity = currentTotal,
                 currentQuantity = currentTotal + batch.purchaseQuantity,
                 user = user,
-                notes = "New Batch: ${batch.batchNumber}"
-            )
-            vaccineDao.insertTransaction(transaction)
-            
-            // Queue Sync
+                notes = "Stock Added: ${batch.batchNumber}"
+            ))
+
+            auditLogger.logAction("Stock Added", user, "Vaccine: ${vaccine.brandName}, Batch: ${batch.batchNumber}, Qty: ${batch.purchaseQuantity}")
             syncRepository.enqueue("BATCH", batch.batchId, SyncOperation.CREATE, SyncPriority.MEDIUM)
-            // Transactions could also be synced if needed for remote audit
+        }
+    }
+
+    override suspend fun updateBatch(batch: VaccineBatchEntity, user: String, notes: String?) {
+        database.withTransaction {
+            val oldBatch = vaccineDao.getBatchById(batch.batchId) ?: return@withTransaction
+            val currentTotal = vaccineDao.getTotalStockForVaccine(batch.vaccineId) ?: 0
+            val diff = batch.remainingQuantity - oldBatch.remainingQuantity
+
+            vaccineDao.updateBatch(batch)
+
+            if (diff != 0) {
+                vaccineDao.insertTransaction(InventoryTransactionEntity(
+                    vaccineId = batch.vaccineId,
+                    batchId = batch.batchId,
+                    transactionType = InventoryTransactionType.MANUAL_ADJUSTMENT.name,
+                    quantity = diff,
+                    previousQuantity = currentTotal,
+                    currentQuantity = currentTotal + diff,
+                    user = user,
+                    notes = notes ?: "Batch Updated: ${batch.batchNumber}"
+                ))
+            }
+
+            auditLogger.logAction("Batch Updated", user, "Batch: ${batch.batchNumber}, Qty Diff: $diff")
+            syncRepository.enqueue("BATCH", batch.batchId, SyncOperation.UPDATE, SyncPriority.MEDIUM)
         }
     }
 
@@ -99,11 +165,10 @@ class InventoryRepositoryImpl @Inject constructor(
         database.withTransaction {
             val batch = vaccineDao.getBatchById(batchId) ?: return@withTransaction
             val currentTotal = vaccineDao.getTotalStockForVaccine(batch.vaccineId) ?: 0
-            
-            val updatedBatch = batch.copy(isDeleted = true)
-            vaccineDao.updateBatch(updatedBatch)
-            
-            val transaction = InventoryTransactionEntity(
+
+            vaccineDao.updateBatch(batch.copy(isDeleted = true))
+
+            vaccineDao.insertTransaction(InventoryTransactionEntity(
                 vaccineId = batch.vaccineId,
                 batchId = batch.batchId,
                 transactionType = InventoryTransactionType.MANUAL_ADJUSTMENT.name,
@@ -112,9 +177,9 @@ class InventoryRepositoryImpl @Inject constructor(
                 currentQuantity = currentTotal - batch.remainingQuantity,
                 user = user,
                 notes = "Batch Deleted: ${batch.batchNumber}"
-            )
-            vaccineDao.insertTransaction(transaction)
-            
+            ))
+
+            auditLogger.logAction("Batch Deleted", user, "Batch: ${batch.batchNumber}, Removed Qty: ${batch.remainingQuantity}")
             syncRepository.enqueue("BATCH", batchId, SyncOperation.UPDATE, SyncPriority.MEDIUM)
         }
     }
@@ -128,50 +193,34 @@ class InventoryRepositoryImpl @Inject constructor(
         patientId: String?
     ) {
         database.withTransaction {
-            var remainingToDeduct = quantity
-            val allActiveBatches = vaccineDao.getActiveBatchesByExpiry(vaccineId)
-            
-            // Filter out expired batches for administration
-            val validBatches = allActiveBatches.filter { !InventoryUtils.isExpired(it.expiryDate) }
+            var remaining = quantity
+            val batches = vaccineDao.getActiveBatchesByExpiry(vaccineId)
+                .filter { !InventoryUtils.isExpired(it.expiryDate) }
 
-            for (batch in validBatches) {
-                if (remainingToDeduct <= 0) break
-
-                val deductFromThisBatch = minOf(batch.remainingQuantity, remainingToDeduct)
-                val prevQty = vaccineDao.getTotalStockForVaccine(vaccineId) ?: 0
+            for (batch in batches) {
+                if (remaining <= 0) break
+                val deduct = minOf(batch.remainingQuantity, remaining)
+                val prev = vaccineDao.getTotalStockForVaccine(vaccineId) ?: 0
                 
-                val updatedBatch = batch.copy(
-                    remainingQuantity = batch.remainingQuantity - deductFromThisBatch
-                )
-                vaccineDao.updateBatch(updatedBatch)
-
-                val transaction = InventoryTransactionEntity(
+                vaccineDao.updateBatch(batch.copy(remainingQuantity = batch.remainingQuantity - deduct))
+                vaccineDao.insertTransaction(InventoryTransactionEntity(
                     vaccineId = vaccineId,
                     batchId = batch.batchId,
                     patientId = patientId,
                     vaccinationId = vaccinationId,
                     transactionType = transactionType.name,
-                    quantity = -deductFromThisBatch,
-                    previousQuantity = prevQty,
-                    currentQuantity = prevQty - deductFromThisBatch,
+                    quantity = -deduct,
+                    previousQuantity = prev,
+                    currentQuantity = prev - deduct,
                     user = user
-                )
-                vaccineDao.insertTransaction(transaction)
+                ))
                 
-                // Queue Sync for the updated batch
                 syncRepository.enqueue("BATCH", batch.batchId, SyncOperation.UPDATE, SyncPriority.HIGH)
-
-                remainingToDeduct -= deductFromThisBatch
+                remaining -= deduct
             }
 
-            if (remainingToDeduct > 0) {
-                val expiredCount = allActiveBatches.size - validBatches.size
-                if (expiredCount > 0 && validBatches.isEmpty()) {
-                    throw IllegalStateException("All available batches for this vaccine have expired. Cannot proceed with vaccination.")
-                } else {
-                    throw IllegalStateException("Insufficient non-expired stock for vaccine $vaccineId. Available: ${quantity - remainingToDeduct}, Requested: $quantity")
-                }
-            }
+            if (remaining > 0) throw IllegalStateException("Insufficient stock")
+            auditLogger.logAction("Stock Deducted", user, "VaccineId: $vaccineId, Qty: $quantity")
         }
     }
 
@@ -183,36 +232,22 @@ class InventoryRepositoryImpl @Inject constructor(
         notes: String?
     ) {
         database.withTransaction {
-            val batch = vaccineDao.getBatchById(batchId)
-                ?: throw IllegalStateException("Batch not found: $batchId")
-            
-            if (transactionType == InventoryTransactionType.VACCINATION && InventoryUtils.isExpired(batch.expiryDate)) {
-                throw IllegalStateException("This vaccine batch expired on ${batch.expiryDate}. Please select another batch.")
-            }
+            val batch = vaccineDao.getBatchById(batchId) ?: throw IllegalStateException("Batch not found")
+            if (transactionType == InventoryTransactionType.VACCINATION && InventoryUtils.isExpired(batch.expiryDate)) throw IllegalStateException("Batch expired")
+            if (batch.remainingQuantity < quantity) throw IllegalStateException("Insufficient stock")
 
-            if (batch.remainingQuantity < quantity) {
-                throw IllegalStateException("Insufficient stock in batch ${batch.batchNumber}. Available: ${batch.remainingQuantity}, Requested: $quantity")
-            }
-
-            val currentTotal = vaccineDao.getTotalStockForVaccine(batch.vaccineId) ?: 0
-            
-            val updatedBatch = batch.copy(
-                remainingQuantity = batch.remainingQuantity - quantity
-            )
-            vaccineDao.updateBatch(updatedBatch)
-
-            val transaction = InventoryTransactionEntity(
+            val current = vaccineDao.getTotalStockForVaccine(batch.vaccineId) ?: 0
+            vaccineDao.updateBatch(batch.copy(remainingQuantity = batch.remainingQuantity - quantity))
+            vaccineDao.insertTransaction(InventoryTransactionEntity(
                 vaccineId = batch.vaccineId,
                 batchId = batchId,
                 transactionType = transactionType.name,
                 quantity = -quantity,
-                previousQuantity = currentTotal,
-                currentQuantity = currentTotal - quantity,
+                previousQuantity = current,
+                currentQuantity = current - quantity,
                 user = user,
                 notes = notes
-            )
-            vaccineDao.insertTransaction(transaction)
-            
+            ))
             syncRepository.enqueue("BATCH", batchId, SyncOperation.UPDATE, SyncPriority.HIGH)
         }
     }
@@ -225,28 +260,20 @@ class InventoryRepositoryImpl @Inject constructor(
         notes: String?
     ) {
         database.withTransaction {
-            val batch = vaccineDao.getBatchById(batchId)
-                ?: throw IllegalStateException("Batch not found: $batchId")
+            val batch = vaccineDao.getBatchById(batchId) ?: throw IllegalStateException("Batch not found")
+            val current = vaccineDao.getTotalStockForVaccine(batch.vaccineId) ?: 0
             
-            val currentTotal = vaccineDao.getTotalStockForVaccine(batch.vaccineId) ?: 0
-            
-            val updatedBatch = batch.copy(
-                remainingQuantity = batch.remainingQuantity + quantity
-            )
-            vaccineDao.updateBatch(updatedBatch)
-
-            val transaction = InventoryTransactionEntity(
+            vaccineDao.updateBatch(batch.copy(remainingQuantity = batch.remainingQuantity + quantity))
+            vaccineDao.insertTransaction(InventoryTransactionEntity(
                 vaccineId = batch.vaccineId,
                 batchId = batchId,
                 transactionType = transactionType.name,
                 quantity = quantity,
-                previousQuantity = currentTotal,
-                currentQuantity = currentTotal + quantity,
+                previousQuantity = current,
+                currentQuantity = current + quantity,
                 user = user,
                 notes = notes
-            )
-            vaccineDao.insertTransaction(transaction)
-            
+            ))
             syncRepository.enqueue("BATCH", batchId, SyncOperation.UPDATE, SyncPriority.HIGH)
         }
     }
@@ -254,27 +281,21 @@ class InventoryRepositoryImpl @Inject constructor(
     override suspend fun adjustStock(batchId: String, newQuantity: Int, user: String, reason: String) {
         database.withTransaction {
             val batch = vaccineDao.getBatchById(batchId) ?: return@withTransaction
-            val currentTotal = vaccineDao.getTotalStockForVaccine(batch.vaccineId) ?: 0
+            val current = vaccineDao.getTotalStockForVaccine(batch.vaccineId) ?: 0
             val diff = newQuantity - batch.remainingQuantity
             
-            val updatedBatch = batch.copy(remainingQuantity = newQuantity)
-            vaccineDao.updateBatch(updatedBatch)
-            
-            val transaction = InventoryTransactionEntity(
+            vaccineDao.updateBatch(batch.copy(remainingQuantity = newQuantity))
+            vaccineDao.insertTransaction(InventoryTransactionEntity(
                 vaccineId = batch.vaccineId,
                 batchId = batchId,
                 transactionType = InventoryTransactionType.MANUAL_ADJUSTMENT.name,
                 quantity = diff,
-                previousQuantity = currentTotal,
-                currentQuantity = currentTotal + diff,
+                previousQuantity = current,
+                currentQuantity = current + diff,
                 user = user,
                 notes = "Adjustment: $reason"
-            )
-            vaccineDao.insertTransaction(transaction)
-            
+            ))
             syncRepository.enqueue("BATCH", batchId, SyncOperation.UPDATE, SyncPriority.MEDIUM)
-
-            auditLogger.logAction("Stock modified", null, "Batch: ${batch.batchNumber}, New Qty: $newQuantity, Reason: $reason")
         }
     }
 
@@ -285,18 +306,14 @@ class InventoryRepositoryImpl @Inject constructor(
     override suspend fun refreshInventory() {
         withContext(Dispatchers.IO) {
             try {
-                // Refresh Vaccine Definitions
                 val vaccineSnapshot = firestore.collection("vaccines").get().await()
                 val vaccines = vaccineSnapshot.documents.mapNotNull { FirestoreMappers.toVaccineEntity(it) }
                 vaccineDao.insertVaccines(vaccines)
 
-                // Refresh Batches
                 val batchSnapshot = firestore.collection("vaccine_batches").get().await()
                 val batches = batchSnapshot.documents.mapNotNull { FirestoreMappers.toVaccineBatchEntity(it) }
                 vaccineDao.insertBatches(batches)
-            } catch (e: Exception) {
-                // Error handling
-            }
+            } catch (_: Exception) {}
         }
     }
 }

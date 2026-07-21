@@ -1,163 +1,119 @@
 package com.clinic.neochild.features.inventory
 
-import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.clinic.neochild.core.utils.InventoryUtils
-import com.clinic.neochild.domain.model.Vaccine
-import com.clinic.neochild.core.ui.*
 import com.clinic.neochild.core.designsystem.NeoChildTheme
+import com.clinic.neochild.core.ui.*
+import com.clinic.neochild.core.utils.InventoryUtils
 import com.clinic.neochild.core.utils.PatientUtils.formatDateForDisplay
-import com.clinic.neochild.core.utils.PatientUtils.parseDate
-import java.util.*
-
-enum class SortOption { BRAND_AZ, QUANTITY, EXPIRY }
+import com.clinic.neochild.data.local.entity.VaccineBatchEntity
+import com.clinic.neochild.domain.model.InventoryFilter
+import com.clinic.neochild.domain.model.InventoryItem
+import com.clinic.neochild.domain.model.InventorySort
 
 @Composable
 fun VaccineInventoryScreen(
-    onBack: () -> Unit = {}, 
+    onBack: () -> Unit = {},
     onAddVaccine: () -> Unit = {},
-    onEditVaccine: (String) -> Unit = {},
+    onEditBatch: (String) -> Unit = {},
     viewModel: VaccineInventoryViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    var searchQuery by rememberSaveable { mutableStateOf("") }
-    var currentSort by rememberSaveable { mutableStateOf(SortOption.BRAND_AZ) }
-    var vaccineToDelete by remember { mutableStateOf<Vaccine?>(null) }
-    
-    val context = androidx.compose.ui.platform.LocalContext.current
-
-    val filteredVaccines = remember(uiState.vaccines, searchQuery) {
-        if (searchQuery.isBlank()) uiState.vaccines
-        else uiState.vaccines.filter { 
-            it.brandName.contains(searchQuery, ignoreCase = true) || 
-            it.type.contains(searchQuery, ignoreCase = true) 
-        }
-    }
-
-    val sortedGroups = remember(filteredVaccines, currentSort) {
-        val groups = filteredVaccines.groupBy { it.brandName.trim().lowercase() }
-        when (currentSort) {
-            SortOption.BRAND_AZ -> groups.toList().sortedBy { it.first }
-            SortOption.QUANTITY -> groups.toList().sortedByDescending { it.second.sumOf { v -> v.stock } }
-            SortOption.EXPIRY -> groups.toList().sortedBy { g -> g.second.minOfOrNull { parseDate(it.expiryDate)?.time ?: Long.MAX_VALUE } }
-        }
-    }
+    var batchToDelete by remember { mutableStateOf<VaccineBatchEntity?>(null) }
 
     DeleteConfirmationDialog(
-        show = vaccineToDelete != null,
-        onDismiss = { vaccineToDelete = null },
+        show = batchToDelete != null,
+        onDismiss = { batchToDelete = null },
         onConfirm = {
-            vaccineToDelete?.let { viewModel.deleteBatch(it) }
-            vaccineToDelete = null
+            batchToDelete?.let { viewModel.deleteBatch(it.batchId) }
+            batchToDelete = null
         },
-        title = "Delete Vaccine",
-        message = "Are you sure you want to delete ${vaccineToDelete?.brandName} (Batch: ${vaccineToDelete?.batchNumber})?"
+        title = "Delete Batch",
+        message = "Are you sure you want to delete Batch ${batchToDelete?.batchNumber}?"
     )
 
     VaccineInventoryContent(
-        isLoading = uiState.isLoading,
-        lowStockThreshold = uiState.lowStockThreshold,
-        searchQuery = searchQuery,
-        onSearchQueryChange = { searchQuery = it },
+        uiState = uiState,
+        onSearchQueryChange = viewModel::onSearchQueryChange,
+        onFilterChange = viewModel::onFilterChange,
+        onSortChange = viewModel::onSortChange,
         onBack = onBack,
         onAddVaccine = onAddVaccine,
-        onEditVaccine = onEditVaccine,
-        onDeleteVaccine = { vaccineToDelete = it },
-        sortedGroups = sortedGroups,
-        onSortSelected = { currentSort = it }
+        onEditBatch = onEditBatch,
+        onDeleteBatch = { batchToDelete = it }
     )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun VaccineInventoryContent(
-    isLoading: Boolean,
-    lowStockThreshold: Int,
-    searchQuery: String,
+    uiState: VaccineInventoryUiState,
     onSearchQueryChange: (String) -> Unit,
+    onFilterChange: (InventoryFilter) -> Unit,
+    onSortChange: (InventorySort) -> Unit,
     onBack: () -> Unit,
     onAddVaccine: () -> Unit,
-    onEditVaccine: (String) -> Unit,
-    onDeleteVaccine: (Vaccine) -> Unit,
-    sortedGroups: List<Pair<String, List<Vaccine>>>,
-    onSortSelected: (SortOption) -> Unit
+    onEditBatch: (String) -> Unit,
+    onDeleteBatch: (VaccineBatchEntity) -> Unit
 ) {
-    var isSearchActive by rememberSaveable { mutableStateOf(false) }
+    var isSearchActive by remember { mutableStateOf(false) }
 
     AppBackground {
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
                 SearchTopAppBar(
-                    title = "Vaccine Inventory",
-                    searchQuery = searchQuery,
+                    title = "Inventory",
+                    searchQuery = uiState.searchQuery,
                     onSearchQueryChange = onSearchQueryChange,
                     isSearchActive = isSearchActive,
                     onSearchActiveChange = { isSearchActive = it },
                     onBack = onBack,
-                    placeholder = "Search by brand or type...",
                     actions = {
-                        SortButton(
-                            options = listOf(
-                                SortOption.BRAND_AZ to "Brand (A-Z)",
-                                SortOption.QUANTITY to "Quantity",
-                                SortOption.EXPIRY to "Expiry"
-                            ),
-                            onSortSelected = { option, _ -> onSortSelected(option) }
-                        )
+                        FilterButton(currentFilter = uiState.filter, onFilterSelected = onFilterChange)
+                        SortButton(currentSort = uiState.sort, onSortSelected = onSortChange)
                     }
                 )
             },
             floatingActionButton = {
-                FloatingActionButton(
-                    onClick = onAddVaccine,
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "Add Vaccine")
+                FloatingActionButton(onClick = onAddVaccine) {
+                    Icon(Icons.Default.Add, "Add Stock")
                 }
             }
-        ) { paddingValues ->
-            if (isLoading) {
-                Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
+        ) { padding ->
+            if (uiState.isLoading) {
+                Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
-            } else if (sortedGroups.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
-                    Text(if (searchQuery.isEmpty()) "No vaccines in inventory" else "No matching vaccines found")
+            } else if (uiState.inventory.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                    Text(if (uiState.searchQuery.isEmpty()) "No inventory found" else "No results found")
                 }
             } else {
                 LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues)
-                        .padding(horizontal = 16.dp),
-                    contentPadding = PaddingValues(bottom = 80.dp, top = 8.dp),
+                    modifier = Modifier.fillMaxSize().padding(padding),
+                    contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(items = sortedGroups, key = { it.first }) { group ->
-                        VaccineGroupCard(
-                            batches = group.second,
-                            lowStockThreshold = lowStockThreshold,
-                            onEdit = onEditVaccine,
-                            onDelete = onDeleteVaccine,
-                            modifier = Modifier.animateItem()
+                    items(uiState.inventory, key = { it.id }) { item ->
+                        VaccineItemCard(
+                            item = item,
+                            onEditBatch = onEditBatch,
+                            onDeleteBatch = onDeleteBatch
                         )
                     }
                 }
@@ -166,218 +122,126 @@ private fun VaccineInventoryContent(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun VaccineGroupCard(
-    batches: List<Vaccine>,
-    lowStockThreshold: Int,
-    onEdit: (String) -> Unit,
-    onDelete: (Vaccine) -> Unit,
-    modifier: Modifier = Modifier
+private fun VaccineItemCard(
+    item: InventoryItem,
+    onEditBatch: (String) -> Unit,
+    onDeleteBatch: (VaccineBatchEntity) -> Unit
 ) {
-    var expanded by rememberSaveable { mutableStateOf(false) }
-    var menuExpandedId by remember { mutableStateOf<String?>(null) }
-    
-    val totalStock = remember(batches) { batches.sumOf { it.stock } }
-    val first = batches.first()
-    val brandName = first.brandName.trim()
-    
-    val sortedBatches = remember(batches) { batches.sortedBy { parseDate(it.expiryDate) } }
-    
-    val expirySummary = remember(sortedBatches) {
-        if (sortedBatches.size > 1) {
-            sortedBatches.joinToString(", ") { "${formatDateForDisplay(it.expiryDate)} (${it.stock})" }
-        } else {
-            formatDateForDisplay(sortedBatches.firstOrNull()?.expiryDate ?: "")
-        }
-    }
-
-    val cardColor = remember(sortedBatches) {
-        var statusColor: Color? = null
-        
-        for (batch in sortedBatches) {
-            if (InventoryUtils.isExpired(batch.expiryDate)) {
-                statusColor = Color(0xFFED9080) // Reddish for expired
-                break
-            } else if (InventoryUtils.isNearExpiry(batch.expiryDate)) {
-                if (statusColor == null) statusColor = Color(0xFFEBC181) // Yellowish for near expiry
-            }
-        }
-        statusColor
-    }
-
-    val isLowStock = totalStock > 0 && totalStock <= lowStockThreshold
+    var expanded by remember { mutableStateOf(false) }
 
     Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .combinedClickable(
-                onClick = { expanded = !expanded },
-                onLongClick = { menuExpandedId = first.id }
-            ),
+        modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
         colors = CardDefaults.cardColors(
-            containerColor = (cardColor ?: if (isLowStock) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f) else MaterialTheme.colorScheme.surfaceVariant).copy(alpha = 0.7f),
-            contentColor = if (cardColor != null) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant
+            containerColor = when {
+                item.hasExpired -> Color(0xFFFFEBEE)
+                item.isLowStock -> Color(0xFFFFF3E0)
+                else -> MaterialTheme.colorScheme.surfaceVariant
+            }
         )
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            Row(
-                modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f).padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = brandName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        if (isLowStock) {
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Surface(
-                                color = MaterialTheme.colorScheme.error,
-                                shape = androidx.compose.foundation.shape.CircleShape
-                            ) {
-                                Text(
-                                    text = "Low Stock",
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onError
-                                )
-                            }
-                        }
-                    }
-                    
-                    val earliestBatch = sortedBatches.firstOrNull()
-                    if (earliestBatch != null) {
-                        val statusText = when {
-                            InventoryUtils.isExpired(earliestBatch.expiryDate) -> "⚠ Expired"
-                            InventoryUtils.isExpiringToday(earliestBatch.expiryDate) -> "⚠ Expires TODAY"
-                            InventoryUtils.isNearExpiry(earliestBatch.expiryDate) -> "⚠ Near Expiry (${InventoryUtils.getDaysUntilExpiry(earliestBatch.expiryDate)} days)"
-                            else -> "Exp: ${formatDateForDisplay(earliestBatch.expiryDate)}"
-                        }
-                        val statusColor = when {
-                            InventoryUtils.isExpired(earliestBatch.expiryDate) -> MaterialTheme.colorScheme.error
-                            InventoryUtils.isExpiringToday(earliestBatch.expiryDate) -> Color(0xFFD32F2F) // Deep Red
-                            else -> MaterialTheme.colorScheme.onSurfaceVariant
-                        }
-                        Text(text = statusText, style = MaterialTheme.typography.bodyMedium, color = statusColor)
-                    }
-                    
-                    if (expanded) {
-                        VaccineGroupDetails(batches = batches, onMenuRequest = { menuExpandedId = it })
-                    }
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(item.brandName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text(item.company, style = MaterialTheme.typography.bodySmall)
                 }
-                
-                StockBadge(stock = totalStock, lowStockThreshold = lowStockThreshold)
+                StockStatusBadge(item)
             }
 
-            val selectedBatch = batches.find { it.id == menuExpandedId }
-            if (selectedBatch != null) {
-                ActionDropdownMenu(
-                    expanded = true,
-                    onDismiss = { menuExpandedId = null },
-                    onEdit = { onEdit(selectedBatch.id) },
-                    onDelete = { onDelete(selectedBatch) }
+            AnimatedVisibility(visible = expanded) {
+                Column(modifier = Modifier.padding(top = 16.dp)) {
+                    HorizontalDivider()
+                    Spacer(Modifier.height(8.dp))
+                    item.batches.forEach { batch ->
+                        BatchRow(batch, onEditBatch, onDeleteBatch)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BatchRow(
+    batch: VaccineBatchEntity,
+    onEditBatch: (String) -> Unit,
+    onDeleteBatch: (VaccineBatchEntity) -> Unit
+) {
+    var menuExpanded by remember { mutableStateOf(false) }
+
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text("Batch: ${batch.batchNumber}", fontWeight = FontWeight.Bold)
+            Text("Exp: ${formatDateForDisplay(batch.expiryDate)} • Qty: ${batch.remainingQuantity}")
+            Text("Mfg: ${batch.manufacturer} • Pur: ${formatDateForDisplay(batch.purchaseDate)}", style = MaterialTheme.typography.labelSmall)
+        }
+        
+        IconButton(onClick = { menuExpanded = true }) {
+            Icon(Icons.Default.MoreVert, null)
+            DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                DropdownMenuItem(
+                    text = { Text("Edit") },
+                    onClick = { menuExpanded = false; onEditBatch(batch.batchId) }
+                )
+                DropdownMenuItem(
+                    text = { Text("Delete", color = Color.Red) },
+                    onClick = { menuExpanded = false; onDeleteBatch(batch) }
                 )
             }
         }
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun VaccineGroupDetails(batches: List<Vaccine>, onMenuRequest: (String) -> Unit) {
-    Spacer(modifier = Modifier.height(16.dp))
-    HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
-    Spacer(modifier = Modifier.height(8.dp))
-    
-    val first = batches.first()
-    if (first.companyName.isNotEmpty()) {
-        Text(text = "Company: ${first.companyName}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(modifier = Modifier.height(12.dp))
+private fun StockStatusBadge(item: InventoryItem) {
+    Column(horizontalAlignment = Alignment.End) {
+        Text(
+            text = "${item.stock}",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Black,
+            color = if (item.isLowStock || item.hasExpired) Color.Red else MaterialTheme.colorScheme.primary
+        )
+        if (item.hasExpired) Text("EXPIRED", color = Color.Red, style = MaterialTheme.typography.labelSmall)
+        else if (item.isLowStock) Text("LOW STOCK", color = Color(0xFFE65100), style = MaterialTheme.typography.labelSmall)
     }
+}
 
-    batches.forEach { vaccine ->
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).combinedClickable(
-                onClick = { },
-                onLongClick = { onMenuRequest(vaccine.id) }
-            ),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                val isExpired = InventoryUtils.isExpired(vaccine.expiryDate)
-                val isExpiringToday = !isExpired && InventoryUtils.isExpiringToday(vaccine.expiryDate)
-                val isNearExpiry = !isExpired && !isExpiringToday && InventoryUtils.isNearExpiry(vaccine.expiryDate)
-                
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "Batch: ${vaccine.batchNumber}", 
-                        style = MaterialTheme.typography.bodyMedium, 
-                        fontWeight = FontWeight.Bold,
-                        color = if (isExpired || isExpiringToday) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
-                    )
-                    if (isExpired) {
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("(EXPIRED)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
-                    } else if (isExpiringToday) {
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("(EXPIRES TODAY)", style = MaterialTheme.typography.labelSmall, color = Color(0xFFD32F2F), fontWeight = FontWeight.Bold)
-                    } else if (isNearExpiry) {
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("(Near Expiry)", style = MaterialTheme.typography.labelSmall, color = Color(0xFFFFA000))
-                    }
-
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = "Exp: ${formatDateForDisplay(vaccine.expiryDate)}", style = MaterialTheme.typography.bodySmall)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = "${vaccine.stock}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
-                }
-                Row {
-                    Text(text = "Net: ₹${vaccine.netRate}", style = MaterialTheme.typography.bodySmall)
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(text = "MRP: ₹${vaccine.mrp}", style = MaterialTheme.typography.bodySmall)
-                }
+@Composable
+private fun FilterButton(currentFilter: InventoryFilter, onFilterSelected: (InventoryFilter) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    IconButton(onClick = { expanded = true }) {
+        Icon(Icons.Default.FilterList, "Filter")
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            InventoryFilter.entries.forEach { filter ->
+                DropdownMenuItem(
+                    text = { Text(filter.name.replace("_", " ").lowercase().capitalize()) },
+                    onClick = { onFilterSelected(filter); expanded = false },
+                    trailingIcon = { if (currentFilter == filter) Icon(Icons.Default.Check, null) }
+                )
             }
         }
     }
 }
 
 @Composable
-private fun StockBadge(stock: Int, lowStockThreshold: Int) {
-    Column(
-        modifier = Modifier
-            .fillMaxHeight()
-            .width(80.dp)
-            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
-            .padding(vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(
-            text = "$stock",
-            style = MaterialTheme.typography.headlineLarge,
-            fontWeight = FontWeight.ExtraBold,
-            color = if (stock <= lowStockThreshold) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-        )
+private fun SortButton(currentSort: InventorySort, onSortSelected: (InventorySort) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    IconButton(onClick = { expanded = true }) {
+        Icon(Icons.Default.Sort, "Sort")
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            InventorySort.entries.forEach { sort ->
+                DropdownMenuItem(
+                    text = { Text(sort.name.replace("_", " ").lowercase().capitalize()) },
+                    onClick = { onSortSelected(sort); expanded = false },
+                    trailingIcon = { if (currentSort == sort) Icon(Icons.Default.Check, null) }
+                )
+            }
+        }
     }
 }
 
-@Preview(showBackground = true)
-@Composable
-private fun VaccineInventoryPreview() {
-    NeoChildTheme {
-        VaccineInventoryContent(
-            isLoading = false,
-            lowStockThreshold = 5,
-            searchQuery = "",
-            onSearchQueryChange = {},
-            onBack = {},
-            onAddVaccine = {},
-            onEditVaccine = {},
-            onDeleteVaccine = {},
-            sortedGroups = listOf(
-                "bcg" to listOf(Vaccine("1", "BCG", "SII BCG", "SII", 10, "B123", "2025-01-01", 500.0, 400.0))
-            ),
-            onSortSelected = {}
-        )
-    }
-}
+private fun String.capitalize() = this.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }

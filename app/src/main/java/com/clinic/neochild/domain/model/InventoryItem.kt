@@ -9,5 +9,10 @@ data class InventoryItem(
     val threshold: Int,
     val type: String,
     val company: String,
-    val batches: List<VaccineBatchEntity> = emptyList()
+    val batches: List<VaccineBatchEntity> = emptyList(),
+    val isLowStock: Boolean = false,
+    val isNearExpiry: Boolean = false,
+    val hasExpired: Boolean = false,
+    val hasOutofStock: Boolean = false,
+    val activeBatchesCount: Int = 0
 )

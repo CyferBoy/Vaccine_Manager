@@ -6,7 +6,7 @@ import com.clinic.neochild.core.constants.Constants
 import com.clinic.neochild.data.local.entity.VaccineBatchEntity
 import com.clinic.neochild.data.local.entity.VaccineEntity
 import com.clinic.neochild.domain.model.BatchStatus
-import com.clinic.neochild.domain.model.Vaccine
+import com.clinic.neochild.domain.model.InventoryItem
 import com.clinic.neochild.domain.repository.InventoryRepository
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -18,7 +18,7 @@ import javax.inject.Inject
 
 data class AddVaccineStockUiState(
     val isLoading: Boolean = false,
-    val allVaccines: List<Vaccine> = emptyList(),
+    val allItems: List<InventoryItem> = emptyList(),
     val isSaved: Boolean = false,
     val error: String? = null
 )
@@ -41,8 +41,9 @@ class AddVaccineStockViewModel @Inject constructor(
     fun loadBatch(batchId: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            val batch = inventoryRepository.getAllBatches().first().find { it.batchId == batchId }
-            _editingBatch.value = batch
+            inventoryRepository.getBatchById(batchId)?.let {
+                _editingBatch.value = it
+            }
             _uiState.update { it.copy(isLoading = false) }
         }
     }
@@ -50,20 +51,7 @@ class AddVaccineStockViewModel @Inject constructor(
     private fun observeInventory() {
         viewModelScope.launch {
             inventoryRepository.getInventoryItems().collect { items ->
-                val vaccines = items.map { item ->
-                    Vaccine(
-                        id = item.id,
-                        type = item.type,
-                        brandName = item.brandName,
-                        companyName = item.company,
-                        stock = item.stock,
-                        batchNumber = "",
-                        expiryDate = "",
-                        mrp = 0.0,
-                        netRate = 0.0
-                    )
-                }
-                _uiState.update { it.copy(allVaccines = vaccines) }
+                _uiState.update { it.copy(allItems = items) }
             }
         }
     }
@@ -84,51 +72,37 @@ class AddVaccineStockViewModel @Inject constructor(
             try {
                 val user = FirebaseAuth.getInstance().currentUser?.email ?: "Unknown"
                 
-                // 1. Find or Create Vaccine Definition
-                val existingVaccines = inventoryRepository.getAllVaccines().first()
-                val def = existingVaccines.find { 
+                // Find if vaccine already exists in our list
+                val existingItem = _uiState.value.allItems.find { 
                     it.brandName.equals(brandName, true) && it.type.equals(type, true) 
                 }
 
-                val finalVaccineId = if (def == null) {
-                    val newId = UUID.randomUUID().toString()
-                    val newDef = VaccineEntity(
-                        id = newId,
-                        type = type,
-                        brandName = brandName,
-                        companyName = companyName
-                    )
-                    inventoryRepository.addVaccineDefinition(newDef)
-                    newId
-                } else {
-                    if (def.companyName != companyName) {
-                        inventoryRepository.updateVaccineDefinition(def.copy(companyName = companyName))
-                    }
-                    def.id
-                }
+                val vaccineId = existingItem?.id ?: UUID.randomUUID().toString()
+                val vaccine = VaccineEntity(
+                    id = vaccineId,
+                    type = type,
+                    brandName = brandName,
+                    companyName = companyName
+                )
 
-                // 2. Add or Update Batch
                 if (editingBatchId != null) {
-                    val batch = inventoryRepository.getAllBatches().first().find { it.batchId == editingBatchId }
-                    if (batch != null) {
-                        val updatedBatch = batch.copy(
-                            vaccineId = finalVaccineId,
-                            batchNumber = batchNumber,
-                            manufacturer = companyName,
-                            expiryDate = expiryDate,
-                            remainingQuantity = quantity, // Assuming direct update for now
-                            purchaseCost = netRate,
-                            sellingPrice = mrp
-                        )
-                        inventoryRepository.addBatch(updatedBatch, user) // insertBatch uses REPLACE
-                    }
+                    val batch = _editingBatch.value ?: throw IllegalStateException("Batch not loaded")
+                    val updatedBatch = batch.copy(
+                        vaccineId = vaccineId,
+                        batchNumber = batchNumber,
+                        manufacturer = companyName,
+                        expiryDate = expiryDate,
+                        remainingQuantity = quantity,
+                        purchaseCost = netRate,
+                        sellingPrice = mrp
+                    )
+                    inventoryRepository.updateBatch(updatedBatch, user)
                 } else {
                     val batchId = UUID.randomUUID().toString()
                     val today = SimpleDateFormat(Constants.DATE_FORMAT, Locale.ENGLISH).format(Date())
-                    
                     val batch = VaccineBatchEntity(
                         batchId = batchId,
-                        vaccineId = finalVaccineId,
+                        vaccineId = vaccineId,
                         batchNumber = batchNumber,
                         manufacturer = companyName,
                         purchaseDate = today,
@@ -140,22 +114,9 @@ class AddVaccineStockViewModel @Inject constructor(
                         sellingPrice = mrp,
                         status = BatchStatus.ACTIVE.name
                     )
-                    inventoryRepository.addBatch(batch, user)
+                    inventoryRepository.addStock(vaccine, batch, user)
                 }
                 
-                _uiState.update { it.copy(isSaved = true, isLoading = false) }
-            } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message, isLoading = false) }
-            }
-        }
-    }
-
-    fun deleteBatch(batchId: String) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
-            try {
-                val user = FirebaseAuth.getInstance().currentUser?.email ?: "Unknown"
-                inventoryRepository.deleteBatch(batchId, user)
                 _uiState.update { it.copy(isSaved = true, isLoading = false) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message, isLoading = false) }

@@ -30,7 +30,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         WidgetDueEntity::class,
         AuditLogEntity::class
     ], 
-    version = 16,
+    version = 17,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -178,6 +178,13 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_16_17 = object : Migration(16, 17) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Add vaccineIds to vaccinations table
+                db.execSQL("ALTER TABLE `vaccinations` ADD COLUMN `vaccineIds` TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val dbFile = context.getDatabasePath(DB_NAME)
@@ -218,7 +225,7 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                 .openHelperFactory(factory)
                 .setJournalMode(RoomDatabase.JournalMode.TRUNCATE)
-                .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16)
+                .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17)
                 .fallbackToDestructiveMigrationOnDowngrade()
                 .build()
                 INSTANCE = instance

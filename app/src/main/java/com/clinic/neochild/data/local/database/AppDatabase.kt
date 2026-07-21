@@ -1,6 +1,7 @@
 package com.clinic.neochild.data.local.database
 
 import android.content.Context
+import android.util.Log
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -45,6 +46,9 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun auditLogDao(): AuditLogDao
 
     companion object {
+        private const val TAG = "AppDatabase"
+        private const val DB_NAME = "neochild_db"
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -176,12 +180,21 @@ abstract class AppDatabase : RoomDatabase() {
 
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
-                val passphrase = SecurityUtils.getDatabasePassphrase(context)
+                val dbFile = context.getDatabasePath(DB_NAME)
+                val isNewDatabase = !dbFile.exists()
+
+                val passphrase = try {
+                    SecurityUtils.getDatabasePassphrase(context, shouldGenerate = isNewDatabase)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Passphrase unavailable. Preventing database initialization to protect data.", e)
+                    // We throw here. The application should catch this at a higher level (e.g. in DatabaseModule or UI)
+                    throw IllegalStateException("Security keys could not be loaded. Please ensure your device is unlocked.", e)
+                }
+
                 val factory = SupportOpenHelperFactory(passphrase)
                 
-                val dbFile = context.getDatabasePath("neochild_db")
-                
-                if (dbFile.exists()) {
+                if (!isNewDatabase) {
+                    Log.d(TAG, "Opening encrypted database...")
                     try {
                         net.zetetic.database.sqlcipher.SQLiteDatabase.openDatabase(
                             dbFile.absolutePath, 
@@ -190,17 +203,18 @@ abstract class AppDatabase : RoomDatabase() {
                             net.zetetic.database.sqlcipher.SQLiteDatabase.OPEN_READONLY,
                             null
                         ).close()
+                        Log.d(TAG, "Database opened successfully.")
                     } catch (e: Exception) {
-                        // Key mismatch or corruption. Since we use EncryptedSharedPreferences for the key,
-                        // if that failed and was reset in SecurityUtils, we must recreate the database.
-                        context.deleteDatabase("neochild_db")
+                        Log.e(TAG, "Database open failed. Key mismatch or corruption suspected.", e)
+                        // CRITICAL: Never delete the database automatically.
+                        throw IllegalStateException("Unable to access the encrypted database. Your security keys could not be loaded.", e)
                     }
                 }
 
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
-                    "neochild_db"
+                    DB_NAME
                 )
                 .openHelperFactory(factory)
                 .setJournalMode(RoomDatabase.JournalMode.TRUNCATE)

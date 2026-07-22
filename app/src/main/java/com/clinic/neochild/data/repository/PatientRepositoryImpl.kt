@@ -17,6 +17,7 @@ import com.clinic.neochild.domain.repository.SyncRepository
 import com.clinic.neochild.core.model.SyncOperation
 import com.clinic.neochild.core.model.SyncPriority
 import com.clinic.neochild.core.logger.AuditLogger
+import com.clinic.neochild.core.utils.PatientIdGenerator
 import com.clinic.neochild.data.remote.mapper.FirestoreMappers
 import androidx.room.withTransaction
 import com.google.firebase.firestore.FirebaseFirestore
@@ -37,7 +38,8 @@ class PatientRepositoryImpl @Inject constructor(
     private val notesDao: PatientNotesDao,
     private val firestore: FirebaseFirestore,
     private val syncRepository: SyncRepository,
-    private val auditLogger: AuditLogger
+    private val auditLogger: AuditLogger,
+    private val idGenerator: PatientIdGenerator
 ) : PatientRepository {
 
     override val allPatients: Flow<List<Patient>> = 
@@ -51,23 +53,60 @@ class PatientRepositoryImpl @Inject constructor(
         withContext(Dispatchers.IO) {
             try {
                 val snapshot = firestore.collection("patients").get().await()
-                val patients = snapshot.documents.mapNotNull { FirestoreMappers.toPatient(it) }
-                patientDao.insertPatients(patients.map { it.toEntity() })
-            } catch (_: Exception) {}
+                val patients = snapshot.documents.mapNotNull { 
+                    try {
+                        FirestoreMappers.toPatient(it)
+                    } catch (e: Exception) {
+                        android.util.Log.e("PatientRepo", "Mapping failed for doc ${it.id}", e)
+                        null
+                    }
+                }
+                
+                android.util.Log.d("PatientRepo", "Pulled ${patients.size} patients from Firestore")
+                
+                database.withTransaction {
+                    for (patient in patients) {
+                        try {
+                            // 1. Uniqueness check for clinic ID
+                            if (patient.patientClinicId.isNotBlank()) {
+                                val existingByClinicId = patientDao.getPatientByClinicId(patient.patientClinicId)
+                                if (existingByClinicId != null && existingByClinicId.id != patient.id) {
+                                    // Handle duplicate Clinic ID conflict
+                                    val resolvedId = patient.patientClinicId + "-CONFLICT-" + patient.id.take(4)
+                                    patientDao.insertPatient(patient.copy(patientClinicId = resolvedId).toEntity())
+                                    continue
+                                }
+                            }
+
+                            // 2. Insert or update
+                            patientDao.insertPatient(patient.toEntity())
+                        } catch (e: Exception) {
+                            android.util.Log.e("PatientRepo", "Insert failed for patient ${patient.id}", e)
+                        }
+                    }
+                }
+                android.util.Log.d("PatientRepo", "Refresh complete. Total local: ${patientDao.getTotalPatientCount()}")
+            } catch (e: Exception) {
+                android.util.Log.e("PatientRepo", "Refresh failed", e)
+                throw e // Propagate to UI
+            }
         }
     }
 
     override suspend fun addPatient(patient: Patient) {
         database.withTransaction {
-            // Business Rule: patientClinicId must be unique
-            if (patient.patientClinicId.isNotBlank()) {
-                val existing = patientDao.getPatientByClinicId(patient.patientClinicId)
-                if (existing != null && existing.id != patient.id) {
+            // Business Rule: patientClinicId must be unique. 
+            // If empty, generate one.
+            val finalClinicId = if (patient.patientClinicId.isBlank()) {
+                idGenerator.generateUniqueClinicId()
+            } else {
+                if (!idGenerator.isIdUnique(patient.patientClinicId, patient.id)) {
                     throw IllegalStateException("A patient with Clinic ID ${patient.patientClinicId} already exists.")
                 }
+                patient.patientClinicId
             }
 
-            val entity = patient.toEntity(isSynced = false)
+            val entity = patient.copy(patientClinicId = finalClinicId).toEntity(isSynced = false)
             patientDao.insertPatient(entity)
             
             syncRepository.enqueue(

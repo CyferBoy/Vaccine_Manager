@@ -29,7 +29,8 @@ data class PatientListUiState(
     val selectedPatients: Set<Patient> = emptySet(),
     val isMerging: Boolean = false,
     val patientsWithMissingPrice: Set<String> = emptySet(),
-    val totalCount: Int = 0
+    val totalCount: Int = 0,
+    val isRefreshing: Boolean = false
 )
 
 @HiltViewModel
@@ -49,6 +50,8 @@ class PatientListViewModel @Inject constructor(
     private val _isMerging = MutableStateFlow(false)
     private val _error = MutableStateFlow<String?>(null)
 
+    private val _isRefreshing = MutableStateFlow(false)
+
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class, kotlinx.coroutines.FlowPreview::class)
     val uiState: StateFlow<PatientListUiState> = _searchQuery
         .debounce(300)
@@ -57,8 +60,8 @@ class PatientListViewModel @Inject constructor(
                 searchPatientsUseCase(query),
                 _sortOption,
                 getVaccinationsUseCase(),
-                combine(_isMergeSelectionMode, _selectedPatients, _isMerging, _error) { mode, selected, merging, err ->
-                    Quad(mode, selected, merging, err)
+                combine(_isMergeSelectionMode, _selectedPatients, _isMerging, _error, _isRefreshing) { mode, selected, merging, err, refreshing ->
+                    RefreshState(mode, selected, merging, err, refreshing)
                 },
                 flow { emit(patientRepository.getTotalPatientCount()) }
             ) { patients, sort, vaccinations, internalState, total ->
@@ -77,12 +80,13 @@ class PatientListViewModel @Inject constructor(
                     isLoading = false,
                     searchQuery = query,
                     sortOption = sort,
-                    isMergeSelectionMode = internalState.first,
-                    selectedPatients = internalState.second,
-                    isMerging = internalState.third,
-                    error = internalState.fourth,
+                    isMergeSelectionMode = internalState.mode,
+                    selectedPatients = internalState.selected,
+                    isMerging = internalState.merging,
+                    error = internalState.error,
                     patientsWithMissingPrice = missingPrice,
-                    totalCount = total
+                    totalCount = total,
+                    isRefreshing = internalState.refreshing
                 )
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), PatientListUiState(isLoading = true))
@@ -93,10 +97,13 @@ class PatientListViewModel @Inject constructor(
 
     fun refresh() {
         viewModelScope.launch {
+            _isRefreshing.value = true
             try {
                 refreshDataUseCase()
             } catch (e: Exception) {
                 _error.value = "Refresh failed: ${e.message}"
+            } finally {
+                _isRefreshing.value = false
             }
         }
     }
@@ -181,4 +188,4 @@ class PatientListViewModel @Inject constructor(
     }
 }
 
-private data class Quad<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
+private data class RefreshState<A, B, C, D, E>(val mode: A, val selected: B, val merging: C, val error: D, val refreshing: E)

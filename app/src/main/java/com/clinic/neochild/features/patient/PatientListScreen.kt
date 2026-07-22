@@ -25,7 +25,12 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.clinic.neochild.domain.model.Patient
-import com.clinic.neochild.core.ui.*
+import com.clinic.neochild.core.ui.AppPullToRefresh
+import com.clinic.neochild.core.ui.StandardButton
+import com.clinic.neochild.core.ui.AppBackground
+import com.clinic.neochild.core.ui.DeleteConfirmationDialog
+import com.clinic.neochild.core.ui.SearchTopAppBar
+import com.clinic.neochild.core.ui.ActionDropdownMenu
 import com.clinic.neochild.core.designsystem.NeoChildTheme
 import com.clinic.neochild.core.utils.PatientUtils.calculateAgeLabel
 
@@ -80,6 +85,7 @@ fun PatientListScreen(
             if (uiState.isMergeSelectionMode) viewModel.clearSelection()
             else onBack()
         },
+        onRefresh = viewModel::refresh,
         onAddPatient = onAddPatient,
         onSearchQueryChange = viewModel::updateSearchQuery,
         onMergeClick = { showManualMergeDialog = true },
@@ -101,6 +107,7 @@ fun PatientListScreen(
 private fun PatientListContent(
     uiState: PatientListUiState,
     onBack: () -> Unit,
+    onRefresh: () -> Unit,
     onAddPatient: () -> Unit,
     onSearchQueryChange: (String) -> Unit,
     onMergeClick: () -> Unit,
@@ -133,36 +140,50 @@ private fun PatientListContent(
                 }
             }
         ) { paddingValues ->
-            if (uiState.isLoading) {
-                Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-            } else if (uiState.patients.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
-                    Text("No patients found", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues)
-                        .padding(horizontal = 8.dp),
-                    contentPadding = PaddingValues(bottom = 88.dp, top = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(uiState.patients, key = { it.id }) { patient ->
-                        PatientCard(
-                            patient = patient,
-                            isSelected = uiState.selectedPatients.contains(patient),
-                            isMergeMode = uiState.isMergeSelectionMode,
-                            hasMissingPrice = uiState.patientsWithMissingPrice.contains(patient.id),
-                            onClick = { onPatientClick(patient) },
-                            onLongClick = { onPatientLongClick(patient) },
-                            onEdit = { onEditPatient(patient.id) },
-                            onDelete = { onDeletePatient(patient) },
-                            onToggleSelection = { onToggleSelection(patient) },
-                            modifier = Modifier.animateItem()
-                        )
+            AppPullToRefresh(
+                isRefreshing = uiState.isRefreshing,
+                onRefresh = onRefresh,
+                modifier = Modifier.padding(paddingValues)
+            ) {
+                if (uiState.isLoading) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                } else if (uiState.patients.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("No patients found", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            if (uiState.totalCount > 0) {
+                                Text(
+                                    "(${uiState.totalCount} records are archived or hidden)",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 8.dp),
+                        contentPadding = PaddingValues(bottom = 88.dp, top = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(uiState.patients, key = { it.id }) { patient ->
+                            PatientCard(
+                                patient = patient,
+                                isSelected = uiState.selectedPatients.contains(patient),
+                                isMergeMode = uiState.isMergeSelectionMode,
+                                hasMissingPrice = uiState.patientsWithMissingPrice.contains(patient.id),
+                                onClick = { onPatientClick(patient) },
+                                onLongClick = { onPatientLongClick(patient) },
+                                onEdit = { onEditPatient(patient.id) },
+                                onDelete = { onDeletePatient(patient) },
+                                onToggleSelection = { onToggleSelection(patient) },
+                                modifier = Modifier.animateItem()
+                            )
+                        }
                     }
                 }
             }
@@ -363,7 +384,8 @@ private fun PatientListPreview() {
             onPatientLongClick = {},
             onEditPatient = {},
             onDeletePatient = {},
-            onToggleSelection = {}
+            onToggleSelection = {},
+            onRefresh = {}
         )
     }
 }

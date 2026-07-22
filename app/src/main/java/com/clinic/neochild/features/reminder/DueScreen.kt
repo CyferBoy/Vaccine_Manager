@@ -10,6 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.clinic.neochild.core.ui.AppBackground
+import com.clinic.neochild.core.ui.AppPullToRefresh
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,7 +39,11 @@ fun DueScreen(
                 )
             }
         ) { paddingValues ->
-            Box(modifier = Modifier.padding(paddingValues).fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+            AppPullToRefresh(
+                isRefreshing = uiState.isRefreshing,
+                onRefresh = viewModel::refresh,
+                modifier = Modifier.padding(paddingValues)
+            ) {
                 if (uiState.isLoading) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()

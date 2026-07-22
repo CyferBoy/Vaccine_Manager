@@ -19,6 +19,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import android.widget.Toast
 import androidx.compose.ui.unit.dp
+import com.clinic.neochild.core.ui.AppBackground
+import com.clinic.neochild.core.ui.DeleteConfirmationDialog
+import com.clinic.neochild.core.ui.SearchTopAppBar
+import com.clinic.neochild.core.ui.ActionDropdownMenu
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.clinic.neochild.core.designsystem.NeoChildTheme
 import com.clinic.neochild.core.ui.*
@@ -69,10 +73,11 @@ fun VaccineInventoryScreen(
 
     VaccineInventoryContent(
         uiState = uiState,
+        onBack = onBack,
+        onRefresh = viewModel::refresh,
         onSearchQueryChange = viewModel::onSearchQueryChange,
         onFilterChange = viewModel::onFilterChange,
         onSortChange = viewModel::onSortChange,
-        onBack = onBack,
         onAddVaccine = onAddVaccine,
         onEditBatch = onEditBatch,
         onDeleteBatch = { batchToDelete = it },
@@ -88,10 +93,11 @@ fun VaccineInventoryScreen(
 @Composable
 private fun VaccineInventoryContent(
     uiState: VaccineInventoryUiState,
+    onBack: () -> Unit,
+    onRefresh: () -> Unit,
     onSearchQueryChange: (String) -> Unit,
     onFilterChange: (InventoryFilter) -> Unit,
     onSortChange: (InventorySort) -> Unit,
-    onBack: () -> Unit,
     onAddVaccine: () -> Unit,
     onEditBatch: (String) -> Unit,
     onDeleteBatch: (VaccineBatchEntity) -> Unit,
@@ -123,28 +129,34 @@ private fun VaccineInventoryContent(
                 }
             }
         ) { padding ->
-            if (uiState.isLoading) {
-                Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-            } else if (uiState.inventory.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                    Text(if (uiState.searchQuery.isEmpty()) "No inventory found" else "No results found")
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize().padding(padding),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(uiState.inventory, key = { it.id }) { item ->
-                        VaccineItemCard(
-                            item = item,
-                            onEditBatch = onEditBatch,
-                            onDeleteBatch = onDeleteBatch,
-                            onEditVaccine = onEditVaccine,
-                            onDeleteVaccine = onDeleteVaccine
-                        )
+            AppPullToRefresh(
+                isRefreshing = uiState.isRefreshing,
+                onRefresh = onRefresh,
+                modifier = Modifier.padding(padding)
+            ) {
+                if (uiState.isLoading) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                } else if (uiState.inventory.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(if (uiState.searchQuery.isEmpty()) "No inventory found" else "No results found")
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(uiState.inventory, key = { it.id }) { item ->
+                            VaccineItemCard(
+                                item = item,
+                                onEditBatch = onEditBatch,
+                                onDeleteBatch = onDeleteBatch,
+                                onEditVaccine = onEditVaccine,
+                                onDeleteVaccine = onDeleteVaccine
+                            )
+                        }
                     }
                 }
             }

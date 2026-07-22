@@ -207,6 +207,10 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE `patients` ADD COLUMN `attachments` TEXT")
                 
                 // Deduplicate patientClinicId before creating UNIQUE index
+                // 1. Ensure no NULLs (if any exist from older versions)
+                db.execSQL("UPDATE patients SET patientClinicId = '' WHERE patientClinicId IS NULL")
+                
+                // 2. Identify and rename duplicates
                 db.execSQL("""
                     UPDATE patients 
                     SET patientClinicId = patientClinicId || '-DUP-' || substr(id, 1, 4)
@@ -214,6 +218,10 @@ abstract class AppDatabase : RoomDatabase() {
                         SELECT MIN(rowid) FROM patients GROUP BY patientClinicId
                     )
                 """)
+                
+                // 3. Ensure no NULLs for isSynced and isDeleted (Room expects Int 0/1)
+                db.execSQL("UPDATE patients SET isSynced = 1 WHERE isSynced IS NULL")
+                db.execSQL("UPDATE patients SET isDeleted = 0 WHERE isDeleted IS NULL")
 
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_patients_name` ON `patients` (`name`)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_patients_phone` ON `patients` (`phone`)")

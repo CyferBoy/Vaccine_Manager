@@ -26,7 +26,8 @@ data class DueUiState(
     val filteredVaccinations: List<Vaccination> = emptyList(),
     val isLoading: Boolean = false,
     val selectedFilter: String = "Today",
-    val overdueCount: Int = 0
+    val overdueCount: Int = 0,
+    val isRefreshing: Boolean = false
 )
 
 @HiltViewModel
@@ -43,14 +44,17 @@ class DueViewModel @Inject constructor(
     private val _searchQuery = MutableStateFlow("")
     val searchQuery = _searchQuery.asStateFlow()
 
+    private val _isRefreshing = MutableStateFlow(false)
+
     private val currentUserEmail: String
         get() = auth.currentUser?.email ?: "Unknown Staff"
 
     val uiState: StateFlow<DueUiState> = combine(
         getPatientsUseCase(),
         _searchQuery,
-        _selectedFilter
-    ) { patients, query, filter ->
+        _selectedFilter,
+        _isRefreshing
+    ) { patients, query, filter, refreshing ->
         
         val filterStatus = when (filter) {
             "Completed" -> listOf(ReminderStatus.COMPLETED)
@@ -83,9 +87,22 @@ class DueViewModel @Inject constructor(
             filteredVaccinations = filtered,
             isLoading = false,
             selectedFilter = filter,
-            overdueCount = overdue
+            overdueCount = overdue,
+            isRefreshing = refreshing
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DueUiState(isLoading = true))
+
+    fun refresh() {
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            try {
+                reminderRepository.refreshReminders()
+            } catch (_: Exception) { }
+            finally {
+                _isRefreshing.value = false
+            }
+        }
+    }
 
     fun updateFilter(filter: String) {
         _selectedFilter.value = filter

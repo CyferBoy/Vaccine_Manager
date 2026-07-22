@@ -16,6 +16,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.clinic.neochild.domain.model.Patient
 import com.clinic.neochild.domain.model.Vaccination
 import com.clinic.neochild.core.designsystem.NeoChildTheme
+import com.clinic.neochild.core.ui.AppPullToRefresh
 import kotlinx.coroutines.launch
 
 @Composable
@@ -35,6 +36,7 @@ fun StatisticsScreen(
             viewModel.updateTab(tab)
             scope.launch { drawerState.close() }
         },
+        onRefresh = viewModel::refresh,
         onMenuClick = { scope.launch { drawerState.open() } },
         onBack = onBack,
         onMonthClick = onMonthClick
@@ -47,6 +49,7 @@ private fun StatisticsContent(
     uiState: StatisticsUiState,
     drawerState: DrawerState,
     onTabSelected: (Int) -> Unit,
+    onRefresh: () -> Unit,
     onMenuClick: () -> Unit,
     onBack: () -> Unit,
     onMonthClick: (String) -> Unit
@@ -89,7 +92,11 @@ private fun StatisticsContent(
                 )
             },
         ) { paddingValues ->
-            Box(modifier = Modifier.padding(paddingValues).fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+            AppPullToRefresh(
+                isRefreshing = uiState.isRefreshing,
+                onRefresh = onRefresh,
+                modifier = Modifier.padding(paddingValues)
+            ) {
                 if (uiState.isLoading) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
@@ -180,7 +187,8 @@ private fun StatisticsPreview() {
             onTabSelected = {},
             onMenuClick = {},
             onBack = {},
-            onMonthClick = {}
+            onMonthClick = {},
+            onRefresh = {}
         )
     }
 }

@@ -42,7 +42,7 @@ fun OverdueSummaryCard(overdueCount: Int) {
             Spacer(modifier = Modifier.width(16.dp))
             Column {
                 Text("Overdue Vaccinations", fontWeight = FontWeight.Bold, color = if (overdueCount > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("$overdueCount patients currently overdue (incl. Yesterday)", style = MaterialTheme.typography.bodySmall)
+                Text("$overdueCount patients currently overdue", style = MaterialTheme.typography.bodySmall)
             }
             Spacer(modifier = Modifier.weight(1f))
             Text(overdueCount.toString(), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = if (overdueCount > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
@@ -124,11 +124,11 @@ fun DuePatientCard(
                         val statusText = when {
                             vaccination.isDone && vaccination.nextDueDate.isBlank() -> "✅ Completed"
                             vaccination.isDone -> "✅ Done"
-                            category is DateCategory.Overdue || category is DateCategory.Yesterday -> "⏰ Overdue"
+                            category is DateCategory.Overdue -> "⏰ Overdue"
                             else -> "⏰ Due"
                         }
                         val statusColor = if (vaccination.isDone) Color(0xFF4CAF50) else {
-                            if (category is DateCategory.Overdue || category is DateCategory.Yesterday) MaterialTheme.colorScheme.error
+                            if (category is DateCategory.Overdue) MaterialTheme.colorScheme.error
                             else MaterialTheme.colorScheme.primary
                         }
                         

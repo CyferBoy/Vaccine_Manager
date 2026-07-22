@@ -16,8 +16,14 @@ interface DueReminderDao {
     @Query("SELECT * FROM due_reminders WHERE id = :id LIMIT 1")
     suspend fun getDueReminderById(id: Long): DueReminderEntity?
 
+    @Query("SELECT * FROM due_reminders WHERE patientId = :pId AND originalVisitId = :vId AND vaccineName = :name LIMIT 1")
+    suspend fun getDueReminderByStableId(pId: String, vId: String, name: String): DueReminderEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertDueReminder(reminder: DueReminderEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertDueReminders(reminders: List<DueReminderEntity>)
 
     @Update
     suspend fun updateDueReminder(reminder: DueReminderEntity)
@@ -35,8 +41,14 @@ interface DueReminderDao {
     @Query("SELECT * FROM completed_reminders WHERE id = :id LIMIT 1")
     suspend fun getCompletedReminderById(id: Long): CompletedReminderEntity?
 
+    @Query("SELECT * FROM completed_reminders WHERE patientId = :pId AND originalVisitId = :vId AND vaccineName = :name LIMIT 1")
+    suspend fun getCompletedReminderByStableId(pId: String, vId: String, name: String): CompletedReminderEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCompletedReminder(reminder: CompletedReminderEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCompletedReminders(reminders: List<CompletedReminderEntity>)
 
     @Query("DELETE FROM completed_reminders WHERE patientId = :patientId AND originalVisitId = :visitId AND vaccineName = :vaccineName")
     suspend fun deleteCompletedReminder(patientId: String, visitId: String, vaccineName: String)
@@ -48,8 +60,14 @@ interface DueReminderDao {
     @Query("SELECT * FROM dismissed_reminders WHERE id = :id LIMIT 1")
     suspend fun getDismissedReminderById(id: Long): DismissedReminderEntity?
 
+    @Query("SELECT * FROM dismissed_reminders WHERE patientId = :pId AND originalVisitId = :vId AND vaccineName = :name LIMIT 1")
+    suspend fun getDismissedReminderByStableId(pId: String, vId: String, name: String): DismissedReminderEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertDismissedReminder(reminder: DismissedReminderEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertDismissedReminders(reminders: List<DismissedReminderEntity>)
 
     @Query("DELETE FROM dismissed_reminders WHERE patientId = :patientId AND originalVisitId = :visitId AND vaccineName = :vaccineName")
     suspend fun deleteDismissedReminder(patientId: String, visitId: String, vaccineName: String)
@@ -61,8 +79,14 @@ interface DueReminderDao {
     @Query("SELECT * FROM external_reminders WHERE id = :id LIMIT 1")
     suspend fun getExternalReminderById(id: Long): ExternalReminderEntity?
 
+    @Query("SELECT * FROM external_reminders WHERE patientId = :pId AND originalVisitId = :vId AND vaccineName = :name LIMIT 1")
+    suspend fun getExternalReminderByStableId(pId: String, vId: String, name: String): ExternalReminderEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertExternalReminder(reminder: ExternalReminderEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertExternalReminders(reminders: List<ExternalReminderEntity>)
 
     @Query("DELETE FROM external_reminders WHERE patientId = :patientId AND originalVisitId = :visitId AND vaccineName = :vaccineName")
     suspend fun deleteExternalReminder(patientId: String, visitId: String, vaccineName: String)

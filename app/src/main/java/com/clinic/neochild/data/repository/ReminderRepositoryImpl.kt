@@ -143,11 +143,13 @@ class ReminderRepositoryImpl @Inject constructor(
         val todayStart = todayCal.timeInMillis
 
         ReminderStats(
-            dueToday = dueList.count { DateClassifier.classify(it.nextDueDate, todayCal) is DateCategory.Today },
+            dueToday = dueList.count { 
+                val cat = DateClassifier.classify(it.nextDueDate, todayCal)
+                cat is DateCategory.Today || cat is DateCategory.GracePeriod 
+            },
             dueTomorrow = dueList.count { DateClassifier.classify(it.nextDueDate, todayCal) is DateCategory.Tomorrow },
             overdue = dueList.count { 
-                val cat = DateClassifier.classify(it.nextDueDate, todayCal)
-                cat is DateCategory.Overdue || cat is DateCategory.Yesterday 
+                DateClassifier.classify(it.nextDueDate, todayCal) is DateCategory.Overdue
             },
             completedToday = completedEntities.count { it.completionDate >= todayStart },
             rescheduledToday = dueEntities.count { it.status == ReminderStatus.RESCHEDULED.name && it.updatedAt >= todayStart },

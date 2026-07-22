@@ -153,27 +153,16 @@ fun VaccinationCardDates(vaccination: Vaccination) {
         Column(horizontalAlignment = Alignment.End) {
             Text(text = "NEXT DUE DATE", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                val nextDueDateDisplay = if (vaccination.nextDueDate.isBlank()) "None" else DateClassifier.formatDisplay(vaccination.nextDueDate)
+                val nextDueDateDisplay = if (vaccination.nextDueDate.isBlank()) "None" else formatDateForDisplay(vaccination.nextDueDate)
                 Text(
                     text = nextDueDateDisplay, 
                     style = MaterialTheme.typography.bodySmall, 
                     fontWeight = FontWeight.Medium, 
                     color = if (vaccination.nextDueDate.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary
                 )
-                Spacer(modifier = Modifier.width(4.dp))
-                if (vaccination.isDone) {
+                if (vaccination.isDone && vaccination.nextDueDate.isNotBlank()) {
+                    Spacer(modifier = Modifier.width(4.dp))
                     Text(text = "✅ Done", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color(0xFF4CAF50))
-                } else {
-                    val category = if (vaccination.nextDueDate.isNotBlank()) DateClassifier.classify(vaccination.nextDueDate) else null
-                    val isActuallyOverdue = !vaccination.isDone && category != null && 
-                        (category is DateCategory.Overdue || category is DateCategory.Yesterday)
-                    
-                    Text(
-                        text = if (isActuallyOverdue) "⏰ Overdue" else "⏰ Due", 
-                        style = MaterialTheme.typography.labelSmall, 
-                        fontWeight = FontWeight.Bold, 
-                        color = if (isActuallyOverdue) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-                    )
                 }
             }
         }

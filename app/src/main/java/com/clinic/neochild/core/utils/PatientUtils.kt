@@ -163,9 +163,8 @@ object PatientUtils {
         return pendingVaccinations.filter { v ->
             val category = DateClassifier.classify(v.nextDueDate)
             when (filter) {
-                "Overdue" -> category is DateCategory.Overdue || category is DateCategory.Yesterday
-                "Yesterday" -> category is DateCategory.Yesterday
-                "Today" -> category is DateCategory.Today
+                "Overdue" -> category is DateCategory.Overdue
+                "Today" -> category is DateCategory.Today || category is DateCategory.GracePeriod
                 "Tomorrow" -> category is DateCategory.Tomorrow
                 "This Week" -> {
                     val date = parseDate(v.nextDueDate)

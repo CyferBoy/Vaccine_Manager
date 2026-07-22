@@ -77,12 +77,14 @@ class VaccineInventoryViewModel @Inject constructor(
         }
     }
 
-    fun deleteVaccine(vaccineId: String) {
+    fun deleteVaccine(vaccineId: String, onError: (String) -> Unit = {}) {
         viewModelScope.launch {
             try {
                 val user = FirebaseAuth.getInstance().currentUser?.email ?: "Unknown"
                 inventoryRepository.deleteVaccine(vaccineId, user)
-            } catch (_: Exception) { }
+            } catch (e: Exception) {
+                onError(e.message ?: "Failed to delete vaccine")
+            }
         }
     }
 }

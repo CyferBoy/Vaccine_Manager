@@ -26,7 +26,9 @@ data class DueReminderEntity(
     val updatedAt: Long = System.currentTimeMillis(),
     val isSynced: Boolean = false,
     val isDeleted: Boolean = false
-)
+) {
+    fun getStableId(): String = "${patientId}_${originalVisitId}_${vaccineName}"
+}
 
 @Entity(
     tableName = "completed_reminders",
@@ -43,7 +45,9 @@ data class CompletedReminderEntity(
     val notes: String? = null,
     val isSynced: Boolean = false,
     val isDeleted: Boolean = false
-)
+) {
+    fun getStableId(): String = "${patientId}_${originalVisitId}_${vaccineName}"
+}
 
 @Entity(
     tableName = "dismissed_reminders",
@@ -60,7 +64,9 @@ data class DismissedReminderEntity(
     val reason: String? = null,
     val isSynced: Boolean = false,
     val isDeleted: Boolean = false
-)
+) {
+    fun getStableId(): String = "${patientId}_${originalVisitId}_${vaccineName}"
+}
 
 @Entity(
     tableName = "external_reminders",
@@ -78,7 +84,9 @@ data class ExternalReminderEntity(
     val notes: String? = null,
     val isSynced: Boolean = false,
     val isDeleted: Boolean = false
-)
+) {
+    fun getStableId(): String = "${patientId}_${originalVisitId}_${vaccineName}"
+}
 
 // Keep the old entity for migration purposes if needed, 
 // but we'll use the new ones from now on.

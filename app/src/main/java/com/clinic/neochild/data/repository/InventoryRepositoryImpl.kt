@@ -110,28 +110,44 @@ class InventoryRepositoryImpl @Inject constructor(
 
     override suspend fun addStock(vaccine: VaccineEntity, batch: VaccineBatchEntity, user: String) {
         database.withTransaction {
-            val existing = vaccineDao.getVaccineById(vaccine.id)
-            if (existing == null) {
-                vaccineDao.insertVaccine(vaccine)
-                syncRepository.enqueue("VACCINE", vaccine.id, SyncOperation.CREATE, SyncPriority.MEDIUM)
+            // Try to find existing vaccine by ID first, then by Name and Type to prevent duplicates
+            var finalVaccine = vaccineDao.getVaccineByIdIncludingDeleted(vaccine.id)
+            
+            if (finalVaccine == null) {
+                finalVaccine = vaccineDao.getVaccineByNameAndTypeIncludingDeleted(vaccine.brandName, vaccine.type)
             }
 
-            val currentTotal = vaccineDao.getTotalStockForVaccine(batch.vaccineId) ?: 0
-            vaccineDao.insertBatch(batch)
+            val finalVaccineId = if (finalVaccine != null) {
+                if (finalVaccine.isDeleted) {
+                    // Restore archived vaccine
+                    vaccineDao.updateVaccine(finalVaccine.copy(isDeleted = false, lastUpdated = System.currentTimeMillis()))
+                    syncRepository.enqueue("VACCINE", finalVaccine.id, SyncOperation.UPDATE, SyncPriority.MEDIUM)
+                    auditLogger.logAction("Vaccine Restored", user, "Vaccine: ${finalVaccine.brandName}")
+                }
+                finalVaccine.id
+            } else {
+                vaccineDao.insertVaccine(vaccine.copy(isDeleted = false))
+                syncRepository.enqueue("VACCINE", vaccine.id, SyncOperation.CREATE, SyncPriority.MEDIUM)
+                vaccine.id
+            }
+
+            val currentTotal = vaccineDao.getTotalStockForVaccine(finalVaccineId) ?: 0
+            val finalBatch = batch.copy(vaccineId = finalVaccineId)
+            vaccineDao.insertBatch(finalBatch)
 
             vaccineDao.insertTransaction(InventoryTransactionEntity(
-                vaccineId = batch.vaccineId,
-                batchId = batch.batchId,
+                vaccineId = finalVaccineId,
+                batchId = finalBatch.batchId,
                 transactionType = InventoryTransactionType.PURCHASE.name,
-                quantity = batch.purchaseQuantity,
+                quantity = finalBatch.purchaseQuantity,
                 previousQuantity = currentTotal,
-                currentQuantity = currentTotal + batch.purchaseQuantity,
+                currentQuantity = currentTotal + finalBatch.purchaseQuantity,
                 user = user,
-                notes = "Stock Added: ${batch.batchNumber}"
+                notes = "Stock Added: ${finalBatch.batchNumber}"
             ))
 
-            auditLogger.logAction("Stock Added", user, "Vaccine: ${vaccine.brandName}, Batch: ${batch.batchNumber}, Qty: ${batch.purchaseQuantity}")
-            syncRepository.enqueue("BATCH", batch.batchId, SyncOperation.CREATE, SyncPriority.MEDIUM)
+            auditLogger.logAction("Stock Added", user, "Vaccine: ${vaccine.brandName}, Batch: ${finalBatch.batchNumber}, Qty: ${finalBatch.purchaseQuantity}")
+            syncRepository.enqueue("BATCH", finalBatch.batchId, SyncOperation.CREATE, SyncPriority.MEDIUM)
         }
     }
 
@@ -181,23 +197,51 @@ class InventoryRepositoryImpl @Inject constructor(
 
             auditLogger.logAction("Batch Deleted", user, "Batch: ${batch.batchNumber}, Removed Qty: ${batch.remainingQuantity}")
             syncRepository.enqueue("BATCH", batchId, SyncOperation.UPDATE, SyncPriority.MEDIUM)
+
+            // Check if this was the last batch
+            val remainingBatches = vaccineDao.getBatchesByVaccineSync(batch.vaccineId)
+            if (remainingBatches.isEmpty()) {
+                val vaccine = vaccineDao.getVaccineById(batch.vaccineId)
+                if (vaccine != null && !vaccine.isDeleted) {
+                    vaccineDao.updateVaccine(vaccine.copy(isDeleted = true))
+                    syncRepository.enqueue("VACCINE", vaccine.id, SyncOperation.UPDATE, SyncPriority.MEDIUM)
+                    auditLogger.logAction("Vaccine Archived", user, "Vaccine: ${vaccine.brandName} (Final batch removed)")
+                }
+            }
         }
     }
 
     override suspend fun deleteVaccine(vaccineId: String, user: String) {
         database.withTransaction {
-            val vaccine = vaccineDao.getVaccineById(vaccineId) ?: return@withTransaction
-            val batches = vaccineDao.getBatchesByVaccineSync(vaccineId)
+            val vaccine = vaccineDao.getVaccineByIdIncludingDeleted(vaccineId) ?: return@withTransaction
             
-            for (batch in batches) {
-                if (!batch.isDeleted) {
-                    deleteBatch(batch.batchId, user)
-                }
+            // 1. Check for ANY batches (including soft-deleted)
+            val batchCount = vaccineDao.getBatchCountForVaccine(vaccineId)
+            if (batchCount > 0) {
+                throw IllegalStateException("This vaccine cannot be deleted because batch records still exist.")
             }
             
-            vaccineDao.updateVaccine(vaccine.copy(isDeleted = true))
-            auditLogger.logAction("Vaccine Deleted", user, "Vaccine: ${vaccine.brandName}")
-            syncRepository.enqueue("VACCINE", vaccineId, SyncOperation.UPDATE, SyncPriority.MEDIUM)
+            // 2. Check historical references
+            val vaccinationCount = vaccineDao.getVaccinationCountForVaccine(vaccineId)
+            val wasteCount = vaccineDao.getWasteCountForVaccine(vaccineId)
+            val transactionCount = vaccineDao.getTransactionCountForVaccine(vaccineId)
+            val auditCount = vaccineDao.getAuditCountForVaccine(vaccine.brandName)
+            
+            val hasHistory = vaccinationCount > 0 || wasteCount > 0 || transactionCount > 0 || auditCount > 0
+            
+            if (hasHistory) {
+                // Archive (Soft-delete) if not already
+                if (!vaccine.isDeleted) {
+                    vaccineDao.updateVaccine(vaccine.copy(isDeleted = true))
+                    syncRepository.enqueue("VACCINE", vaccineId, SyncOperation.UPDATE, SyncPriority.MEDIUM)
+                    auditLogger.logAction("Vaccine Archived", user, "Vaccine: ${vaccine.brandName} (Historical records exist)")
+                }
+            } else {
+                // Permanent Delete
+                vaccineDao.deleteVaccinePermanently(vaccine)
+                syncRepository.enqueue("VACCINE", vaccineId, SyncOperation.DELETE, SyncPriority.MEDIUM)
+                auditLogger.logAction("Vaccine Permanently Deleted", user, "Vaccine: ${vaccine.brandName}")
+            }
         }
     }
 

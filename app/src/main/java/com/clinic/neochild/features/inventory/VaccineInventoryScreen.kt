@@ -15,7 +15,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import android.widget.Toast
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.clinic.neochild.core.designsystem.NeoChildTheme
@@ -37,6 +39,7 @@ fun VaccineInventoryScreen(
     val uiState by viewModel.uiState.collectAsState()
     var batchToDelete by remember { mutableStateOf<VaccineBatchEntity?>(null) }
     var vaccineToDelete by remember { mutableStateOf<InventoryItem?>(null) }
+    val context = LocalContext.current
 
     DeleteConfirmationDialog(
         show = batchToDelete != null,
@@ -53,11 +56,15 @@ fun VaccineInventoryScreen(
         show = vaccineToDelete != null,
         onDismiss = { vaccineToDelete = null },
         onConfirm = {
-            vaccineToDelete?.let { viewModel.deleteVaccine(it.id) }
+            vaccineToDelete?.let { 
+                viewModel.deleteVaccine(it.id) { error ->
+                    Toast.makeText(context, error, Toast.LENGTH_LONG).show()
+                }
+            }
             vaccineToDelete = null
         },
         title = "Delete Vaccine",
-        message = "Are you sure you want to delete ${vaccineToDelete?.brandName} and all its batches?"
+        message = "Are you sure you want to delete ${vaccineToDelete?.brandName}? If history exists, it will be archived instead."
     )
 
     VaccineInventoryContent(

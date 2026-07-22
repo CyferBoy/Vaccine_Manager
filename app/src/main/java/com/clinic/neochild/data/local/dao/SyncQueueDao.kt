@@ -21,6 +21,9 @@ interface SyncQueueDao {
     @Query("UPDATE sync_queue SET status = :status, retryCount = retryCount + 1, lastError = :error, updatedAt = :timestamp WHERE queueId = :id")
     suspend fun markFailed(id: Long, status: String, error: String, timestamp: Long = System.currentTimeMillis())
 
+    @Query("DELETE FROM sync_queue WHERE entityId = 'kotlin.Unit' OR entityId = 'Unit' OR entityId = 'null'")
+    suspend fun cleanCorruptedItems()
+
     @Query("UPDATE sync_queue SET retryCount = retryCount + 1, lastError = :error, updatedAt = :timestamp WHERE queueId = :id")
     suspend fun incrementRetryCount(id: Long, error: String, timestamp: Long = System.currentTimeMillis())
 

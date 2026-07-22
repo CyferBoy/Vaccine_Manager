@@ -30,6 +30,11 @@ class SyncRepositoryImpl @Inject constructor(
         operation: SyncOperation,
         priority: SyncPriority
     ) {
+        if (entityId.isBlank() || entityId == "kotlin.Unit" || entityId == "Unit" || entityId == "null") {
+            android.util.Log.e("SyncRepository", "CRITICAL: Attempted to enqueue invalid entityId: $entityId for $entityName")
+            return
+        }
+
         syncDao.enqueue(
             SyncQueueEntity(
                 entityName = entityName,
@@ -51,6 +56,8 @@ class SyncRepositoryImpl @Inject constructor(
     }
 
     override suspend fun processNextItems() {
+        syncDao.cleanCorruptedItems()
+
         val pending = syncDao.getItemsByStatus(SyncStatus.PENDING.name)
         if (pending.isEmpty()) return
 

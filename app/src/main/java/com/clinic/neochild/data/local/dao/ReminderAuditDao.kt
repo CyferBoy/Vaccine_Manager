@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface ReminderAuditDao {
     @Insert
-    suspend fun insertAudit(audit: ReminderAuditEntity)
+    suspend fun insertAudit(audit: ReminderAuditEntity): Long
 
     @Query("SELECT * FROM reminder_audits WHERE patientId = :patientId ORDER BY timestamp DESC")
     fun getAuditsForPatient(patientId: String): Flow<List<ReminderAuditEntity>>

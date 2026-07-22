@@ -5,9 +5,9 @@ import java.util.concurrent.TimeUnit
 
 sealed class DateCategory {
     data class Overdue(val days: Int) : DateCategory()
-    object Yesterday : DateCategory()
     object Today : DateCategory()
     object Tomorrow : DateCategory()
+    data class GracePeriod(val dateStr: String) : DateCategory()
     data class Future(val dateStr: String) : DateCategory()
 }
 
@@ -26,6 +26,7 @@ object DateClassifier {
     /**
      * Classifies a date string into clinic-friendly categories.
      * Uses device local time.
+     * Implements a 4-day grace period where dates are shown instead of "Overdue".
      */
     fun classify(dateStr: String, todayStart: Calendar = getTodayStart()): DateCategory {
         val targetDate = PatientUtils.parseDate(dateStr) ?: return DateCategory.Future(dateStr)
@@ -42,8 +43,8 @@ object DateClassifier {
         val diffDays = TimeUnit.MILLISECONDS.toDays(diffMs).toInt()
 
         return when {
-            diffDays < -1 -> DateCategory.Overdue(-diffDays)
-            diffDays == -1 -> DateCategory.Yesterday
+            diffDays < -4 -> DateCategory.Overdue(-diffDays)
+            diffDays < 0 -> DateCategory.GracePeriod(PatientUtils.formatDateForDisplay(dateStr))
             diffDays == 0 -> DateCategory.Today
             diffDays == 1 -> DateCategory.Tomorrow
             else -> DateCategory.Future(PatientUtils.formatDateForDisplay(dateStr))
@@ -56,9 +57,9 @@ object DateClassifier {
     fun formatDisplay(dateStr: String, todayStart: Calendar = getTodayStart()): String {
         return when (val category = classify(dateStr, todayStart)) {
             is DateCategory.Overdue -> "Overdue (${category.days} days)"
-            is DateCategory.Yesterday -> "Yesterday"
             is DateCategory.Today -> "Today"
             is DateCategory.Tomorrow -> "Tomorrow"
+            is DateCategory.GracePeriod -> category.dateStr
             is DateCategory.Future -> category.dateStr
         }
     }

@@ -144,11 +144,6 @@ class MainActivity : FragmentActivity() {
                     isAppLocked = false
                 }
 
-                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                    super.onAuthenticationError(errorCode, errString)
-                    // If user cancels or error, keep app locked. 
-                    // BiometricPrompt handles its own UI for retries.
-                }
             })
 
         val promptInfo = BiometricPrompt.PromptInfo.Builder()

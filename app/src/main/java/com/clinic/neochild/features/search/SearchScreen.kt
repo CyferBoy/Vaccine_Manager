@@ -96,8 +96,9 @@ private fun SearchResultItem(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
+                val clinicIdDisplay = if (patient.patientClinicId.isBlank()) "Not Assigned" else patient.patientClinicId
                 Text(
-                    text = "ID: ${patient.patientClinicId}",
+                    text = "ID: $clinicIdDisplay",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 )

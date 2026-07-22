@@ -96,9 +96,8 @@ fun PatientInfoSection(patient: Patient) {
                 Text(text = patient.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             }
 
-            if (patient.patientClinicId.isNotBlank()) {
-                InfoRow(Icons.Default.Badge, "Clinic ID: ${patient.patientClinicId}")
-            }
+            val clinicIdDisplay = if (patient.patientClinicId.isBlank()) "Not Assigned" else patient.patientClinicId
+            InfoRow(Icons.Default.Badge, "Clinic ID: $clinicIdDisplay")
 
             val ageLabel = calculateAgeLabel(patient.dob)
             InfoRow(Icons.Default.Cake, "${formatDateForDisplay(patient.dob)} (${ageLabel ?: "Unknown Age"})")

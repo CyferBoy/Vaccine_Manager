@@ -11,28 +11,30 @@ class PatientIdGenerator @Inject constructor(
 ) {
     /**
      * Generates a unique clinic ID.
-     * Format: NEO-XXXX (where XXXX is a random 4-digit number)
+     * Format: NEO-XXXX (Sequential based on highest existing)
      */
     suspend fun generateUniqueClinicId(): String {
-        var clinicId: String
-        var isUnique = false
-        var attempts = 0
+        val maxId = patientDao.getMaxClinicId()
+        val nextNumber = if (maxId != null && maxId.startsWith("NEO-")) {
+            val numericPart = maxId.substring(4).toIntOrNull() ?: 0
+            numericPart + 1
+        } else {
+            1000 // Start from 1000 for new clinics
+        }
         
-        do {
-            val randomNum = Random().nextInt(9000) + 1000 // 1000 to 9999
-            clinicId = "NEO-$randomNum"
-            
-            // Verify uniqueness
+        var clinicId = "NEO-$nextNumber"
+        var isUnique = false
+        var currentNum = nextNumber
+        
+        // Final safety check for uniqueness
+        while (!isUnique) {
             val existing = patientDao.getPatientByClinicId(clinicId)
             if (existing == null) {
                 isUnique = true
+            } else {
+                currentNum++
+                clinicId = "NEO-$currentNum"
             }
-            attempts++
-        } while (!isUnique && attempts < 100)
-
-        if (!isUnique) {
-            // Fallback to a longer ID if collisions are high
-            clinicId = "NEO-${System.currentTimeMillis() % 1000000}"
         }
         
         return clinicId

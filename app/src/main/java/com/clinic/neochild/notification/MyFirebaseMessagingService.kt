@@ -11,12 +11,4 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
     @Inject
     lateinit var notificationHelper: NotificationHelper
 
-    override fun onMessageReceived(message: RemoteMessage) {
-        super.onMessageReceived(message)
-        // Handle cloud messages if needed
-    }
-
-    override fun onNewToken(token: String) {
-        super.onNewToken(token)
-    }
 }

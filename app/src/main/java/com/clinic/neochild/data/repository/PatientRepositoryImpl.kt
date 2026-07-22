@@ -26,6 +26,16 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import com.clinic.neochild.core.preferences.PreferenceManager
+import com.clinic.neochild.data.migration.PatientClinicIdMigrationWorker
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.GlobalScope
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -39,8 +49,34 @@ class PatientRepositoryImpl @Inject constructor(
     private val firestore: FirebaseFirestore,
     private val syncRepository: SyncRepository,
     private val auditLogger: AuditLogger,
-    private val idGenerator: PatientIdGenerator
+    private val idGenerator: PatientIdGenerator,
+    private val preferenceManager: PreferenceManager,
+    @ApplicationContext private val context: Context
 ) : PatientRepository {
+
+    init {
+        // Schedule migration if not completed
+        GlobalScope.launch(Dispatchers.IO) {
+            if (!preferenceManager.isPatientIdMigrationCompleted.first()) {
+                schedulePatientIdMigration()
+            }
+        }
+    }
+
+    private fun schedulePatientIdMigration() {
+        val request = OneTimeWorkRequestBuilder<PatientClinicIdMigrationWorker>()
+            .build()
+        
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            PatientClinicIdMigrationWorker.WORK_NAME,
+            ExistingWorkPolicy.KEEP,
+            request
+        )
+        
+        // Note: The worker itself should update preferenceManager when successfully done.
+        // But since we want it to run once per app lifecycle if it fails, 
+        // we keep the check in init.
+    }
 
     override val allPatients: Flow<List<Patient>> = 
         patientDao.getAllPatients().map { list -> list.map { it.toPatient() } }

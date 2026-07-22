@@ -200,42 +200,73 @@ abstract class AppDatabase : RoomDatabase() {
 
         val MIGRATION_18_19 = object : Migration(18, 19) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // 1. Update Patients
-                db.execSQL("ALTER TABLE `patients` ADD COLUMN `notes` TEXT")
-                db.execSQL("ALTER TABLE `patients` ADD COLUMN `guardianRelation` TEXT")
-                db.execSQL("ALTER TABLE `patients` ADD COLUMN `guardianPhone` TEXT")
-                db.execSQL("ALTER TABLE `patients` ADD COLUMN `attachments` TEXT")
+                Log.i(TAG, "Starting Migration 18 -> 19")
+
+                // 1. Refactor Patients (Handle NULLs and NOT NULL constraints)
+                Log.d(TAG, "Migrating patients table...")
                 
-                // Deduplicate patientClinicId before creating UNIQUE index
-                // 1. Ensure no NULLs (if any exist from older versions)
+                // Repair data in old table first (Ensure no NULLs before copying)
                 db.execSQL("UPDATE patients SET patientClinicId = '' WHERE patientClinicId IS NULL")
-                
-                // 2. Identify and rename duplicates
-                db.execSQL("""
-                    UPDATE patients 
-                    SET patientClinicId = patientClinicId || '-DUP-' || substr(id, 1, 4)
-                    WHERE rowid NOT IN (
-                        SELECT MIN(rowid) FROM patients GROUP BY patientClinicId
-                    )
-                """)
-                
-                // 3. Ensure no NULLs for isSynced and isDeleted (Room expects Int 0/1)
                 db.execSQL("UPDATE patients SET isSynced = 1 WHERE isSynced IS NULL")
                 db.execSQL("UPDATE patients SET isDeleted = 0 WHERE isDeleted IS NULL")
+                
+                // Create new table with exact schema required by Room
+                db.execSQL("""
+                    CREATE TABLE `patients_new` (
+                        `id` TEXT NOT NULL, 
+                        `patientClinicId` TEXT NOT NULL, 
+                        `name` TEXT NOT NULL, 
+                        `parentName` TEXT NOT NULL, 
+                        `phone` TEXT NOT NULL, 
+                        `alternatePhone` TEXT NOT NULL, 
+                        `dob` TEXT NOT NULL, 
+                        `gender` TEXT NOT NULL, 
+                        `village` TEXT NOT NULL, 
+                        `address` TEXT NOT NULL, 
+                        `registrationDate` TEXT NOT NULL, 
+                        `notes` TEXT, 
+                        `guardianRelation` TEXT, 
+                        `guardianPhone` TEXT, 
+                        `attachments` TEXT, 
+                        `isSynced` INTEGER NOT NULL, 
+                        `isDeleted` INTEGER NOT NULL, 
+                        PRIMARY KEY(`id`)
+                    )
+                """)
 
+                // Transfer data using COALESCE to ensure NOT NULL compliance
+                db.execSQL("""
+                    INSERT INTO patients_new (
+                        id, patientClinicId, name, parentName, phone, alternatePhone, 
+                        dob, gender, village, address, registrationDate, 
+                        isSynced, isDeleted
+                    )
+                    SELECT 
+                        id, patientClinicId, name, COALESCE(parentName, ''), phone, COALESCE(alternatePhone, ''), 
+                        dob, gender, COALESCE(village, ''), COALESCE(address, ''), COALESCE(registrationDate, ''), 
+                        isSynced, isDeleted
+                    FROM patients
+                """)
+                
+                db.execSQL("DROP TABLE patients")
+                db.execSQL("ALTER TABLE patients_new RENAME TO patients")
+                
+                // Recreate all indices for patients
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_patients_patientClinicId` ON `patients` (`patientClinicId`)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_patients_name` ON `patients` (`name`)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_patients_phone` ON `patients` (`phone`)")
-                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_patients_patientClinicId` ON `patients` (`patientClinicId`)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_patients_isSynced` ON `patients` (`isSynced`)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_patients_isDeleted` ON `patients` (`isDeleted`)")
 
                 // 2. Update Vaccines
+                Log.d(TAG, "Updating vaccines table...")
                 db.execSQL("ALTER TABLE `vaccines` ADD COLUMN `manufacturer` TEXT")
                 db.execSQL("ALTER TABLE `vaccines` ADD COLUMN `category` TEXT")
                 db.execSQL("ALTER TABLE `vaccines` ADD COLUMN `doseSchedule` TEXT")
                 db.execSQL("ALTER TABLE `vaccines` ADD COLUMN `storageDetails` TEXT")
 
                 // 3. Update Vaccine Batches
+                Log.d(TAG, "Updating vaccine_batches table...")
                 db.execSQL("ALTER TABLE `vaccine_batches` ADD COLUMN `reservedQuantity` INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE `vaccine_batches` ADD COLUMN `usedQuantity` INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE `vaccine_batches` ADD COLUMN `wastedQuantity` INTEGER NOT NULL DEFAULT 0")
@@ -244,6 +275,7 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_vaccine_batches_vaccineId` ON `vaccine_batches` (`vaccineId`)")
 
                 // 4. Create New Tables
+                Log.d(TAG, "Creating new tables...")
                 db.execSQL("""
                     CREATE TABLE IF NOT EXISTS `reminder_states` (
                         `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `patientId` TEXT NOT NULL, 
@@ -271,6 +303,7 @@ abstract class AppDatabase : RoomDatabase() {
                     )
                 """)
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_patient_notes_patientId` ON `patient_notes` (`patientId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_patient_notes_timestamp` ON `patient_notes` (`timestamp`)")
 
                 db.execSQL("""
                     CREATE TABLE IF NOT EXISTS `staff_profiles` (
@@ -302,6 +335,7 @@ abstract class AppDatabase : RoomDatabase() {
                 """)
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_finance_transactions_patientId` ON `finance_transactions` (`patientId`)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_finance_transactions_visitId` ON `finance_transactions` (`visitId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_finance_transactions_timestamp` ON `finance_transactions` (`timestamp`)")
 
                 db.execSQL("""
                     CREATE TABLE IF NOT EXISTS `borrow_records` (
@@ -313,8 +347,11 @@ abstract class AppDatabase : RoomDatabase() {
                         FOREIGN KEY(`batchId`) REFERENCES `vaccine_batches`(`batchId`) ON UPDATE NO ACTION ON DELETE CASCADE
                     )
                 """)
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_borrow_records_vaccineId` ON `borrow_records` (`vaccineId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_borrow_records_batchId` ON `borrow_records` (`batchId`)")
 
-                // 5. Migrate Reminders
+                // 5. Migrate Reminders to reminder_states
+                Log.d(TAG, "Migrating reminders to states...")
                 db.execSQL("""
                     INSERT INTO reminder_states (patientId, originalVisitId, vaccineName, dueDate, status, reminderDate, priority, reminderEnabled, category, notes, lastReminderTime, notificationSent, createdAt, updatedAt, isSynced, isDeleted, vaccinationSource)
                     SELECT patientId, originalVisitId, vaccineName, dueDate, status, reminderDate, priority, reminderEnabled, category, notes, lastReminderTime, notificationSent, createdAt, updatedAt, isSynced, isDeleted, NULL
@@ -336,7 +373,8 @@ abstract class AppDatabase : RoomDatabase() {
                     FROM external_reminders
                 """)
 
-                // 6. Refactor Vaccinations to Visits
+                // 6. Refactor Vaccinations to patient_visits
+                Log.d(TAG, "Refactoring vaccinations to patient_visits...")
                 db.execSQL("ALTER TABLE `vaccinations` RENAME TO `patient_visits_old`")
                 db.execSQL("""
                     CREATE TABLE IF NOT EXISTS `patient_visits` (
@@ -351,6 +389,7 @@ abstract class AppDatabase : RoomDatabase() {
                         FOREIGN KEY(`patientId`) REFERENCES `patients`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
                     )
                 """)
+                // Map old column names if they differed (e.g., performedBy -> doctor, batchNumbers -> batchIds)
                 db.execSQL("""
                     INSERT INTO patient_visits (id, patientId, dateGiven, doctor, vaccineNames, vaccineIds, batchIds, notes, receiptNumber, totalPaid, nxtVaccineNames, nextDueDate, cost, cashAmount, onlineAmount, withFees, doctorsAcc, isDone, source, isSynced, isDeleted)
                     SELECT id, patientId, dateGiven, performedBy, vaccineNames, vaccineIds, batchNumbers, notes, receiptNumber, totalPaid, nxtVaccineNames, nextDueDate, cost, cashAmount, onlineAmount, withFees, doctorsAcc, isDone, source, isSynced, isDeleted
@@ -363,6 +402,7 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_patient_visits_isSynced` ON `patient_visits` (`isSynced`)")
 
                 // 7. Update Audit Logs and Merge Reminder Audits
+                Log.d(TAG, "Merging audit logs...")
                 db.execSQL("ALTER TABLE `audit_logs` RENAME TO `audit_logs_old`")
                 db.execSQL("""
                     CREATE TABLE IF NOT EXISTS `audit_logs` (
@@ -375,16 +415,17 @@ abstract class AppDatabase : RoomDatabase() {
                 """)
                 db.execSQL("""
                     INSERT INTO audit_logs (timestamp, user, module, entityType, entityId, action, remarks, device, isSynced, patientId)
-                    SELECT timestamp, staffMember, 'LEGACY', 'UNKNOWN', '0', action, details, device, isSynced, patientId
+                    SELECT timestamp, COALESCE(staffMember, 'SYSTEM'), 'LEGACY', 'UNKNOWN', '0', action, details, device, isSynced, patientId
                     FROM audit_logs_old
                 """)
                 db.execSQL("""
                     INSERT INTO audit_logs (timestamp, user, module, entityType, entityId, action, remarks, isSynced, patientId)
-                    SELECT timestamp, performedBy, 'REMINDER', 'REMINDER', (patientId || '||' || vaccineName), action, notes, isSynced, patientId
+                    SELECT timestamp, COALESCE(performedBy, 'SYSTEM'), 'REMINDER', 'REMINDER', (patientId || '||' || vaccineName), action, notes, isSynced, patientId
                     FROM reminder_audits
                 """)
                 
-                // 8. Drop Legacy Tables before creating new indices (to avoid name conflicts)
+                // 8. Cleanup and Final Indices
+                Log.d(TAG, "Cleaning up legacy tables...")
                 db.execSQL("DROP TABLE IF EXISTS `audit_logs_old`")
                 db.execSQL("DROP TABLE IF EXISTS `reminder_audits`")
                 db.execSQL("DROP TABLE IF EXISTS `due_reminders`")
@@ -392,7 +433,6 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("DROP TABLE IF EXISTS `dismissed_reminders`")
                 db.execSQL("DROP TABLE IF EXISTS `external_reminders`")
 
-                // 9. Add missing indices across all tables
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_audit_logs_timestamp` ON `audit_logs` (`timestamp`)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_audit_logs_patientId` ON `audit_logs` (`patientId`)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_audit_logs_entityType` ON `audit_logs` (`entityType`)")
@@ -400,17 +440,14 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_audit_logs_module` ON `audit_logs` (`module`)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_audit_logs_user` ON `audit_logs` (`user`)")
                 
-                db.execSQL("CREATE INDEX IF NOT EXISTS `index_patient_notes_timestamp` ON `patient_notes` (`timestamp`)")
-                db.execSQL("CREATE INDEX IF NOT EXISTS `index_finance_transactions_timestamp` ON `finance_transactions` (`timestamp`)")
-                
-                db.execSQL("CREATE INDEX IF NOT EXISTS `index_borrow_records_vaccineId` ON `borrow_records` (`vaccineId`)")
-                db.execSQL("CREATE INDEX IF NOT EXISTS `index_borrow_records_batchId` ON `borrow_records` (`batchId`)")
-                
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_inventory_transactions_vaccineId` ON `inventory_transactions` (`vaccineId`)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_inventory_transactions_batchId` ON `inventory_transactions` (`batchId`)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_inventory_transactions_vaccinationId` ON `inventory_transactions` (`vaccinationId`)")
+
+                Log.i(TAG, "Migration 18 -> 19 completed successfully.")
             }
         }
+
 
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
@@ -451,7 +488,7 @@ abstract class AppDatabase : RoomDatabase() {
                     DB_NAME
                 )
                 .openHelperFactory(factory)
-                .setJournalMode(RoomDatabase.JournalMode.TRUNCATE)
+                .setJournalMode(JournalMode.TRUNCATE)
                 .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19)
                 .fallbackToDestructiveMigrationOnDowngrade()
                 .build()

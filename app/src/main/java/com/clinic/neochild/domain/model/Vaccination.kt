@@ -20,6 +20,7 @@ data class Vaccination(
     val notes: String = "",
     val rescheduleReason: String = "",
     val performedBy: String = "",
+    val status: ReminderStatus = ReminderStatus.ACTIVE,
     val batchNumbers: List<String> = emptyList(),
     val expiryDates: List<String> = emptyList(),
 )

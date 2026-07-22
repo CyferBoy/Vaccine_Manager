@@ -55,25 +55,31 @@ class DueViewModel @Inject constructor(
         val filterStatus = when (filter) {
             "Completed" -> listOf(ReminderStatus.COMPLETED)
             "Dismissed" -> listOf(ReminderStatus.DISMISSED)
-            else -> null
+            "Vaccinated Elsewhere" -> listOf(ReminderStatus.EXTERNAL)
+            else -> listOf(ReminderStatus.ACTIVE, ReminderStatus.RESCHEDULED)
         }
 
-        val dueVaccinations = reminderRepository.getDueList(query, filterStatus).first()
+        val processedVaccinations = reminderRepository.getDueList(query, filterStatus).first()
         
-        val filtered = if (filter == "Completed" || filter == "Dismissed") {
-            dueVaccinations 
-        } else {
-            PatientUtils.filterVaccinationsByPeriod(dueVaccinations, filter)
+        val filtered = when (filter) {
+            "Today", "Tomorrow", "This Week", "Upcoming", "Overdue" -> {
+                PatientUtils.filterVaccinationsByPeriod(processedVaccinations, filter)
+            }
+            else -> processedVaccinations
         }
         
-        val overdue = dueVaccinations.count { 
+        // Count overall overdue from the "Active/Due" pool for the badge, regardless of current tab
+        val allDue = if (filterStatus.contains(ReminderStatus.ACTIVE)) processedVaccinations 
+                     else reminderRepository.getDueList("", listOf(ReminderStatus.ACTIVE, ReminderStatus.RESCHEDULED)).first()
+
+        val overdue = allDue.count { 
             val cat = DateClassifier.classify(it.nextDueDate)
             cat is DateCategory.Overdue || cat is DateCategory.Yesterday
         }
 
         DueUiState(
             patients = patients,
-            vaccinations = dueVaccinations,
+            vaccinations = processedVaccinations,
             filteredVaccinations = filtered,
             isLoading = false,
             selectedFilter = filter,
@@ -115,6 +121,13 @@ class DueViewModel @Inject constructor(
         viewModelScope.launch {
             val req = findMatchingRequirement(vaccination) ?: return@launch
             reminderRepository.markVaccinatedElsewhere(req, source, date, notes, currentUserEmail)
+        }
+    }
+
+    fun restoreReminder(vaccination: Vaccination) {
+        viewModelScope.launch {
+            val req = findMatchingRequirement(vaccination) ?: return@launch
+            reminderRepository.restoreReminder(req, currentUserEmail)
         }
     }
 

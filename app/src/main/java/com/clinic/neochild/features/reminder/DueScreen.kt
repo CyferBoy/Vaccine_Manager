@@ -56,7 +56,8 @@ fun DueScreen(
                         },
                         onDismissReminder = viewModel::dismissReminder,
                         onReschedule = viewModel::rescheduleVaccination,
-                        onVaccinatedElsewhere = viewModel::markVaccinatedElsewhere
+                        onVaccinatedElsewhere = viewModel::markVaccinatedElsewhere,
+                        onRestoreReminder = viewModel::restoreReminder
                     )
                 }
             }

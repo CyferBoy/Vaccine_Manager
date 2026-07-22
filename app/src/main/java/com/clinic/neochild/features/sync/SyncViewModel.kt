@@ -3,25 +3,45 @@ package com.clinic.neochild.features.sync
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.clinic.neochild.domain.repository.SyncRepository
+import com.clinic.neochild.domain.usecase.sync.RefreshDataUseCase
 import com.clinic.neochild.core.model.SyncItem
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class SyncViewModel @Inject constructor(
-    private val syncRepository: SyncRepository
+    private val syncRepository: SyncRepository,
+    private val refreshDataUseCase: RefreshDataUseCase
 ) : ViewModel() {
 
     val syncQueue: StateFlow<List<SyncItem>> = syncRepository.getSyncQueue()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing = _isRefreshing.asStateFlow()
+
     fun processSync() {
         viewModelScope.launch {
             syncRepository.processNextItems()
+        }
+    }
+
+    fun forceRefreshFromCloud() {
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            try {
+                refreshDataUseCase()
+            } catch (e: Exception) {
+                // Potential error handling
+            } finally {
+                _isRefreshing.value = false
+            }
         }
     }
 

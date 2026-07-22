@@ -20,6 +20,7 @@ data class DueReminderEntity(
     val reminderEnabled: Boolean = true,
     val category: String = "VACCINATION",
     val notes: String? = null,
+    val performedBy: String = "",
     val lastReminderTime: Long = 0,
     val notificationSent: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),

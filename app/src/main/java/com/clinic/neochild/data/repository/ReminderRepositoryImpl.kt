@@ -92,7 +92,16 @@ class ReminderRepositoryImpl @Inject constructor(
         filterStatus: List<ReminderStatus>?
     ): Flow<List<Vaccination>> = getProcessedDueFlow().map { (processed, patientEntities) ->
         val patientMap = patientEntities.associateBy { it.id }
-        processed.filter { vacc ->
+        
+        // Root Cause Fix: Apply filterStatus to the list
+        val stateFiltered = if (filterStatus == null || filterStatus.isEmpty()) {
+            // Default to only showing ACTIVE/RESCHEDULED (Due) if no filter is provided
+            processed.filter { it.status == ReminderStatus.ACTIVE || it.status == ReminderStatus.RESCHEDULED }
+        } else {
+            processed.filter { filterStatus.contains(it.status) }
+        }
+
+        stateFiltered.filter { vacc ->
             val patient = patientMap[vacc.patientId]
             
             // Apply Search Filter
@@ -101,9 +110,7 @@ class ReminderRepositoryImpl @Inject constructor(
                 patient?.phone?.contains(searchQuery) == true ||
                 vacc.nxtVaccineNames.any { it.contains(searchQuery, ignoreCase = true) }
             }
-            if (!matchesSearch) return@filter false
-
-            true
+            matchesSearch
         }
     }
 
@@ -174,20 +181,22 @@ class ReminderRepositoryImpl @Inject constructor(
         val potential = ReminderEngine.getPotentialRequirements(allVaccinations)
         
         val dueMap = dueEntities.associateBy { "${it.patientId}_${it.originalVisitId}_${it.vaccineName}" }
-        val completedKeys = completedEntities.map { "${it.patientId}_${it.originalVisitId}_${it.vaccineName}" }.toSet()
-        val dismissedKeys = dismissedEntities.map { "${it.patientId}_${it.originalVisitId}_${it.vaccineName}" }.toSet()
-        val externalKeys = externalEntities.map { "${it.patientId}_${it.originalVisitId}_${it.vaccineName}" }.toSet()
+        val completedMap = completedEntities.associateBy { "${it.patientId}_${it.originalVisitId}_${it.vaccineName}" }
+        val dismissedMap = dismissedEntities.associateBy { "${it.patientId}_${it.originalVisitId}_${it.vaccineName}" }
+        val externalMap = externalEntities.associateBy { "${it.patientId}_${it.originalVisitId}_${it.vaccineName}" }
 
-        return potential.mapNotNull { req ->
+        val result = mutableListOf<Vaccination>()
+
+        // 1. Process Potential (Due/Overdue)
+        potential.forEach { req ->
             val key = "${req.patientId}_${req.originalVisitId}_${req.vaccineName}"
             
-            // If it's already completed, dismissed or done elsewhere, it's not "due"
-            if (completedKeys.contains(key) || dismissedKeys.contains(key) || externalKeys.contains(key)) {
-                return@mapNotNull null
+            // Skip if it exists in terminal states
+            if (completedMap.containsKey(key) || dismissedMap.containsKey(key) || externalMap.containsKey(key)) {
+                return@forEach
             }
 
             val savedDue = dueMap[key]
-            
             val status = try {
                 savedDue?.status?.let { ReminderStatus.valueOf(it) } ?: ReminderStatus.ACTIVE
             } catch (_: Exception) {
@@ -203,9 +212,53 @@ class ReminderRepositoryImpl @Inject constructor(
             allVaccinations.find { it.id == req.originalVisitId }?.copy(
                 nxtVaccineNames = listOf(req.vaccineName),
                 nextDueDate = finalDueDate,
-                isDone = false
-            )
+                isDone = false,
+                status = status,
+                performedBy = savedDue?.performedBy ?: ""
+            )?.let { result.add(it) }
         }
+
+        // 2. Process Completed
+        completedMap.values.forEach { comp ->
+            allVaccinations.find { it.id == comp.originalVisitId }?.copy(
+                nxtVaccineNames = listOf(comp.vaccineName),
+                nextDueDate = comp.dueDate,
+                isDone = true,
+                status = ReminderStatus.COMPLETED,
+                dateGiven = PatientUtils.formatDate(Date(comp.completionDate)),
+                performedBy = comp.completedBy,
+                notes = comp.notes ?: ""
+            )?.let { result.add(it) }
+        }
+
+        // 3. Process Dismissed
+        dismissedMap.values.forEach { dis ->
+            allVaccinations.find { it.id == dis.originalVisitId }?.copy(
+                nxtVaccineNames = listOf(dis.vaccineName),
+                nextDueDate = dis.dueDate,
+                isDone = false,
+                status = ReminderStatus.DISMISSED,
+                dateGiven = PatientUtils.formatDate(Date(dis.dismissalDate)),
+                performedBy = dis.dismissedBy,
+                notes = dis.reason ?: ""
+            )?.let { result.add(it) }
+        }
+
+        // 4. Process External
+        externalMap.values.forEach { ext ->
+            allVaccinations.find { it.id == ext.originalVisitId }?.copy(
+                nxtVaccineNames = listOf(ext.vaccineName),
+                nextDueDate = ext.dueDate,
+                isDone = true,
+                status = ReminderStatus.EXTERNAL,
+                dateGiven = ext.externalDate,
+                performedBy = ext.recordedBy,
+                source = ext.source,
+                notes = ext.notes ?: ""
+            )?.let { result.add(it) }
+        }
+
+        return result
     }
 
     private suspend fun enqueueReminderSync(

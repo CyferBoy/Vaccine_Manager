@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.clinic.neochild.domain.model.ReminderStatus
 import com.clinic.neochild.domain.model.VaccinationSource
 import java.text.SimpleDateFormat
 import java.util.*
@@ -19,11 +20,13 @@ import java.util.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ManageDueBottomSheet(
+    status: ReminderStatus,
     onDismiss: () -> Unit,
     onMarkAsDone: () -> Unit,
     onDismissReminder: () -> Unit,
     onReschedule: () -> Unit,
-    onVaccinatedElsewhere: () -> Unit
+    onVaccinatedElsewhere: () -> Unit,
+    onRestore: () -> Unit
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -34,36 +37,54 @@ fun ManageDueBottomSheet(
                 .fillMaxWidth()
                 .padding(bottom = 32.dp)
         ) {
+            val title = when (status) {
+                ReminderStatus.ACTIVE, ReminderStatus.RESCHEDULED -> "Manage Due Vaccination"
+                ReminderStatus.COMPLETED -> "Completed Vaccination"
+                ReminderStatus.DISMISSED -> "Dismissed Reminder"
+                ReminderStatus.EXTERNAL -> "External Vaccination"
+                else -> "Manage Reminder"
+            }
+
             Text(
-                text = "Manage Due Vaccination",
+                text = title,
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.padding(16.dp)
             )
             
-            ListItem(
-                headlineContent = { Text("Mark as Done") },
-                supportingContent = { Text("Given in this clinic today") },
-                leadingContent = { Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF4CAF50)) },
-                modifier = Modifier.clickable { onMarkAsDone() }
-            )
-            ListItem(
-                headlineContent = { Text("Dismiss Reminder") },
-                supportingContent = { Text("Stop reminders for this vaccine") },
-                leadingContent = { Icon(Icons.Default.NotificationsOff, contentDescription = null) },
-                modifier = Modifier.clickable { onDismissReminder() }
-            )
-            ListItem(
-                headlineContent = { Text("Reschedule") },
-                supportingContent = { Text("Change the due date") },
-                leadingContent = { Icon(Icons.Default.Event, contentDescription = null) },
-                modifier = Modifier.clickable { onReschedule() }
-            )
-            ListItem(
-                headlineContent = { Text("Vaccinated Elsewhere") },
-                supportingContent = { Text("Recorded at another facility") },
-                leadingContent = { Icon(Icons.Default.Public, contentDescription = null) },
-                modifier = Modifier.clickable { onVaccinatedElsewhere() }
-            )
+            if (status == ReminderStatus.ACTIVE || status == ReminderStatus.RESCHEDULED) {
+                ListItem(
+                    headlineContent = { Text("Mark as Done") },
+                    supportingContent = { Text("Given in this clinic today") },
+                    leadingContent = { Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF4CAF50)) },
+                    modifier = Modifier.clickable { onMarkAsDone() }
+                )
+                ListItem(
+                    headlineContent = { Text("Dismiss Reminder") },
+                    supportingContent = { Text("Stop reminders for this vaccine") },
+                    leadingContent = { Icon(Icons.Default.NotificationsOff, contentDescription = null) },
+                    modifier = Modifier.clickable { onDismissReminder() }
+                )
+                ListItem(
+                    headlineContent = { Text("Reschedule") },
+                    supportingContent = { Text("Change the due date") },
+                    leadingContent = { Icon(Icons.Default.Event, contentDescription = null) },
+                    modifier = Modifier.clickable { onReschedule() }
+                )
+                ListItem(
+                    headlineContent = { Text("Vaccinated Elsewhere") },
+                    supportingContent = { Text("Recorded at another facility") },
+                    leadingContent = { Icon(Icons.Default.Public, contentDescription = null) },
+                    modifier = Modifier.clickable { onVaccinatedElsewhere() }
+                )
+            } else {
+                ListItem(
+                    headlineContent = { Text("Restore to Active") },
+                    supportingContent = { Text("Move back to due/overdue schedule") },
+                    leadingContent = { Icon(Icons.Default.Restore, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    modifier = Modifier.clickable { onRestore() }
+                )
+            }
+
             ListItem(
                 headlineContent = { Text("Cancel") },
                 leadingContent = { Icon(Icons.Default.Close, contentDescription = null) },

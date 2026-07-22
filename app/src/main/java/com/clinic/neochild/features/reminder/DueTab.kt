@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import com.clinic.neochild.domain.model.Patient
 import com.clinic.neochild.domain.model.Vaccination
 import com.clinic.neochild.domain.model.VaccinationSource
+import com.clinic.neochild.domain.model.ReminderStatus
 import com.clinic.neochild.core.designsystem.NeoChildTheme
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -29,10 +30,11 @@ fun DueTab(
     onMarkAsDone: (Vaccination) -> Unit = {},
     onDismissReminder: (Vaccination, String) -> Unit = { _, _ -> },
     onReschedule: (Vaccination, String, String, String) -> Unit = { _, _, _, _ -> },
-    onVaccinatedElsewhere: (Vaccination, VaccinationSource, String, String) -> Unit = { _, _, _, _ -> }
+    onVaccinatedElsewhere: (Vaccination, VaccinationSource, String, String) -> Unit = { _, _, _, _ -> },
+    onRestoreReminder: (Vaccination) -> Unit = {}
 ) {
     var searchQuery by remember { mutableStateOf("") }
-    val filters = remember { listOf("Overdue", "Today", "Tomorrow", "This Week", "Upcoming", "Completed", "Dismissed") }
+    val filters = remember { listOf("Overdue", "Today", "Tomorrow", "This Week", "Upcoming", "Completed", "Dismissed", "Vaccinated Elsewhere") }
     var selectedVaccination by remember { mutableStateOf<Vaccination?>(null) }
     var showManageSheet by remember { mutableStateOf(false) }
     var showReschedulePicker by remember { mutableStateOf(false) }
@@ -64,8 +66,10 @@ fun DueTab(
         }
 
         item {
-            OverdueSummaryCard(overdueCount = overdueCount)
-            Spacer(modifier = Modifier.height(16.dp))
+            if (initialFilter == "Overdue") {
+                OverdueSummaryCard(overdueCount = overdueCount)
+                Spacer(modifier = Modifier.height(16.dp))
+            }
         }
 
         item {
@@ -103,6 +107,7 @@ fun DueTab(
 
     if (showManageSheet && selectedVaccination != null) {
         ManageDueBottomSheet(
+            status = selectedVaccination?.status ?: ReminderStatus.ACTIVE,
             onDismiss = { showManageSheet = false },
             onMarkAsDone = { 
                 selectedVaccination?.let { onMarkAsDone(it) }
@@ -119,6 +124,10 @@ fun DueTab(
             onVaccinatedElsewhere = { 
                 showManageSheet = false
                 showElsewhereSheet = true 
+            },
+            onRestore = {
+                selectedVaccination?.let { onRestoreReminder(it) }
+                showManageSheet = false
             }
         )
     }

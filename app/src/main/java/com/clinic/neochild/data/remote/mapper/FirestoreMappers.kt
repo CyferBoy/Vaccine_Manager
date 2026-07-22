@@ -174,6 +174,7 @@ object FirestoreMappers {
                 reminderEnabled = doc.getBoolean("reminderEnabled") ?: true,
                 category = doc.getString("category") ?: "VACCINATION",
                 notes = doc.getString("notes"),
+                performedBy = doc.getString("performedBy") ?: "",
                 lastReminderTime = doc.getLong("lastReminderTime") ?: 0L,
                 notificationSent = doc.getBoolean("notificationSent") ?: false,
                 createdAt = doc.getLong("createdAt") ?: System.currentTimeMillis(),

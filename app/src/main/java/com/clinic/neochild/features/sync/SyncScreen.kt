@@ -22,7 +22,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.clinic.neochild.core.ui.AppBackground
 import com.clinic.neochild.core.model.SyncItem
 import com.clinic.neochild.core.model.SyncStatus
-import com.clinic.neochild.core.utils.PatientUtils.formatDateForDisplay
 import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -32,6 +31,18 @@ fun SyncScreen(
     viewModel: SyncViewModel = hiltViewModel()
 ) {
     val syncQueue by viewModel.syncQueue.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    var wasRefreshing by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isRefreshing) {
+        if (wasRefreshing && !isRefreshing) {
+            snackbarHostState.showSnackbar("Cloud data imported successfully")
+        }
+        wasRefreshing = isRefreshing
+    }
+
     var selectedItems by remember { mutableStateOf(setOf<Long>()) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var isDeleteAll by remember { mutableStateOf(false) }
@@ -43,6 +54,7 @@ fun SyncScreen(
 
     AppBackground {
         Scaffold(
+            snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
                 TopAppBar(
                     title = { 
@@ -75,6 +87,12 @@ fun SyncScreen(
                                 Icon(Icons.Default.Delete, contentDescription = "Delete Selected")
                             }
                         } else {
+                            IconButton(
+                                onClick = { viewModel.forceRefreshFromCloud() },
+                                enabled = !isRefreshing
+                            ) {
+                                Icon(Icons.Default.CloudDownload, contentDescription = "Force Import from Cloud")
+                            }
                             IconButton(onClick = { viewModel.clearSynced() }) {
                                 Icon(Icons.Default.DeleteSweep, contentDescription = "Clear Synced")
                             }
@@ -92,78 +110,83 @@ fun SyncScreen(
                 )
             }
         ) { paddingValues ->
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(paddingValues),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                item {
-                    SyncSummary(syncQueue.size, failedItems.size)
+            Column(modifier = Modifier.padding(paddingValues)) {
+                if (isRefreshing) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }
-
-                if (failedItems.isNotEmpty()) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     item {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                "Failed Sync Tasks", 
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                            Row {
-                                TextButton(onClick = { viewModel.retryAllFailed() }) {
-                                    Text("Retry All")
-                                }
-                                TextButton(
-                                    onClick = { 
-                                        isDeleteAll = true
-                                        showDeleteConfirm = true 
-                                    },
-                                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                                ) {
-                                    Text("Delete All")
+                        SyncSummary(syncQueue.size, failedItems.size)
+                    }
+
+                    if (failedItems.isNotEmpty()) {
+                        item {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "Failed Sync Tasks", 
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                                Row {
+                                    TextButton(onClick = { viewModel.retryAllFailed() }) {
+                                        Text("Retry All")
+                                    }
+                                    TextButton(
+                                        onClick = { 
+                                            isDeleteAll = true
+                                            showDeleteConfirm = true 
+                                        },
+                                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                                    ) {
+                                        Text("Delete All")
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    items(failedItems, key = { "failed_${it.id}" }) { item ->
-                        SyncItemCard(
-                            item = item,
-                            isSelected = selectedItems.contains(item.id),
-                            onToggleSelection = {
-                                selectedItems = if (selectedItems.contains(item.id)) {
-                                    selectedItems - item.id
-                                } else {
-                                    selectedItems + item.id
+                        items(failedItems, key = { "failed_${it.id}" }) { item ->
+                            SyncItemCard(
+                                item = item,
+                                isSelected = selectedItems.contains(item.id),
+                                onToggleSelection = {
+                                    selectedItems = if (selectedItems.contains(item.id)) {
+                                        selectedItems - item.id
+                                    } else {
+                                        selectedItems + item.id
+                                    }
                                 }
+                            )
+                        }
+
+                        item { Spacer(Modifier.height(16.dp)) }
+                    }
+
+                    if (pendingItems.isNotEmpty()) {
+                        item {
+                            Text(
+                                "Pending/Recent Tasks",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        items(pendingItems, key = { "pending_${it.id}" }) { item ->
+                            SyncItemCard(item = item)
+                        }
+                    }
+
+                    if (syncQueue.isEmpty() && !isRefreshing) {
+                        item {
+                            Box(modifier = Modifier.fillParentMaxHeight(0.7f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                Text("Sync queue is empty", color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                        )
-                    }
-
-                    item { Spacer(Modifier.height(16.dp)) }
-                }
-
-                if (pendingItems.isNotEmpty()) {
-                    item {
-                        Text(
-                            "Pending/Recent Tasks",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    items(pendingItems, key = { "pending_${it.id}" }) { item ->
-                        SyncItemCard(item = item)
-                    }
-                }
-
-                if (syncQueue.isEmpty()) {
-                    item {
-                        Box(modifier = Modifier.fillParentMaxHeight(0.7f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            Text("Sync queue is empty", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }

@@ -1,9 +1,17 @@
-# Neo Child Clinic - Vaccine Manager (v1.1)
+# Neo Child Clinic - Vaccine Manager (v1.2)
 
 Neo Child Clinic is a modern Android application designed for pediatric clinics to manage patient records, vaccination schedules, and consultations efficiently.
 
-## Recent Updates (v1.1)
-- **Advanced Reminder Engine:** Implemented a "Requirement-Based Satisfaction" model. Reminders are now tracked per vaccine rather than per visit, ensuring catch-up vaccinations are never missed even if visits are out of order.
+## Recent Updates (v1.2)
+- **Sequential Clinic ID System:** Replaced random ID generation with a production-safe sequential system (`NEO-1000`, `NEO-1001`). 
+- **Automated Legacy Migration:** One-time background migration job to assign sequential IDs to all existing patients without data loss.
+- **Improved Room Schema Integrity:** Critical repair of the database migration path to ensure 100% schema alignment and prevent crashes on existing installations.
+- **Offline-First ID Assignment:** New IDs are assigned locally and queued for background sync, ensuring functionality even without internet.
+- **Enhanced UI Visibility:** Patients without assigned IDs are now clearly marked as "Not Assigned" instead of being hidden, ensuring full database visibility.
+- **Data Deduplication Logic:** Intelligent conflict resolution that preserves unique clinic IDs across multiple devices and sync cycles.
+
+## Previous Updates (v1.1)
+- **Advanced Reminder Engine:** Implemented a "Requirement-Based Satisfaction" model. Reminders are now tracked per vaccine rather than per visit.
 - **Improved Workflow:** Added "Mark as Done" action to vaccination history via long-press, allowing staff to quickly clear requirements without creating new visits.
 - **Real-time Widget Sync:** The home screen widget and "Due" tab now update immediately when vaccinations are marked as completed, ensuring the interface is always accurate.
 - **Smart Due Filtering:** Completed vaccinations are now automatically filtered out of the "Due" list and widget for a cleaner, action-oriented interface.

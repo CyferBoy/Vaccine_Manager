@@ -236,7 +236,7 @@ class ReminderRepositoryImpl @Inject constructor(
                     )
                     dueReminderDao.insertReminder(reminder)
                     
-                    auditLogger.log(
+                    auditLogger.recordLog(
                         module = "PATIENT",
                         entityType = "REMINDER",
                         entityId = "${patientId}||${originalVisitId}||${name}",
@@ -276,7 +276,7 @@ class ReminderRepositoryImpl @Inject constructor(
                     enqueueReminderSync("REMINDER_STATE", requirement.patientId, requirement.originalVisitId, requirement.vaccineName, SyncOperation.CREATE, SyncPriority.MEDIUM)
                 }
 
-                auditLogger.log(
+                auditLogger.recordLog(
                     module = "PATIENT",
                     entityType = "REMINDER",
                     entityId = "${requirement.patientId}||${requirement.originalVisitId}||${requirement.vaccineName}",
@@ -314,7 +314,7 @@ class ReminderRepositoryImpl @Inject constructor(
 
                 dueReminderDao.insertReminder(updated)
 
-                auditLogger.log(
+                auditLogger.recordLog(
                     module = "PATIENT",
                     entityType = "REMINDER",
                     entityId = "${requirement.patientId}||${requirement.originalVisitId}||${requirement.vaccineName}",
@@ -367,7 +367,7 @@ class ReminderRepositoryImpl @Inject constructor(
                     dueReminderDao.insertReminder(external)
                 }
 
-                auditLogger.log(
+                auditLogger.recordLog(
                     module = "PATIENT",
                     entityType = "REMINDER",
                     entityId = "${requirement.patientId}||${requirement.originalVisitId}||${requirement.vaccineName}",
@@ -403,7 +403,7 @@ class ReminderRepositoryImpl @Inject constructor(
                     dueReminderDao.insertReminder(dismissed)
                 }
 
-                auditLogger.log(
+                auditLogger.recordLog(
                     module = "PATIENT",
                     entityType = "REMINDER",
                     entityId = "${requirement.patientId}||${requirement.originalVisitId}||${requirement.vaccineName}",
@@ -430,7 +430,7 @@ class ReminderRepositoryImpl @Inject constructor(
                     )
                     dueReminderDao.insertReminder(restored)
 
-                    auditLogger.log(
+                    auditLogger.recordLog(
                         module = "PATIENT",
                         entityType = "REMINDER",
                         entityId = "${requirement.patientId}||${requirement.originalVisitId}||${requirement.vaccineName}",
@@ -452,7 +452,7 @@ class ReminderRepositoryImpl @Inject constructor(
                 if (existing != null) {
                     dueReminderDao.softDeleteReminder(existing.id)
                     
-                    auditLogger.log(
+                    auditLogger.recordLog(
                         module = "PATIENT",
                         entityType = "REMINDER",
                         entityId = "${requirement.patientId}||${requirement.originalVisitId}||${requirement.vaccineName}",

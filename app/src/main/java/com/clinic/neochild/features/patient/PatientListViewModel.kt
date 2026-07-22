@@ -6,6 +6,8 @@ import com.clinic.neochild.domain.model.Patient
 import com.clinic.neochild.domain.usecase.patient.DeletePatientUseCase
 import com.clinic.neochild.domain.usecase.patient.MergePatientsUseCase
 import com.clinic.neochild.domain.usecase.patient.SearchPatientsUseCase
+import com.clinic.neochild.domain.usecase.sync.RefreshDataUseCase
+import com.clinic.neochild.domain.repository.PatientRepository
 import com.clinic.neochild.domain.usecase.vaccination.GetVaccinationsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -26,7 +28,8 @@ data class PatientListUiState(
     val isMergeSelectionMode: Boolean = false,
     val selectedPatients: Set<Patient> = emptySet(),
     val isMerging: Boolean = false,
-    val patientsWithMissingPrice: Set<String> = emptySet()
+    val patientsWithMissingPrice: Set<String> = emptySet(),
+    val totalCount: Int = 0
 )
 
 @HiltViewModel
@@ -34,7 +37,9 @@ class PatientListViewModel @Inject constructor(
     private val getVaccinationsUseCase: GetVaccinationsUseCase,
     private val deletePatientUseCase: DeletePatientUseCase,
     private val mergePatientsUseCase: MergePatientsUseCase,
-    private val searchPatientsUseCase: SearchPatientsUseCase
+    private val searchPatientsUseCase: SearchPatientsUseCase,
+    private val refreshDataUseCase: RefreshDataUseCase,
+    private val patientRepository: PatientRepository
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
@@ -54,8 +59,9 @@ class PatientListViewModel @Inject constructor(
                 getVaccinationsUseCase(),
                 combine(_isMergeSelectionMode, _selectedPatients, _isMerging, _error) { mode, selected, merging, err ->
                     Quad(mode, selected, merging, err)
-                }
-            ) { patients, sort, vaccinations, internalState ->
+                },
+                flow { emit(patientRepository.getTotalPatientCount()) }
+            ) { patients, sort, vaccinations, internalState, total ->
                 
                 val missingPrice = if (query.isEmpty()) {
                     vaccinations.filter { it.cost <= 0.0 }.map { it.patientId }.toSet()
@@ -75,10 +81,25 @@ class PatientListViewModel @Inject constructor(
                     selectedPatients = internalState.second,
                     isMerging = internalState.third,
                     error = internalState.fourth,
-                    patientsWithMissingPrice = missingPrice
+                    patientsWithMissingPrice = missingPrice,
+                    totalCount = total
                 )
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), PatientListUiState(isLoading = true))
+
+    init {
+        refresh()
+    }
+
+    fun refresh() {
+        viewModelScope.launch {
+            try {
+                refreshDataUseCase()
+            } catch (e: Exception) {
+                _error.value = "Refresh failed: ${e.message}"
+            }
+        }
+    }
 
     fun updateSearchQuery(query: String) {
         _searchQuery.value = query

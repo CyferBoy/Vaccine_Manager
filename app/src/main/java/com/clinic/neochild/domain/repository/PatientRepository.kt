@@ -19,6 +19,7 @@ interface PatientRepository {
     
     fun searchPatients(query: String): Flow<List<Patient>>
     fun getPatientCount(): Flow<Int>
+    suspend fun getTotalPatientCount(): Int
     
     // Timeline & History
     fun getPatientTimeline(patientId: String): Flow<List<AuditLogEntity>>

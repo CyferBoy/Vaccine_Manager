@@ -12,4 +12,5 @@ data class Patient(
     val village: String = "",
     val address: String = "",
     val registrationDate: String = "",
+    val isDeleted: Boolean = false
 )

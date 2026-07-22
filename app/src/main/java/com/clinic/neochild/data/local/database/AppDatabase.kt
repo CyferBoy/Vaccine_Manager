@@ -143,27 +143,27 @@ abstract class AppDatabase : RoomDatabase() {
                 """)
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_external_reminders_patientId_originalVisitId_vaccineName` ON `external_reminders` (`patientId`, `originalVisitId`, `vaccineName`)")
 
-                // 2. Migrate data
+                // 2. Migrate data with deduplication
                 db.execSQL("""
-                    INSERT INTO due_reminders (patientId, originalVisitId, vaccineName, dueDate, reminderDate, status, priority, reminderEnabled, category, notes, lastReminderTime, notificationSent, createdAt, updatedAt, isSynced, isDeleted)
+                    INSERT OR REPLACE INTO due_reminders (patientId, originalVisitId, vaccineName, dueDate, reminderDate, status, priority, reminderEnabled, category, notes, lastReminderTime, notificationSent, createdAt, updatedAt, isSynced, isDeleted)
                     SELECT patientId, originalVisitId, vaccineName, dueDate, dueDate, status, priority, reminderEnabled, category, notes, lastReminderTime, notificationSent, createdAt, updatedAt, isSynced, 0
-                    FROM reminders WHERE completed = 0 AND status NOT IN ('COMPLETED', 'DISMISSED', 'EXTERNAL')
+                    FROM reminders WHERE (completed = 0 OR completed IS NULL) AND status NOT IN ('COMPLETED', 'DISMISSED', 'EXTERNAL')
                 """)
 
                 db.execSQL("""
-                    INSERT INTO completed_reminders (patientId, originalVisitId, vaccineName, dueDate, completionDate, completedBy, notes, isSynced, isDeleted)
+                    INSERT OR REPLACE INTO completed_reminders (patientId, originalVisitId, vaccineName, dueDate, completionDate, completedBy, notes, isSynced, isDeleted)
                     SELECT patientId, originalVisitId, vaccineName, dueDate, updatedAt, 'MIGRATED', notes, isSynced, 0
                     FROM reminders WHERE status = 'COMPLETED' OR completed = 1
                 """)
 
                 db.execSQL("""
-                    INSERT INTO dismissed_reminders (patientId, originalVisitId, vaccineName, dueDate, dismissalDate, dismissedBy, reason, isSynced, isDeleted)
+                    INSERT OR REPLACE INTO dismissed_reminders (patientId, originalVisitId, vaccineName, dueDate, dismissalDate, dismissedBy, reason, isSynced, isDeleted)
                     SELECT patientId, originalVisitId, vaccineName, dueDate, updatedAt, 'MIGRATED', notes, isSynced, 0
                     FROM reminders WHERE status = 'DISMISSED'
                 """)
 
                 db.execSQL("""
-                    INSERT INTO external_reminders (patientId, originalVisitId, vaccineName, dueDate, externalDate, source, recordedBy, notes, isSynced, isDeleted)
+                    INSERT OR REPLACE INTO external_reminders (patientId, originalVisitId, vaccineName, dueDate, externalDate, source, recordedBy, notes, isSynced, isDeleted)
                     SELECT patientId, originalVisitId, vaccineName, dueDate, dueDate, IFNULL(vaccinationSource, 'UNKNOWN'), 'MIGRATED', notes, isSynced, 0
                     FROM reminders WHERE status = 'EXTERNAL'
                 """)
@@ -205,6 +205,16 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE `patients` ADD COLUMN `guardianRelation` TEXT")
                 db.execSQL("ALTER TABLE `patients` ADD COLUMN `guardianPhone` TEXT")
                 db.execSQL("ALTER TABLE `patients` ADD COLUMN `attachments` TEXT")
+                
+                // Deduplicate patientClinicId before creating UNIQUE index
+                db.execSQL("""
+                    UPDATE patients 
+                    SET patientClinicId = patientClinicId || '-DUP-' || substr(id, 1, 4)
+                    WHERE rowid NOT IN (
+                        SELECT MIN(rowid) FROM patients GROUP BY patientClinicId
+                    )
+                """)
+
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_patients_name` ON `patients` (`name`)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_patients_phone` ON `patients` (`phone`)")
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_patients_patientClinicId` ON `patients` (`patientClinicId`)")
@@ -223,18 +233,20 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE `vaccine_batches` ADD COLUMN `wastedQuantity` INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE `vaccine_batches` ADD COLUMN `borrowedQuantity` INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_vaccine_batches_batchNumber` ON `vaccine_batches` (`batchNumber`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_vaccine_batches_vaccineId` ON `vaccine_batches` (`vaccineId`)")
 
                 // 4. Create New Tables
                 db.execSQL("""
                     CREATE TABLE IF NOT EXISTS `reminder_states` (
                         `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `patientId` TEXT NOT NULL, 
                         `originalVisitId` TEXT NOT NULL, `vaccineName` TEXT NOT NULL, `dueDate` TEXT NOT NULL, 
-                        `status` TEXT NOT NULL, `reminderDate` TEXT, `priority` TEXT NOT NULL, 
-                        `reminderEnabled` INTEGER NOT NULL, `category` TEXT NOT NULL, `notes` TEXT, 
-                        `completionDate` INTEGER, `performedBy` TEXT, `dismissalDate` INTEGER, 
+                        `status` TEXT NOT NULL, `priority` TEXT NOT NULL, `reminderEnabled` INTEGER NOT NULL, 
+                        `category` TEXT NOT NULL, `vaccinationSource` TEXT, `notes` TEXT, 
+                        `reminderDate` TEXT, `completionDate` INTEGER, `performedBy` TEXT, `dismissalDate` INTEGER, 
                         `dismissalReason` TEXT, `externalDate` TEXT, `source` TEXT, 
                         `lastReminderTime` INTEGER NOT NULL, `notificationSent` INTEGER NOT NULL, 
                         `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `isSynced` INTEGER NOT NULL,
+                        `isDeleted` INTEGER NOT NULL,
                         FOREIGN KEY(`patientId`) REFERENCES `patients`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
                     )
                 """)
@@ -296,23 +308,23 @@ abstract class AppDatabase : RoomDatabase() {
 
                 // 5. Migrate Reminders
                 db.execSQL("""
-                    INSERT INTO reminder_states (patientId, originalVisitId, vaccineName, dueDate, status, reminderDate, priority, reminderEnabled, category, notes, lastReminderTime, notificationSent, createdAt, updatedAt, isSynced)
-                    SELECT patientId, originalVisitId, vaccineName, dueDate, status, reminderDate, priority, reminderEnabled, category, notes, lastReminderTime, notificationSent, createdAt, updatedAt, isSynced
+                    INSERT INTO reminder_states (patientId, originalVisitId, vaccineName, dueDate, status, reminderDate, priority, reminderEnabled, category, notes, lastReminderTime, notificationSent, createdAt, updatedAt, isSynced, isDeleted, vaccinationSource)
+                    SELECT patientId, originalVisitId, vaccineName, dueDate, status, reminderDate, priority, reminderEnabled, category, notes, lastReminderTime, notificationSent, createdAt, updatedAt, isSynced, isDeleted, NULL
                     FROM due_reminders
                 """)
                 db.execSQL("""
-                    INSERT OR REPLACE INTO reminder_states (patientId, originalVisitId, vaccineName, dueDate, status, notes, completionDate, performedBy, createdAt, updatedAt, isSynced, priority, reminderEnabled, category, lastReminderTime, notificationSent)
-                    SELECT patientId, originalVisitId, vaccineName, dueDate, 'COMPLETED', notes, completionDate, completedBy, completionDate, completionDate, isSynced, 'MEDIUM', 0, 'VACCINATION', 0, 0
+                    INSERT OR REPLACE INTO reminder_states (patientId, originalVisitId, vaccineName, dueDate, status, notes, completionDate, performedBy, createdAt, updatedAt, isSynced, isDeleted, priority, reminderEnabled, category, lastReminderTime, notificationSent, vaccinationSource)
+                    SELECT patientId, originalVisitId, vaccineName, dueDate, 'COMPLETED', notes, completionDate, completedBy, completionDate, completionDate, isSynced, isDeleted, 'MEDIUM', 0, 'VACCINATION', 0, 0, NULL
                     FROM completed_reminders
                 """)
                 db.execSQL("""
-                    INSERT OR REPLACE INTO reminder_states (patientId, originalVisitId, vaccineName, dueDate, status, notes, dismissalDate, dismissalReason, createdAt, updatedAt, isSynced, priority, reminderEnabled, category, lastReminderTime, notificationSent)
-                    SELECT patientId, originalVisitId, vaccineName, dueDate, 'DISMISSED', NULL, dismissalDate, reason, dismissalDate, dismissalDate, isSynced, 'MEDIUM', 0, 'VACCINATION', 0, 0
+                    INSERT OR REPLACE INTO reminder_states (patientId, originalVisitId, vaccineName, dueDate, status, notes, dismissalDate, dismissalReason, createdAt, updatedAt, isSynced, isDeleted, priority, reminderEnabled, category, lastReminderTime, notificationSent, vaccinationSource)
+                    SELECT patientId, originalVisitId, vaccineName, dueDate, 'DISMISSED', NULL, dismissalDate, reason, dismissalDate, dismissalDate, isSynced, isDeleted, 'MEDIUM', 0, 'VACCINATION', 0, 0, NULL
                     FROM dismissed_reminders
                 """)
                 db.execSQL("""
-                    INSERT OR REPLACE INTO reminder_states (patientId, originalVisitId, vaccineName, dueDate, status, notes, externalDate, source, performedBy, createdAt, updatedAt, isSynced, priority, reminderEnabled, category, lastReminderTime, notificationSent)
-                    SELECT patientId, originalVisitId, vaccineName, dueDate, 'EXTERNAL', notes, externalDate, source, recordedBy, 0, 0, isSynced, 'MEDIUM', 0, 'VACCINATION', 0, 0
+                    INSERT OR REPLACE INTO reminder_states (patientId, originalVisitId, vaccineName, dueDate, status, notes, externalDate, source, performedBy, createdAt, updatedAt, isSynced, isDeleted, priority, reminderEnabled, category, lastReminderTime, notificationSent, vaccinationSource)
+                    SELECT patientId, originalVisitId, vaccineName, dueDate, 'EXTERNAL', notes, externalDate, source, recordedBy, 0, 0, isSynced, isDeleted, 'MEDIUM', 0, 'VACCINATION', 0, 0, source
                     FROM external_reminders
                 """)
 
@@ -340,6 +352,7 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_patient_visits_patientId` ON `patient_visits` (`patientId`)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_patient_visits_receiptNumber` ON `patient_visits` (`receiptNumber`)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_patient_visits_doctor` ON `patient_visits` (`doctor`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_patient_visits_isSynced` ON `patient_visits` (`isSynced`)")
 
                 // 7. Update Audit Logs and Merge Reminder Audits
                 db.execSQL("ALTER TABLE `audit_logs` RENAME TO `audit_logs_old`")
@@ -363,13 +376,31 @@ abstract class AppDatabase : RoomDatabase() {
                     FROM reminder_audits
                 """)
                 
-                // 8. Drop Legacy Tables
-                db.execSQL("DROP TABLE `audit_logs_old`")
-                db.execSQL("DROP TABLE `reminder_audits`")
-                db.execSQL("DROP TABLE `due_reminders`")
-                db.execSQL("DROP TABLE `completed_reminders`")
-                db.execSQL("DROP TABLE `dismissed_reminders`")
-                db.execSQL("DROP TABLE `external_reminders`")
+                // 8. Drop Legacy Tables before creating new indices (to avoid name conflicts)
+                db.execSQL("DROP TABLE IF EXISTS `audit_logs_old`")
+                db.execSQL("DROP TABLE IF EXISTS `reminder_audits`")
+                db.execSQL("DROP TABLE IF EXISTS `due_reminders`")
+                db.execSQL("DROP TABLE IF EXISTS `completed_reminders`")
+                db.execSQL("DROP TABLE IF EXISTS `dismissed_reminders`")
+                db.execSQL("DROP TABLE IF EXISTS `external_reminders`")
+
+                // 9. Add missing indices across all tables
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_audit_logs_timestamp` ON `audit_logs` (`timestamp`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_audit_logs_patientId` ON `audit_logs` (`patientId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_audit_logs_entityType` ON `audit_logs` (`entityType`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_audit_logs_entityId` ON `audit_logs` (`entityId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_audit_logs_module` ON `audit_logs` (`module`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_audit_logs_user` ON `audit_logs` (`user`)")
+                
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_patient_notes_timestamp` ON `patient_notes` (`timestamp`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_finance_transactions_timestamp` ON `finance_transactions` (`timestamp`)")
+                
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_borrow_records_vaccineId` ON `borrow_records` (`vaccineId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_borrow_records_batchId` ON `borrow_records` (`batchId`)")
+                
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_inventory_transactions_vaccineId` ON `inventory_transactions` (`vaccineId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_inventory_transactions_batchId` ON `inventory_transactions` (`batchId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_inventory_transactions_vaccinationId` ON `inventory_transactions` (`vaccinationId`)")
             }
         }
 

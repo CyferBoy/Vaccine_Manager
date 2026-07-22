@@ -129,8 +129,8 @@ class SyncRepositoryImpl @Inject constructor(
                 "VACCINE" -> database.vaccineDao().getVaccineById(entityId)
                 "BATCH" -> database.vaccineDao().getBatchById(entityId)
                 "TRANSACTION" -> database.vaccineDao().getTransactionById(entityId.toLongOrNull() ?: -1L)
-                "FINANCE" -> database.financeDao().getUnsyncedTransactions().find { it.id.toString() == entityId } // Optimization needed
-                "AUDIT_LOG" -> database.auditLogDao().getUnsyncedLogs().find { it.id.toString() == entityId }
+                "FINANCE" -> database.financeDao().getTransactionById(entityId.toLongOrNull() ?: -1L)
+                "AUDIT_LOG" -> database.auditLogDao().getLogById(entityId.toLongOrNull() ?: -1L)
                 else -> null
             }
         } catch (e: Exception) {

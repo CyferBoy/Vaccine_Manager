@@ -1,6 +1,7 @@
 package com.clinic.neochild.data.repository
 
 import com.clinic.neochild.data.local.database.AppDatabase
+import androidx.room.withTransaction
 import com.clinic.neochild.data.local.entity.toVaccination
 import com.clinic.neochild.data.local.entity.toEntity
 import com.clinic.neochild.core.model.SyncOperation
@@ -48,42 +49,59 @@ class VaccinationRepositoryImpl @Inject constructor(
     }
 
     override suspend fun addVaccination(vaccination: Vaccination) {
-        // 1. Check if it's an update
-        val existing = vaccinationDao.getVaccinationById(vaccination.id)
-        
-        // 2. Save locally
-        vaccinationDao.insertVaccination(vaccination.toEntity(isSynced = false))
-        
-        // 3. Queue for background sync
-        val operation = if (existing == null) SyncOperation.CREATE else SyncOperation.UPDATE
-        
-        syncRepository.enqueue(
-            entityName = "VACCINATION",
-            entityId = vaccination.id,
-            operation = operation,
-            priority = SyncPriority.HIGH
-        )
-        
-        val auditAction = if (existing == null) "Vaccination Added" else "Vaccination Updated"
-        auditLogger.logAction(auditAction, vaccination.patientId, "Vaccines: ${vaccination.vaccineNames.joinToString(", ")}")
+        database.withTransaction {
+            // 1. Check if it's an update
+            val existing = vaccinationDao.getVaccinationById(vaccination.id)
+            
+            // 2. Save locally
+            vaccinationDao.insertVaccination(vaccination.toEntity(isSynced = false))
+            
+            // 3. Queue for background sync
+            val operation = if (existing == null) SyncOperation.CREATE else SyncOperation.UPDATE
+            
+            syncRepository.enqueue(
+                entityName = "VACCINATION",
+                entityId = vaccination.id,
+                operation = operation,
+                priority = SyncPriority.HIGH
+            )
+            
+            auditLogger.recordLog(
+                module = "PATIENT",
+                entityType = "VISIT",
+                entityId = vaccination.id,
+                action = if (existing == null) "CREATED" else "UPDATED",
+                patientId = vaccination.patientId,
+                remarks = "Vaccines: ${vaccination.vaccineNames.joinToString(", ")}"
+            )
+        }
     }
 
     override suspend fun deleteVaccination(id: String) {
-        val existing = vaccinationDao.getVaccinationById(id)
-        vaccinationDao.deleteVaccination(id)
-        
-        syncRepository.enqueue(
-            entityName = "VACCINATION",
-            entityId = id,
-            operation = SyncOperation.DELETE,
-            priority = SyncPriority.MEDIUM
-        )
-        
-        auditLogger.logAction("Vaccine Deleted", existing?.patientId, "Vaccines: ${existing?.vaccineNames ?: "Unknown"}")
+        database.withTransaction {
+            val existing = vaccinationDao.getVaccinationById(id)
+            vaccinationDao.deleteVaccination(id)
+            
+            syncRepository.enqueue(
+                entityName = "VACCINATION",
+                entityId = id,
+                operation = SyncOperation.DELETE,
+                priority = SyncPriority.MEDIUM
+            )
+            
+            auditLogger.recordLog(
+                module = "PATIENT",
+                entityType = "VISIT",
+                entityId = id,
+                action = "DELETED",
+                patientId = existing?.patientId,
+                remarks = "Vaccines: ${existing?.vaccineNames ?: "Unknown"}"
+            )
+        }
     }
 
     override suspend fun markAsDone(id: String) {
-        withContext(Dispatchers.IO) {
+        database.withTransaction {
             val current = vaccinationDao.getVaccinationById(id)
             if (current != null) {
                 val updated = current.copy(isDone = true, isSynced = false)
@@ -96,7 +114,14 @@ class VaccinationRepositoryImpl @Inject constructor(
                     priority = SyncPriority.MEDIUM
                 )
                 
-                auditLogger.logAction("Reminder Completed", current.patientId, "Vaccines: ${current.vaccineNames}")
+                auditLogger.recordLog(
+                    module = "PATIENT",
+                    entityType = "VISIT",
+                    entityId = id,
+                    action = "COMPLETED",
+                    patientId = current.patientId,
+                    remarks = "Vaccines: ${current.vaccineNames}"
+                )
             }
         }
     }

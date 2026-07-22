@@ -71,7 +71,8 @@ object FirestoreMappers {
                 gender = doc.getString("gender") ?: "",
                 village = doc.getString("village") ?: "",
                 address = doc.getString("address") ?: "",
-                registrationDate = doc.getString("registrationDate") ?: ""
+                registrationDate = doc.get("registrationDate")?.toString() ?: "",
+                isDeleted = doc.getBoolean("isDeleted") ?: false
             )
         } catch (_: Exception) {
             null

@@ -1,5 +1,7 @@
 package com.clinic.neochild.data.repository
 
+import com.clinic.neochild.data.local.database.AppDatabase
+import androidx.room.withTransaction
 import com.clinic.neochild.data.local.dao.FinanceDao
 import com.clinic.neochild.data.local.entity.FinanceEntity
 import com.clinic.neochild.domain.repository.FinanceRepository
@@ -13,6 +15,7 @@ import javax.inject.Singleton
 
 @Singleton
 class FinanceRepositoryImpl @Inject constructor(
+    private val database: AppDatabase,
     private val financeDao: FinanceDao,
     private val syncRepository: SyncRepository,
     private val auditLogger: AuditLogger
@@ -38,29 +41,31 @@ class FinanceRepositoryImpl @Inject constructor(
         remarks: String?,
         recordedBy: String
     ) {
-        val transaction = FinanceEntity(
-            type = "INCOME",
-            category = category,
-            amount = amount,
-            paymentMethod = "MIXED", // Simplified for now
-            patientId = patientId,
-            visitId = visitId,
-            remarks = remarks,
-            recordedBy = recordedBy,
-            isSynced = false
-        )
-        val id = financeDao.insertTransaction(transaction)
-        syncRepository.enqueue("FINANCE", id.toString(), SyncOperation.CREATE, SyncPriority.MEDIUM)
-        
-        auditLogger.log(
-            module = "FINANCE",
-            entityType = "TRANSACTION",
-            entityId = id.toString(),
-            action = "INCOME_RECORDED",
-            patientId = patientId,
-            newValue = amount.toString(),
-            remarks = "Income of $amount recorded in $category"
-        )
+        database.withTransaction {
+            val transaction = FinanceEntity(
+                type = "INCOME",
+                category = category,
+                amount = amount,
+                paymentMethod = "MIXED", // Simplified for now
+                patientId = patientId,
+                visitId = visitId,
+                remarks = remarks,
+                recordedBy = recordedBy,
+                isSynced = false
+            )
+            val id = financeDao.insertTransaction(transaction)
+            syncRepository.enqueue("FINANCE", id.toString(), SyncOperation.CREATE, SyncPriority.MEDIUM)
+            
+            auditLogger.recordLog(
+                module = "FINANCE",
+                entityType = "TRANSACTION",
+                entityId = id.toString(),
+                action = "INCOME_RECORDED",
+                patientId = patientId,
+                newValue = amount.toString(),
+                remarks = "Income of $amount recorded in $category"
+            )
+        }
     }
 
     override suspend fun recordExpense(
@@ -69,25 +74,27 @@ class FinanceRepositoryImpl @Inject constructor(
         remarks: String?,
         recordedBy: String
     ) {
-        val transaction = FinanceEntity(
-            type = "EXPENSE",
-            category = category,
-            amount = amount,
-            paymentMethod = "CASH",
-            remarks = remarks,
-            recordedBy = recordedBy,
-            isSynced = false
-        )
-        val id = financeDao.insertTransaction(transaction)
-        syncRepository.enqueue("FINANCE", id.toString(), SyncOperation.CREATE, SyncPriority.MEDIUM)
+        database.withTransaction {
+            val transaction = FinanceEntity(
+                type = "EXPENSE",
+                category = category,
+                amount = amount,
+                paymentMethod = "CASH",
+                remarks = remarks,
+                recordedBy = recordedBy,
+                isSynced = false
+            )
+            val id = financeDao.insertTransaction(transaction)
+            syncRepository.enqueue("FINANCE", id.toString(), SyncOperation.CREATE, SyncPriority.MEDIUM)
 
-        auditLogger.log(
-            module = "FINANCE",
-            entityType = "TRANSACTION",
-            entityId = id.toString(),
-            action = "EXPENSE_RECORDED",
-            newValue = amount.toString(),
-            remarks = "Expense of $amount recorded in $category"
-        )
+            auditLogger.recordLog(
+                module = "FINANCE",
+                entityType = "TRANSACTION",
+                entityId = id.toString(),
+                action = "EXPENSE_RECORDED",
+                newValue = amount.toString(),
+                remarks = "Expense of $amount recorded in $category"
+            )
+        }
     }
 }

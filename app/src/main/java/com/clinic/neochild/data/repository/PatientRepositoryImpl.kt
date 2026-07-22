@@ -1,5 +1,6 @@
 package com.clinic.neochild.data.repository
 
+import com.clinic.neochild.data.local.database.AppDatabase
 import com.clinic.neochild.data.local.dao.PatientDao
 import com.clinic.neochild.data.local.dao.AuditLogDao
 import com.clinic.neochild.data.local.dao.PatientNotesDao
@@ -17,6 +18,7 @@ import com.clinic.neochild.core.model.SyncOperation
 import com.clinic.neochild.core.model.SyncPriority
 import com.clinic.neochild.core.logger.AuditLogger
 import com.clinic.neochild.data.remote.mapper.FirestoreMappers
+import androidx.room.withTransaction
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -28,6 +30,7 @@ import javax.inject.Singleton
 
 @Singleton
 class PatientRepositoryImpl @Inject constructor(
+    private val database: AppDatabase,
     private val patientDao: PatientDao,
     private val vaccinationDao: VaccinationDao,
     private val auditLogDao: AuditLogDao,
@@ -55,43 +58,57 @@ class PatientRepositoryImpl @Inject constructor(
     }
 
     override suspend fun addPatient(patient: Patient) {
-        val entity = patient.toEntity(isSynced = false)
-        patientDao.insertPatient(entity)
-        
-        syncRepository.enqueue(
-            entityName = "PATIENT",
-            entityId = patient.id,
-            operation = SyncOperation.CREATE,
-            priority = SyncPriority.HIGH
-        )
+        database.withTransaction {
+            // Business Rule: patientClinicId must be unique
+            if (patient.patientClinicId.isNotBlank()) {
+                val existing = patientDao.getPatientByClinicId(patient.patientClinicId)
+                if (existing != null && existing.id != patient.id) {
+                    throw IllegalStateException("A patient with Clinic ID ${patient.patientClinicId} already exists.")
+                }
+            }
 
-        auditLogger.log(
-            module = "PATIENT",
-            entityType = "PATIENT",
-            entityId = patient.id,
-            action = "CREATED",
-            patientId = patient.id,
-            remarks = "Patient ${patient.name} registered"
-        )
+            val entity = patient.toEntity(isSynced = false)
+            patientDao.insertPatient(entity)
+            
+            syncRepository.enqueue(
+                entityName = "PATIENT",
+                entityId = patient.id,
+                operation = SyncOperation.CREATE,
+                priority = SyncPriority.HIGH
+            )
+
+            auditLogger.recordLog(
+                module = "PATIENT",
+                entityType = "PATIENT",
+                entityId = patient.id,
+                action = "CREATED",
+                patientId = patient.id,
+                remarks = "Patient ${patient.name} registered"
+            )
+        }
     }
 
     override suspend fun deletePatient(id: String) {
-        patientDao.deletePatient(id)
-        syncRepository.enqueue("PATIENT", id, SyncOperation.DELETE, SyncPriority.MEDIUM)
-        
-        auditLogger.log(
-            module = "PATIENT",
-            entityType = "PATIENT",
-            entityId = id,
-            action = "DELETED",
-            patientId = id
-        )
+        database.withTransaction {
+            patientDao.deletePatient(id)
+            syncRepository.enqueue("PATIENT", id, SyncOperation.DELETE, SyncPriority.MEDIUM)
+            
+            auditLogger.recordLog(
+                module = "PATIENT",
+                entityType = "PATIENT",
+                entityId = id,
+                action = "DELETED",
+                patientId = id
+            )
+        }
     }
 
     override fun searchPatients(query: String): Flow<List<Patient>> =
         patientDao.searchPatients(query).map { list -> list.map { it.toPatient() } }
 
     override fun getPatientCount(): Flow<Int> = patientDao.getPatientCount()
+
+    override suspend fun getTotalPatientCount(): Int = patientDao.getTotalPatientCount()
 
     override fun getPatientTimeline(patientId: String): Flow<List<AuditLogEntity>> {
         return auditLogDao.getLogsForPatient(patientId)

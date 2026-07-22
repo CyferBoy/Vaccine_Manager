@@ -49,7 +49,8 @@ fun PatientEntity.toPatient() = Patient(
     gender = gender,
     village = village,
     address = address,
-    registrationDate = registrationDate
+    registrationDate = registrationDate,
+    isDeleted = isDeleted
 )
 
 fun Patient.toEntity(isSynced: Boolean = true) = PatientEntity(
@@ -64,5 +65,6 @@ fun Patient.toEntity(isSynced: Boolean = true) = PatientEntity(
     village = village,
     address = address,
     registrationDate = registrationDate,
-    isSynced = isSynced
+    isSynced = isSynced,
+    isDeleted = isDeleted
 )

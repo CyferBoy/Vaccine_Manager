@@ -122,7 +122,13 @@ class InventoryRepositoryImpl @Inject constructor(
                     // Restore archived vaccine
                     vaccineDao.updateVaccine(finalVaccine.copy(isDeleted = false, lastUpdated = System.currentTimeMillis()))
                     syncRepository.enqueue("VACCINE", finalVaccine.id, SyncOperation.UPDATE, SyncPriority.MEDIUM)
-                    auditLogger.logAction("Vaccine Restored", user, "Vaccine: ${finalVaccine.brandName}")
+                    auditLogger.recordLog(
+                        module = "VACCINE",
+                        entityType = "VACCINE",
+                        entityId = finalVaccine.id,
+                        action = "RESTORED",
+                        remarks = "Vaccine: ${finalVaccine.brandName}"
+                    )
                 }
                 finalVaccine.id
             } else {
@@ -146,7 +152,13 @@ class InventoryRepositoryImpl @Inject constructor(
                 notes = "Stock Added: ${finalBatch.batchNumber}"
             ))
 
-            auditLogger.logAction("Stock Added", user, "Vaccine: ${vaccine.brandName}, Batch: ${finalBatch.batchNumber}, Qty: ${finalBatch.purchaseQuantity}")
+            auditLogger.recordLog(
+                module = "INVENTORY",
+                entityType = "BATCH",
+                entityId = finalBatch.batchId,
+                action = "CREATED",
+                remarks = "Vaccine: ${vaccine.brandName}, Batch: ${finalBatch.batchNumber}, Qty: ${finalBatch.purchaseQuantity}"
+            )
             syncRepository.enqueue("BATCH", finalBatch.batchId, SyncOperation.CREATE, SyncPriority.MEDIUM)
         }
     }
@@ -172,7 +184,13 @@ class InventoryRepositoryImpl @Inject constructor(
                 ))
             }
 
-            auditLogger.logAction("Batch Updated", user, "Batch: ${batch.batchNumber}, Qty Diff: $diff")
+            auditLogger.recordLog(
+                module = "INVENTORY",
+                entityType = "BATCH",
+                entityId = batch.batchId,
+                action = "UPDATED",
+                remarks = "Batch: ${batch.batchNumber}, Qty Diff: $diff"
+            )
             syncRepository.enqueue("BATCH", batch.batchId, SyncOperation.UPDATE, SyncPriority.MEDIUM)
         }
     }
@@ -195,7 +213,13 @@ class InventoryRepositoryImpl @Inject constructor(
                 notes = "Batch Deleted: ${batch.batchNumber}"
             ))
 
-            auditLogger.logAction("Batch Deleted", user, "Batch: ${batch.batchNumber}, Removed Qty: ${batch.remainingQuantity}")
+            auditLogger.recordLog(
+                module = "INVENTORY",
+                entityType = "BATCH",
+                entityId = batchId,
+                action = "DELETED",
+                remarks = "Batch: ${batch.batchNumber}, Removed Qty: ${batch.remainingQuantity}"
+            )
             syncRepository.enqueue("BATCH", batchId, SyncOperation.UPDATE, SyncPriority.MEDIUM)
 
             // Check if this was the last batch
@@ -205,7 +229,13 @@ class InventoryRepositoryImpl @Inject constructor(
                 if (vaccine != null && !vaccine.isDeleted) {
                     vaccineDao.updateVaccine(vaccine.copy(isDeleted = true))
                     syncRepository.enqueue("VACCINE", vaccine.id, SyncOperation.UPDATE, SyncPriority.MEDIUM)
-                    auditLogger.logAction("Vaccine Archived", user, "Vaccine: ${vaccine.brandName} (Final batch removed)")
+                    auditLogger.recordLog(
+                        module = "VACCINE",
+                        entityType = "VACCINE",
+                        entityId = vaccine.id,
+                        action = "ARCHIVED",
+                        remarks = "Vaccine: ${vaccine.brandName} (Final batch removed)"
+                    )
                 }
             }
         }
@@ -234,13 +264,25 @@ class InventoryRepositoryImpl @Inject constructor(
                 if (!vaccine.isDeleted) {
                     vaccineDao.updateVaccine(vaccine.copy(isDeleted = true))
                     syncRepository.enqueue("VACCINE", vaccineId, SyncOperation.UPDATE, SyncPriority.MEDIUM)
-                    auditLogger.logAction("Vaccine Archived", user, "Vaccine: ${vaccine.brandName} (Historical records exist)")
+                    auditLogger.recordLog(
+                        module = "VACCINE",
+                        entityType = "VACCINE",
+                        entityId = vaccineId,
+                        action = "ARCHIVED",
+                        remarks = "Vaccine: ${vaccine.brandName} (Historical records exist)"
+                    )
                 }
             } else {
                 // Permanent Delete
                 vaccineDao.deleteVaccinePermanently(vaccine)
                 syncRepository.enqueue("VACCINE", vaccineId, SyncOperation.DELETE, SyncPriority.MEDIUM)
-                auditLogger.logAction("Vaccine Permanently Deleted", user, "Vaccine: ${vaccine.brandName}")
+                auditLogger.recordLog(
+                    module = "VACCINE",
+                    entityType = "VACCINE",
+                    entityId = vaccineId,
+                    action = "DELETED_PERMANENTLY",
+                    remarks = "Vaccine: ${vaccine.brandName}"
+                )
             }
         }
     }
@@ -281,7 +323,14 @@ class InventoryRepositoryImpl @Inject constructor(
             }
 
             if (remaining > 0) throw IllegalStateException("Insufficient stock")
-            auditLogger.logAction("Stock Deducted", user, "VaccineId: $vaccineId, Qty: $quantity")
+            auditLogger.recordLog(
+                module = "INVENTORY",
+                entityType = "VACCINE",
+                entityId = vaccineId,
+                action = "STOCK_DEDUCTED",
+                patientId = patientId,
+                remarks = "Qty: $quantity"
+            )
         }
     }
 

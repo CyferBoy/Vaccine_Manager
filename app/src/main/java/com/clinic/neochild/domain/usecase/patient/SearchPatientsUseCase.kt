@@ -13,6 +13,10 @@ class SearchPatientsUseCase @Inject constructor(
     private val patientRepository: PatientRepository
 ) {
     operator fun invoke(query: String): Flow<List<Patient>> {
-        return patientRepository.searchPatients(query)
+        return if (query.isBlank()) {
+            patientRepository.allPatients
+        } else {
+            patientRepository.searchPatients("%$query%")
+        }
     }
 }

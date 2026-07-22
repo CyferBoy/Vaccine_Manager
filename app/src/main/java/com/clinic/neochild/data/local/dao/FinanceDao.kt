@@ -9,6 +9,9 @@ interface FinanceDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTransaction(transaction: FinanceEntity): Long
 
+    @Query("SELECT * FROM finance_transactions WHERE id = :id")
+    suspend fun getTransactionById(id: Long): FinanceEntity?
+
     @Query("SELECT * FROM finance_transactions ORDER BY timestamp DESC")
     fun getAllTransactions(): Flow<List<FinanceEntity>>
 

@@ -12,6 +12,9 @@ interface PatientDao {
     @Query("SELECT * FROM patients WHERE id = :id")
     suspend fun getPatientById(id: String): PatientEntity?
 
+    @Query("SELECT * FROM patients WHERE patientClinicId = :clinicId AND isDeleted = 0 LIMIT 1")
+    suspend fun getPatientByClinicId(clinicId: String): PatientEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPatient(patient: PatientEntity)
 
@@ -37,4 +40,7 @@ interface PatientDao {
 
     @Query("SELECT COUNT(*) FROM patients WHERE isDeleted = 0")
     fun getPatientCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM patients")
+    suspend fun getTotalPatientCount(): Int
 }

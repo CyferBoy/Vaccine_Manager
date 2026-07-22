@@ -33,6 +33,24 @@ class AuditLogger @Inject constructor(
         newValue: String? = null,
         remarks: String? = null
     ) {
+        scope.launch {
+            recordLog(module, entityType, entityId, action, patientId, oldValue, newValue, remarks)
+        }
+    }
+
+    /**
+     * Suspendable version for use inside transactions.
+     */
+    suspend fun recordLog(
+        module: String,
+        entityType: String,
+        entityId: String,
+        action: String,
+        patientId: String? = null,
+        oldValue: String? = null,
+        newValue: String? = null,
+        remarks: String? = null
+    ) {
         val user = auth.currentUser
         val userEmail = user?.email ?: "Unknown"
         val timestamp = System.currentTimeMillis()
@@ -53,12 +71,10 @@ class AuditLogger @Inject constructor(
             isSynced = false
         )
 
-        // 1. Local Log
-        scope.launch {
-            auditLogDao.insertLog(logEntity)
-        }
+        // 1. Local Log (Blocking in suspend context)
+        auditLogDao.insertLog(logEntity)
 
-        // 2. Remote Log
+        // 2. Remote Log (Fire and forget, but Firestore SDK handles persistence)
         val remoteLog = hashMapOf(
             "timestamp" to Date(timestamp),
             "user" to userEmail,

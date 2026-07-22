@@ -11,6 +11,9 @@ interface AuditLogDao {
     @Insert
     suspend fun insertLog(log: AuditLogEntity): Long
 
+    @Query("SELECT * FROM audit_logs WHERE id = :id")
+    suspend fun getLogById(id: Long): AuditLogEntity?
+
     @Query("SELECT * FROM audit_logs WHERE patientId = :patientId ORDER BY timestamp DESC")
     fun getLogsForPatient(patientId: String): Flow<List<AuditLogEntity>>
 

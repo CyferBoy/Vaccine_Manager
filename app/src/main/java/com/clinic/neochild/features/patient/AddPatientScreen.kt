@@ -46,7 +46,7 @@ fun AddPatientScreen(
             isLoading = true
             val patient = viewModel.getPatientById(patientId)
             if (patient != null) {
-                clinicId = patient.patientClinicId
+                clinicId = if (patient.patientClinicId.startsWith("TEMP-")) "" else patient.patientClinicId
                 name = patient.name
                 parentName = patient.parentName
                 phone = patient.phone

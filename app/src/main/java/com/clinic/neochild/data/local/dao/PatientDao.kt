@@ -44,7 +44,7 @@ interface PatientDao {
     @Query("SELECT COUNT(*) FROM patients")
     suspend fun getTotalPatientCount(): Int
 
-    @Query("SELECT * FROM patients WHERE (patientClinicId IS NULL OR patientClinicId = '' OR patientClinicId LIKE '%-DUP-%') AND isDeleted = 0")
+    @Query("SELECT * FROM patients WHERE (patientClinicId IS NULL OR patientClinicId = '' OR patientClinicId LIKE 'TEMP-%' OR patientClinicId LIKE '%-DUP-%') AND isDeleted = 0")
     suspend fun getPatientsNeedingId(): List<PatientEntity>
 
     @Query("SELECT patientClinicId FROM patients WHERE patientClinicId LIKE 'NEO-%' AND patientClinicId NOT LIKE '%-DUP-%' AND patientClinicId NOT LIKE '%-CONFLICT-%' ORDER BY CAST(SUBSTR(patientClinicId, 5) AS INTEGER) DESC LIMIT 1")

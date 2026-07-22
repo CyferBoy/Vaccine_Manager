@@ -122,7 +122,15 @@ class SyncRepositoryImpl @Inject constructor(
 
         return try {
             when (item.entityName) {
-                "PATIENT" -> database.patientDao().getPatientById(entityId)?.toPatient()
+                "PATIENT" -> {
+                    val patient = database.patientDao().getPatientById(entityId)?.toPatient()
+                    // Strip 'TEMP-' prefix before uploading to Firestore
+                    if (patient?.patientClinicId?.startsWith("TEMP-") == true) {
+                        patient.copy(patientClinicId = "")
+                    } else {
+                        patient
+                    }
+                }
                 "VISIT", "VACCINATION" -> database.vaccinationDao().getVaccinationById(entityId)?.toVaccination()
                 "WASTE" -> database.wasteDao().getWasteById(entityId)?.toDomain()
                 "REMINDER_STATE" -> database.dueReminderDao().getReminderById(entityId.toLongOrNull() ?: -1L)

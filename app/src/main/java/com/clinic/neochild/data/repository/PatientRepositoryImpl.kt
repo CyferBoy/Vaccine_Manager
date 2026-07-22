@@ -103,19 +103,34 @@ class PatientRepositoryImpl @Inject constructor(
                 database.withTransaction {
                     for (patient in patients) {
                         try {
-                            // 1. Uniqueness check for clinic ID
-                            if (patient.patientClinicId.isNotBlank()) {
-                                val existingByClinicId = patientDao.getPatientByClinicId(patient.patientClinicId)
+                            val existingLocal = patientDao.getPatientById(patient.id)
+                            
+                            // Determine the best clinic ID to keep
+                            val localClinicId = when {
+                                // 1. Incoming from Firestore has a real ID
+                                patient.patientClinicId.isNotBlank() && !patient.patientClinicId.startsWith("TEMP-") -> 
+                                    patient.patientClinicId
+                                
+                                // 2. Local already has a real ID (assigned by Worker but not yet synced)
+                                existingLocal != null && existingLocal.patientClinicId.isNotBlank() && !existingLocal.patientClinicId.startsWith("TEMP-") -> 
+                                    existingLocal.patientClinicId
+                                
+                                // 3. Fallback to TEMP ID for legacy patients
+                                else -> "TEMP-${patient.id}"
+                            }
+
+                            // Uniqueness conflict check (only for real IDs)
+                            if (!localClinicId.startsWith("TEMP-")) {
+                                val existingByClinicId = patientDao.getPatientByClinicId(localClinicId)
                                 if (existingByClinicId != null && existingByClinicId.id != patient.id) {
-                                    // Handle duplicate Clinic ID conflict
-                                    val resolvedId = patient.patientClinicId + "-CONFLICT-" + patient.id.take(4)
+                                    val resolvedId = localClinicId + "-CONFLICT-" + patient.id.take(4)
                                     patientDao.insertPatient(patient.copy(patientClinicId = resolvedId).toEntity())
                                     continue
                                 }
                             }
 
-                            // 2. Insert or update
-                            patientDao.insertPatient(patient.toEntity())
+                            // Insert/Update
+                            patientDao.insertPatient(patient.copy(patientClinicId = localClinicId).toEntity())
                         } catch (e: Exception) {
                             android.util.Log.e("PatientRepo", "Insert failed for patient ${patient.id}", e)
                         }

@@ -54,6 +54,7 @@ interface ReminderRepository {
 
     // Infrastructure / Internal
     fun triggerImmediateCheck()
+    suspend fun refreshReminders()
     suspend fun syncWithRemote()
     
     // Legacy support

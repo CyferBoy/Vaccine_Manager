@@ -124,11 +124,11 @@ fun DuePatientCard(
                         val statusText = when {
                             vaccination.isDone && vaccination.nextDueDate.isBlank() -> "✅ Completed"
                             vaccination.isDone -> "✅ Done"
-                            category is DateCategory.Overdue -> "⏰ Overdue"
+                            category is DateCategory.Overdue || category is DateCategory.Yesterday -> "⏰ Overdue"
                             else -> "⏰ Due"
                         }
                         val statusColor = if (vaccination.isDone) Color(0xFF4CAF50) else {
-                            if (category is DateCategory.Overdue) MaterialTheme.colorScheme.error
+                            if (category is DateCategory.Overdue || category is DateCategory.Yesterday) MaterialTheme.colorScheme.error
                             else MaterialTheme.colorScheme.primary
                         }
                         

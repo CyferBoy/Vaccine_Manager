@@ -31,7 +31,7 @@ interface DueReminderDao {
     @Query("DELETE FROM due_reminders WHERE patientId = :patientId AND originalVisitId = :visitId AND vaccineName = :vaccineName")
     suspend fun deleteDueReminder(patientId: String, visitId: String, vaccineName: String)
 
-    @Query("UPDATE due_reminders SET isDeleted = 1 WHERE id = :id")
+    @Query("UPDATE due_reminders SET isDeleted = 1, isSynced = 0 WHERE id = :id")
     suspend fun softDeleteDueReminder(id: Long)
 
     // Completed Reminders
@@ -106,6 +106,24 @@ interface DueReminderDao {
 
     @Query("SELECT * FROM external_reminders WHERE patientId = :patientId AND isDeleted = 0")
     fun getExternalRemindersForPatient(patientId: String): Flow<List<ExternalReminderEntity>>
+
+    @Transaction
+    suspend fun getLocalPriority(pId: String, vId: String, name: String): Int {
+        if (getExternalReminderByStableId(pId, vId, name) != null) return 4
+        if (getCompletedReminderByStableId(pId, vId, name) != null) return 3
+        if (getDismissedReminderByStableId(pId, vId, name) != null) return 2
+        if (getDueReminderByStableId(pId, vId, name) != null) return 1
+        return 0
+    }
+
+    @Transaction
+    suspend fun isLocalUnsynced(pId: String, vId: String, name: String): Boolean {
+        if (getExternalReminderByStableId(pId, vId, name)?.isSynced == false) return true
+        if (getCompletedReminderByStableId(pId, vId, name)?.isSynced == false) return true
+        if (getDismissedReminderByStableId(pId, vId, name)?.isSynced == false) return true
+        if (getDueReminderByStableId(pId, vId, name)?.isSynced == false) return true
+        return false
+    }
 
     @Transaction
     suspend fun clearAllStates(patientId: String, visitId: String, vaccineName: String) {

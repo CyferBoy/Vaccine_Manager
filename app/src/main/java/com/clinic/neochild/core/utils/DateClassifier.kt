@@ -5,6 +5,7 @@ import java.util.concurrent.TimeUnit
 
 sealed class DateCategory {
     data class Overdue(val days: Int) : DateCategory()
+    object Yesterday : DateCategory()
     object Today : DateCategory()
     object Tomorrow : DateCategory()
     data class GracePeriod(val dateStr: String) : DateCategory()
@@ -44,6 +45,7 @@ object DateClassifier {
 
         return when {
             diffDays < -4 -> DateCategory.Overdue(-diffDays)
+            diffDays == -1 -> DateCategory.Yesterday
             diffDays < 0 -> DateCategory.GracePeriod(PatientUtils.formatDateForDisplay(dateStr))
             diffDays == 0 -> DateCategory.Today
             diffDays == 1 -> DateCategory.Tomorrow
@@ -56,7 +58,8 @@ object DateClassifier {
      */
     fun formatDisplay(dateStr: String, todayStart: Calendar = getTodayStart()): String {
         return when (val category = classify(dateStr, todayStart)) {
-            is DateCategory.Overdue -> "Overdue (${category.days} days)"
+            is DateCategory.Overdue -> PatientUtils.formatDateForDisplay(dateStr)
+            is DateCategory.Yesterday -> "Yesterday"
             is DateCategory.Today -> "Today"
             is DateCategory.Tomorrow -> "Tomorrow"
             is DateCategory.GracePeriod -> category.dateStr
@@ -65,15 +68,19 @@ object DateClassifier {
     }
 
     /**
-     * Unified comparator for sorting dates as requested:
-     * 1. Overdue (oldest first)
-     * 2. Yesterday
-     * 3. Today
-     * 4. Tomorrow
-     * 5. Future (nearest first)
+     * Unified comparator for sorting dates:
+     * 1. Overdue: latest first (newest dates first)
+     * 2. Others: nearest first
      */
     fun getSortWeight(dateStr: String): Long {
         val targetDate = PatientUtils.parseDate(dateStr) ?: return Long.MAX_VALUE
-        return targetDate.time
+        val category = classify(dateStr)
+        return if (category is DateCategory.Overdue || category is DateCategory.Yesterday) {
+            // Overdue: we want the largest timestamp (latest date) to have the smallest weight
+            // Using a large constant minus time to invert sorting for overdue
+            Long.MAX_VALUE - targetDate.time
+        } else {
+            targetDate.time
+        }
     }
 }

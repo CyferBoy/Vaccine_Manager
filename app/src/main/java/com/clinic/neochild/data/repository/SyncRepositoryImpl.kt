@@ -68,6 +68,31 @@ class SyncRepositoryImpl @Inject constructor(
                 syncDao.updateStatus(item.queueId, SyncStatus.SYNCING.name)
                 uploadEntity(item)
                 syncDao.updateStatus(item.queueId, SyncStatus.SYNCED.name)
+                
+                // Add Audit Log for Reminder Sync
+                if (item.entityName.endsWith("_REMINDER") && item.operation != SyncOperation.DELETE.name) {
+                    val parts = item.entityId.split("||")
+                    if (parts.size == 3) {
+                        database.reminderAuditDao().insertAudit(
+                            ReminderAuditEntity(
+                                patientId = parts[0],
+                                originalVisitId = parts[1],
+                                vaccineName = parts[2],
+                                action = "SYNCED",
+                                oldStatus = null,
+                                newStatus = item.entityName.replace("_REMINDER", ""),
+                                oldDate = null,
+                                newDate = null,
+                                priority = null,
+                                reminderEnabled = null,
+                                performedBy = "SYSTEM_SYNC",
+                                notes = "Successfully synchronized with Firestore",
+                                isSynced = true
+                            )
+                        )
+                    }
+                }
+
                 syncDao.deleteItem(item) 
             } catch (e: Exception) {
                 val isNetworkError = e is java.io.IOException || e.message?.contains("network", ignoreCase = true) == true
@@ -119,20 +144,44 @@ class SyncRepositoryImpl @Inject constructor(
     }
     
     private suspend fun fetchEntityData(item: SyncQueueEntity): Any? {
-        return when (item.entityName) {
-            "PATIENT" -> database.patientDao().getPatientById(item.entityId)?.toPatient()
-            "VACCINATION" -> database.vaccinationDao().getVaccinationById(item.entityId)?.toVaccination()
-            "WASTE" -> database.wasteDao().getWasteById(item.entityId)?.toDomain()
-            "DUE_REMINDER" -> database.dueReminderDao().getDueReminderById(item.entityId.toLong())
-            "COMPLETED_REMINDER" -> database.dueReminderDao().getCompletedReminderById(item.entityId.toLong())
-            "DISMISSED_REMINDER" -> database.dueReminderDao().getDismissedReminderById(item.entityId.toLong())
-            "EXTERNAL_REMINDER" -> database.dueReminderDao().getExternalReminderById(item.entityId.toLong())
-            "REMINDER_OVERRIDE" -> database.reminderDao().getReminderById(item.entityId.toLong())
-            "REMINDER_AUDIT" -> database.reminderAuditDao().getAuditById(item.entityId.toLong())
-            "VACCINE" -> database.vaccineDao().getVaccineById(item.entityId)
-            "BATCH" -> database.vaccineDao().getBatchById(item.entityId)
-            "TRANSACTION" -> database.vaccineDao().getTransactionById(item.entityId.toLong())
-            else -> null
+        val entityId = item.entityId
+        val isReminder = item.entityName.endsWith("_REMINDER")
+        
+        if (isReminder && entityId.contains("||")) {
+            val parts = entityId.split("||")
+            if (parts.size == 3) {
+                val pId = parts[0]
+                val vId = parts[1]
+                val name = parts[2]
+                return when (item.entityName) {
+                    "DUE_REMINDER" -> database.dueReminderDao().getDueReminderByStableId(pId, vId, name)
+                    "COMPLETED_REMINDER" -> database.dueReminderDao().getCompletedReminderByStableId(pId, vId, name)
+                    "DISMISSED_REMINDER" -> database.dueReminderDao().getDismissedReminderByStableId(pId, vId, name)
+                    "EXTERNAL_REMINDER" -> database.dueReminderDao().getExternalReminderByStableId(pId, vId, name)
+                    else -> null
+                }
+            }
+        }
+
+        return try {
+            when (item.entityName) {
+                "PATIENT" -> database.patientDao().getPatientById(entityId)?.toPatient()
+                "VACCINATION" -> database.vaccinationDao().getVaccinationById(entityId)?.toVaccination()
+                "WASTE" -> database.wasteDao().getWasteById(entityId)?.toDomain()
+                "DUE_REMINDER" -> database.dueReminderDao().getDueReminderById(entityId.toLongOrNull() ?: -1L)
+                "COMPLETED_REMINDER" -> database.dueReminderDao().getCompletedReminderById(entityId.toLongOrNull() ?: -1L)
+                "DISMISSED_REMINDER" -> database.dueReminderDao().getDismissedReminderById(entityId.toLongOrNull() ?: -1L)
+                "EXTERNAL_REMINDER" -> database.dueReminderDao().getExternalReminderById(entityId.toLongOrNull() ?: -1L)
+                "REMINDER_OVERRIDE" -> database.reminderDao().getReminderById(entityId.toLongOrNull() ?: -1L)
+                "REMINDER_AUDIT" -> database.reminderAuditDao().getAuditById(entityId.toLongOrNull() ?: -1L)
+                "VACCINE" -> database.vaccineDao().getVaccineById(entityId)
+                "BATCH" -> database.vaccineDao().getBatchById(entityId)
+                "TRANSACTION" -> database.vaccineDao().getTransactionById(entityId.toLongOrNull() ?: -1L)
+                else -> null
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("SyncRepository", "Error fetching data for ${item.entityName}: ${e.message}")
+            null
         }
     }
 

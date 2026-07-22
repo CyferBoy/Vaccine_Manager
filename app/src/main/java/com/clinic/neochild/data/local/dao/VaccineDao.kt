@@ -24,6 +24,9 @@ interface VaccineDao {
     @Update
     suspend fun updateVaccine(vaccine: VaccineEntity)
 
+    @Query("UPDATE vaccines SET isDeleted = 1 WHERE id = :id")
+    suspend fun deleteVaccine(id: String)
+
     @Delete
     suspend fun deleteVaccinePermanently(vaccine: VaccineEntity)
 
@@ -39,6 +42,9 @@ interface VaccineDao {
 
     @Query("SELECT * FROM vaccine_batches WHERE isDeleted = 0")
     fun getAllBatches(): Flow<List<VaccineBatchEntity>>
+
+    @Query("SELECT * FROM vaccine_batches WHERE vaccineId = :vaccineId AND isDeleted = 0")
+    fun getBatchesForVaccine(vaccineId: String): Flow<List<VaccineBatchEntity>>
 
     @Query("SELECT * FROM vaccine_batches WHERE vaccineId = :vaccineId AND isDeleted = 0")
     fun getBatchesByVaccine(vaccineId: String): Flow<List<VaccineBatchEntity>>
@@ -82,7 +88,7 @@ interface VaccineDao {
     @Query("SELECT COUNT(*) FROM vaccine_batches WHERE vaccineId = :vaccineId")
     suspend fun getBatchCountForVaccine(vaccineId: String): Int
 
-    @Query("SELECT COUNT(*) FROM vaccinations WHERE vaccineIds LIKE '%' || :vaccineId || '%' AND isDeleted = 0")
+    @Query("SELECT COUNT(*) FROM patient_visits WHERE vaccineIds LIKE '%' || :vaccineId || '%' AND isDeleted = 0")
     suspend fun getVaccinationCountForVaccine(vaccineId: String): Int
 
     @Query("SELECT COUNT(*) FROM waste_records WHERE vaccineId = :vaccineId AND isDeleted = 0")
@@ -91,6 +97,6 @@ interface VaccineDao {
     @Query("SELECT COUNT(*) FROM inventory_transactions WHERE vaccineId = :vaccineId")
     suspend fun getTransactionCountForVaccine(vaccineId: String): Int
 
-    @Query("SELECT COUNT(*) FROM audit_logs WHERE details LIKE '%' || :brandName || '%'")
+    @Query("SELECT COUNT(*) FROM audit_logs WHERE remarks LIKE '%' || :brandName || '%'")
     suspend fun getAuditCountForVaccine(brandName: String): Int
 }

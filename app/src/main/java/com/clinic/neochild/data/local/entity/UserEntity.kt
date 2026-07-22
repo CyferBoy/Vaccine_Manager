@@ -1,0 +1,20 @@
+package com.clinic.neochild.data.local.entity
+
+import androidx.room.Entity
+import androidx.room.Index
+import androidx.room.PrimaryKey
+
+@Entity(
+    tableName = "user_auth",
+    indices = [Index("email", unique = true)]
+)
+data class UserEntity(
+    @PrimaryKey val id: String,
+    val email: String,
+    val name: String,
+    val biometricEnabled: Boolean = false,
+    val pinHash: String? = null,
+    val lastLogin: Long = 0,
+    val devices: String? = null, // JSON list of device IDs
+    val securityStamp: String = ""
+)

@@ -222,14 +222,15 @@ fun AuditLogItem(log: AuditLogEntity) {
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary
         )
-        if (log.details.isNotBlank()) {
-            Text(text = log.details, style = MaterialTheme.typography.bodySmall)
+        val details = log.remarks ?: ""
+        if (details.isNotBlank()) {
+            Text(text = details, style = MaterialTheme.typography.bodySmall)
         }
         
         Spacer(modifier = Modifier.height(4.dp))
         
         Text(text = "By:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(text = log.staffMember, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+        Text(text = log.user, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
         
         if (log.device != null) {
             Text(text = "Device: ${log.device}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))

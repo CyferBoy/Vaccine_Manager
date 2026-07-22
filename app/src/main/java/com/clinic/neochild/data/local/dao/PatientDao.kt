@@ -31,7 +31,7 @@ interface PatientDao {
         SELECT * FROM patients 
         WHERE isDeleted = 0 
         AND (name LIKE :q OR phone LIKE :q OR parentName LIKE :q OR patientClinicId LIKE :q OR village LIKE :q OR address LIKE :q
-             OR id IN (SELECT patientId FROM vaccinations WHERE isDeleted = 0 AND (vaccineNames LIKE :q OR receiptNumber LIKE :q)))
+             OR id IN (SELECT patientId FROM patient_visits WHERE isDeleted = 0 AND (vaccineNames LIKE :q OR receiptNumber LIKE :q)))
     """)
     fun searchPatients(q: String): Flow<List<PatientEntity>>
 

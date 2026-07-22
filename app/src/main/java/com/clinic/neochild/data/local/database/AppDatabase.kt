@@ -15,22 +15,22 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 @Database(
     entities = [
         PatientEntity::class, 
-        VaccinationEntity::class, 
+        VisitEntity::class, 
         ReminderEntity::class, 
-        DueReminderEntity::class,
-        CompletedReminderEntity::class,
-        DismissedReminderEntity::class,
-        ExternalReminderEntity::class,
         VaccineEntity::class,
-        ReminderAuditEntity::class,
         VaccineBatchEntity::class,
         InventoryTransactionEntity::class,
         SyncQueueEntity::class,
         WasteEntity::class,
         WidgetDueEntity::class,
-        AuditLogEntity::class
+        AuditLogEntity::class,
+        PatientNotesEntity::class,
+        StaffEntity::class,
+        UserEntity::class,
+        FinanceEntity::class,
+        BorrowEntity::class
     ], 
-    version = 18,
+    version = 19,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -44,6 +44,12 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun wasteDao(): WasteDao
     abstract fun widgetDueDao(): WidgetDueDao
     abstract fun auditLogDao(): AuditLogDao
+    
+    // New DAOs
+    abstract fun financeDao(): FinanceDao
+    abstract fun staffDao(): StaffDao
+    abstract fun borrowDao(): BorrowDao
+    abstract fun patientNotesDao(): PatientNotesDao
 
     companion object {
         private const val TAG = "AppDatabase"
@@ -192,6 +198,181 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_18_19 = object : Migration(18, 19) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // 1. Update Patients
+                db.execSQL("ALTER TABLE `patients` ADD COLUMN `notes` TEXT")
+                db.execSQL("ALTER TABLE `patients` ADD COLUMN `guardianRelation` TEXT")
+                db.execSQL("ALTER TABLE `patients` ADD COLUMN `guardianPhone` TEXT")
+                db.execSQL("ALTER TABLE `patients` ADD COLUMN `attachments` TEXT")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_patients_name` ON `patients` (`name`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_patients_phone` ON `patients` (`phone`)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_patients_patientClinicId` ON `patients` (`patientClinicId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_patients_isSynced` ON `patients` (`isSynced`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_patients_isDeleted` ON `patients` (`isDeleted`)")
+
+                // 2. Update Vaccines
+                db.execSQL("ALTER TABLE `vaccines` ADD COLUMN `manufacturer` TEXT")
+                db.execSQL("ALTER TABLE `vaccines` ADD COLUMN `category` TEXT")
+                db.execSQL("ALTER TABLE `vaccines` ADD COLUMN `doseSchedule` TEXT")
+                db.execSQL("ALTER TABLE `vaccines` ADD COLUMN `storageDetails` TEXT")
+
+                // 3. Update Vaccine Batches
+                db.execSQL("ALTER TABLE `vaccine_batches` ADD COLUMN `reservedQuantity` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE `vaccine_batches` ADD COLUMN `usedQuantity` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE `vaccine_batches` ADD COLUMN `wastedQuantity` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE `vaccine_batches` ADD COLUMN `borrowedQuantity` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_vaccine_batches_batchNumber` ON `vaccine_batches` (`batchNumber`)")
+
+                // 4. Create New Tables
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `reminder_states` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `patientId` TEXT NOT NULL, 
+                        `originalVisitId` TEXT NOT NULL, `vaccineName` TEXT NOT NULL, `dueDate` TEXT NOT NULL, 
+                        `status` TEXT NOT NULL, `reminderDate` TEXT, `priority` TEXT NOT NULL, 
+                        `reminderEnabled` INTEGER NOT NULL, `category` TEXT NOT NULL, `notes` TEXT, 
+                        `completionDate` INTEGER, `performedBy` TEXT, `dismissalDate` INTEGER, 
+                        `dismissalReason` TEXT, `externalDate` TEXT, `source` TEXT, 
+                        `lastReminderTime` INTEGER NOT NULL, `notificationSent` INTEGER NOT NULL, 
+                        `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `isSynced` INTEGER NOT NULL,
+                        FOREIGN KEY(`patientId`) REFERENCES `patients`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                """)
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_reminder_states_patientId_originalVisitId_vaccineName` ON `reminder_states` (`patientId`, `originalVisitId`, `vaccineName`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_reminder_states_status` ON `reminder_states` (`status`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_reminder_states_dueDate` ON `reminder_states` (`dueDate`)")
+
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `patient_notes` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `patientId` TEXT NOT NULL, 
+                        `content` TEXT NOT NULL, `author` TEXT NOT NULL, `timestamp` INTEGER NOT NULL, 
+                        `isSynced` INTEGER NOT NULL, `isDeleted` INTEGER NOT NULL,
+                        FOREIGN KEY(`patientId`) REFERENCES `patients`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                """)
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_patient_notes_patientId` ON `patient_notes` (`patientId`)")
+
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `staff_profiles` (
+                        `id` TEXT NOT NULL, `name` TEXT NOT NULL, `email` TEXT NOT NULL, 
+                        `role` TEXT NOT NULL, `department` TEXT, `permissions` TEXT, 
+                        `isActive` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, 
+                        `lastActive` INTEGER NOT NULL, PRIMARY KEY(`id`)
+                    )
+                """)
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_staff_profiles_email` ON `staff_profiles` (`email`)")
+
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `user_auth` (
+                        `id` TEXT NOT NULL, `email` TEXT NOT NULL, `name` TEXT NOT NULL, 
+                        `biometricEnabled` INTEGER NOT NULL, `pinHash` TEXT, `lastLogin` INTEGER NOT NULL, 
+                        `devices` TEXT, `securityStamp` TEXT NOT NULL, PRIMARY KEY(`id`)
+                    )
+                """)
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_user_auth_email` ON `user_auth` (`email`)")
+
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `finance_transactions` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `timestamp` INTEGER NOT NULL, 
+                        `type` TEXT NOT NULL, `category` TEXT NOT NULL, `amount` REAL NOT NULL, 
+                        `currency` TEXT NOT NULL, `paymentMethod` TEXT NOT NULL, `patientId` TEXT, 
+                        `visitId` TEXT, `referenceNumber` TEXT, `remarks` TEXT, `recordedBy` TEXT NOT NULL, 
+                        `isSynced` INTEGER NOT NULL
+                    )
+                """)
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_finance_transactions_patientId` ON `finance_transactions` (`patientId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_finance_transactions_visitId` ON `finance_transactions` (`visitId`)")
+
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `borrow_records` (
+                        `id` TEXT NOT NULL, `doctorName` TEXT NOT NULL, `vaccineId` TEXT NOT NULL, 
+                        `batchId` TEXT NOT NULL, `borrowedDate` TEXT NOT NULL, `quantity` INTEGER NOT NULL, 
+                        `isReturned` INTEGER NOT NULL, `returnedDate` TEXT, `type` TEXT NOT NULL, 
+                        `notes` TEXT, `isSynced` INTEGER NOT NULL, PRIMARY KEY(`id`),
+                        FOREIGN KEY(`vaccineId`) REFERENCES `vaccines`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(`batchId`) REFERENCES `vaccine_batches`(`batchId`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                """)
+
+                // 5. Migrate Reminders
+                db.execSQL("""
+                    INSERT INTO reminder_states (patientId, originalVisitId, vaccineName, dueDate, status, reminderDate, priority, reminderEnabled, category, notes, lastReminderTime, notificationSent, createdAt, updatedAt, isSynced)
+                    SELECT patientId, originalVisitId, vaccineName, dueDate, status, reminderDate, priority, reminderEnabled, category, notes, lastReminderTime, notificationSent, createdAt, updatedAt, isSynced
+                    FROM due_reminders
+                """)
+                db.execSQL("""
+                    INSERT OR REPLACE INTO reminder_states (patientId, originalVisitId, vaccineName, dueDate, status, notes, completionDate, performedBy, createdAt, updatedAt, isSynced, priority, reminderEnabled, category, lastReminderTime, notificationSent)
+                    SELECT patientId, originalVisitId, vaccineName, dueDate, 'COMPLETED', notes, completionDate, completedBy, completionDate, completionDate, isSynced, 'MEDIUM', 0, 'VACCINATION', 0, 0
+                    FROM completed_reminders
+                """)
+                db.execSQL("""
+                    INSERT OR REPLACE INTO reminder_states (patientId, originalVisitId, vaccineName, dueDate, status, notes, dismissalDate, dismissalReason, createdAt, updatedAt, isSynced, priority, reminderEnabled, category, lastReminderTime, notificationSent)
+                    SELECT patientId, originalVisitId, vaccineName, dueDate, 'DISMISSED', NULL, dismissalDate, reason, dismissalDate, dismissalDate, isSynced, 'MEDIUM', 0, 'VACCINATION', 0, 0
+                    FROM dismissed_reminders
+                """)
+                db.execSQL("""
+                    INSERT OR REPLACE INTO reminder_states (patientId, originalVisitId, vaccineName, dueDate, status, notes, externalDate, source, performedBy, createdAt, updatedAt, isSynced, priority, reminderEnabled, category, lastReminderTime, notificationSent)
+                    SELECT patientId, originalVisitId, vaccineName, dueDate, 'EXTERNAL', notes, externalDate, source, recordedBy, 0, 0, isSynced, 'MEDIUM', 0, 'VACCINATION', 0, 0
+                    FROM external_reminders
+                """)
+
+                // 6. Refactor Vaccinations to Visits
+                db.execSQL("ALTER TABLE `vaccinations` RENAME TO `patient_visits_old`")
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `patient_visits` (
+                        `id` TEXT NOT NULL, `patientId` TEXT NOT NULL, `dateGiven` TEXT NOT NULL, 
+                        `doctor` TEXT NOT NULL, `vaccineNames` TEXT NOT NULL, `vaccineIds` TEXT NOT NULL, 
+                        `batchIds` TEXT NOT NULL, `materialsUsed` TEXT, `notes` TEXT NOT NULL, 
+                        `receiptNumber` TEXT NOT NULL, `totalPaid` REAL NOT NULL, `paymentId` TEXT, 
+                        `nxtVaccineNames` TEXT NOT NULL, `nextDueDate` TEXT NOT NULL, `cost` REAL NOT NULL, 
+                        `cashAmount` REAL NOT NULL, `onlineAmount` REAL NOT NULL, `withFees` INTEGER NOT NULL, 
+                        `doctorsAcc` INTEGER NOT NULL, `isDone` INTEGER NOT NULL, `source` TEXT NOT NULL, 
+                        `isSynced` INTEGER NOT NULL, `isDeleted` INTEGER NOT NULL, PRIMARY KEY(`id`),
+                        FOREIGN KEY(`patientId`) REFERENCES `patients`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                """)
+                db.execSQL("""
+                    INSERT INTO patient_visits (id, patientId, dateGiven, doctor, vaccineNames, vaccineIds, batchIds, notes, receiptNumber, totalPaid, nxtVaccineNames, nextDueDate, cost, cashAmount, onlineAmount, withFees, doctorsAcc, isDone, source, isSynced, isDeleted)
+                    SELECT id, patientId, dateGiven, performedBy, vaccineNames, vaccineIds, batchNumbers, notes, receiptNumber, totalPaid, nxtVaccineNames, nextDueDate, cost, cashAmount, onlineAmount, withFees, doctorsAcc, isDone, source, isSynced, isDeleted
+                    FROM patient_visits_old
+                """)
+                db.execSQL("DROP TABLE `patient_visits_old`")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_patient_visits_patientId` ON `patient_visits` (`patientId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_patient_visits_receiptNumber` ON `patient_visits` (`receiptNumber`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_patient_visits_doctor` ON `patient_visits` (`doctor`)")
+
+                // 7. Update Audit Logs and Merge Reminder Audits
+                db.execSQL("ALTER TABLE `audit_logs` RENAME TO `audit_logs_old`")
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `audit_logs` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `timestamp` INTEGER NOT NULL, 
+                        `user` TEXT NOT NULL, `module` TEXT NOT NULL, `entityType` TEXT NOT NULL, 
+                        `entityId` TEXT NOT NULL, `action` TEXT NOT NULL, `oldValue` TEXT, 
+                        `newValue` TEXT, `remarks` TEXT, `device` TEXT, `isSynced` INTEGER NOT NULL, 
+                        `patientId` TEXT
+                    )
+                """)
+                db.execSQL("""
+                    INSERT INTO audit_logs (timestamp, user, module, entityType, entityId, action, remarks, device, isSynced, patientId)
+                    SELECT timestamp, staffMember, 'LEGACY', 'UNKNOWN', '0', action, details, device, isSynced, patientId
+                    FROM audit_logs_old
+                """)
+                db.execSQL("""
+                    INSERT INTO audit_logs (timestamp, user, module, entityType, entityId, action, remarks, isSynced, patientId)
+                    SELECT timestamp, performedBy, 'REMINDER', 'REMINDER', (patientId || '||' || vaccineName), action, notes, isSynced, patientId
+                    FROM reminder_audits
+                """)
+                
+                // 8. Drop Legacy Tables
+                db.execSQL("DROP TABLE `audit_logs_old`")
+                db.execSQL("DROP TABLE `reminder_audits`")
+                db.execSQL("DROP TABLE `due_reminders`")
+                db.execSQL("DROP TABLE `completed_reminders`")
+                db.execSQL("DROP TABLE `dismissed_reminders`")
+                db.execSQL("DROP TABLE `external_reminders`")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val dbFile = context.getDatabasePath(DB_NAME)
@@ -232,7 +413,7 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                 .openHelperFactory(factory)
                 .setJournalMode(RoomDatabase.JournalMode.TRUNCATE)
-                .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18)
+                .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19)
                 .fallbackToDestructiveMigrationOnDowngrade()
                 .build()
                 INSTANCE = instance

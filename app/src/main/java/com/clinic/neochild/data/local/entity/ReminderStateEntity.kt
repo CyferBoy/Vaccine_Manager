@@ -4,10 +4,12 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.clinic.neochild.domain.model.ReminderStatus
 
 /**
- * Legacy support for ReminderEntity.
- * Maps to unified reminder_states table.
+ * Unified Reminder State for a specific vaccine requirement.
+ * Replaces separate Due/Completed/Dismissed/External tables.
+ * Enforces one state per requirement via unique index.
  */
 @Entity(
     tableName = "reminder_states",
@@ -25,25 +27,30 @@ import androidx.room.PrimaryKey
         Index("dueDate")
     ]
 )
-data class ReminderEntity(
+data class ReminderStateEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val patientId: String,
     val originalVisitId: String,
     val vaccineName: String,
     val dueDate: String,
-    val status: String,
+    val status: String, // ReminderStatus: ACTIVE, COMPLETED, DISMISSED, EXTERNAL
+    
+    // Metadata for various states
+    val reminderDate: String? = null,
     val priority: String = "NORMAL",
     val reminderEnabled: Boolean = true,
     val category: String = "VACCINATION",
-    val vaccinationSource: String? = null,
     val notes: String? = null,
     
-    // Extended fields from unified state
-    val reminderDate: String? = null,
+    // Completion details
     val completionDate: Long? = null,
     val performedBy: String? = null,
+    
+    // Dismissal details
     val dismissalDate: Long? = null,
     val dismissalReason: String? = null,
+    
+    // External details
     val externalDate: String? = null,
     val source: String? = null,
     
@@ -51,12 +58,5 @@ data class ReminderEntity(
     val notificationSent: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
-    val isSynced: Boolean = false,
-    val isDeleted: Boolean = false
+    val isSynced: Boolean = false
 )
-
-// Legacy alias for type safety during transition
-typealias DueReminderEntity = ReminderEntity
-typealias CompletedReminderEntity = ReminderEntity
-typealias DismissedReminderEntity = ReminderEntity
-typealias ExternalReminderEntity = ReminderEntity

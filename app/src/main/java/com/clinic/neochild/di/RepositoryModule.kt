@@ -1,21 +1,7 @@
 package com.clinic.neochild.di
 
-import com.clinic.neochild.data.repository.InventoryRepositoryImpl
-import com.clinic.neochild.data.repository.PatientRepositoryImpl
-import com.clinic.neochild.data.repository.ReminderRepositoryImpl
-import com.clinic.neochild.data.repository.SyncManagerImpl
-import com.clinic.neochild.data.repository.SyncRepositoryImpl
-import com.clinic.neochild.data.repository.VaccinationRepositoryImpl
-import com.clinic.neochild.data.repository.VaccineRepositoryImpl
-import com.clinic.neochild.data.repository.WasteRepositoryImpl
-import com.clinic.neochild.domain.repository.InventoryRepository
-import com.clinic.neochild.domain.repository.PatientRepository
-import com.clinic.neochild.domain.repository.ReminderRepository
-import com.clinic.neochild.domain.repository.SyncManager
-import com.clinic.neochild.domain.repository.SyncRepository
-import com.clinic.neochild.domain.repository.VaccinationRepository
-import com.clinic.neochild.domain.repository.VaccineRepository
-import com.clinic.neochild.domain.repository.WasteRepository
+import com.clinic.neochild.data.repository.*
+import com.clinic.neochild.domain.repository.*
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -57,4 +43,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindWasteRepository(impl: WasteRepositoryImpl): WasteRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindFinanceRepository(impl: FinanceRepositoryImpl): FinanceRepository
 }

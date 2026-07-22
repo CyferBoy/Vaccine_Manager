@@ -9,6 +9,13 @@ import com.clinic.neochild.data.local.dao.ReminderAuditDao
 import com.clinic.neochild.data.local.dao.AuditLogDao
 import com.clinic.neochild.data.local.dao.VaccinationDao
 import com.clinic.neochild.data.local.dao.VaccineDao
+import com.clinic.neochild.data.local.dao.PatientNotesDao
+import com.clinic.neochild.data.local.dao.SyncQueueDao
+import com.clinic.neochild.data.local.dao.WasteDao
+import com.clinic.neochild.data.local.dao.WidgetDueDao
+import com.clinic.neochild.data.local.dao.FinanceDao
+import com.clinic.neochild.data.local.dao.StaffDao
+import com.clinic.neochild.data.local.dao.BorrowDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -59,5 +66,40 @@ object DatabaseModule {
     @Provides
     fun provideVaccineDao(database: AppDatabase): VaccineDao {
         return database.vaccineDao()
+    }
+
+    @Provides
+    fun providePatientNotesDao(database: AppDatabase): PatientNotesDao {
+        return database.patientNotesDao()
+    }
+
+    @Provides
+    fun provideSyncQueueDao(database: AppDatabase): SyncQueueDao {
+        return database.syncQueueDao()
+    }
+
+    @Provides
+    fun provideWasteDao(database: AppDatabase): WasteDao {
+        return database.wasteDao()
+    }
+
+    @Provides
+    fun provideWidgetDueDao(database: AppDatabase): WidgetDueDao {
+        return database.widgetDueDao()
+    }
+
+    @Provides
+    fun provideFinanceDao(database: AppDatabase): FinanceDao {
+        return database.financeDao()
+    }
+
+    @Provides
+    fun provideStaffDao(database: AppDatabase): StaffDao {
+        return database.staffDao()
+    }
+
+    @Provides
+    fun provideBorrowDao(database: AppDatabase): BorrowDao {
+        return database.borrowDao()
     }
 }

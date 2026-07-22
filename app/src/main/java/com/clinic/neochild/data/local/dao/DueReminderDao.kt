@@ -6,177 +6,123 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface DueReminderDao {
-    // Due Reminders
-    @Query("SELECT * FROM due_reminders WHERE isDeleted = 0 ORDER BY dueDate ASC")
-    fun getAllDueReminders(): Flow<List<DueReminderEntity>>
+    
+    // Unified Reminder State Queries
+    
+    @Query("SELECT * FROM reminder_states WHERE isDeleted = 0 AND status IN ('ACTIVE', 'RESCHEDULED') ORDER BY dueDate ASC")
+    fun getAllDueReminders(): Flow<List<ReminderEntity>>
 
-    @Query("SELECT * FROM due_reminders WHERE patientId = :patientId AND originalVisitId = :visitId AND vaccineName = :vaccineName AND isDeleted = 0 LIMIT 1")
-    suspend fun getDueReminder(patientId: String, visitId: String, vaccineName: String): DueReminderEntity?
+    @Query("SELECT * FROM reminder_states WHERE isDeleted = 0 AND status = 'COMPLETED' ORDER BY completionDate DESC")
+    fun getAllCompletedReminders(): Flow<List<ReminderEntity>>
 
-    @Query("SELECT * FROM due_reminders WHERE id = :id LIMIT 1")
-    suspend fun getDueReminderById(id: Long): DueReminderEntity?
+    @Query("SELECT * FROM reminder_states WHERE isDeleted = 0 AND status = 'DISMISSED' ORDER BY dismissalDate DESC")
+    fun getAllDismissedReminders(): Flow<List<ReminderEntity>>
 
-    @Query("SELECT * FROM due_reminders WHERE patientId = :pId AND originalVisitId = :vId AND vaccineName = :name LIMIT 1")
-    suspend fun getDueReminderByStableId(pId: String, vId: String, name: String): DueReminderEntity?
+    @Query("SELECT * FROM reminder_states WHERE isDeleted = 0 AND status = 'EXTERNAL' ORDER BY dueDate ASC")
+    fun getAllExternalReminders(): Flow<List<ReminderEntity>>
+
+    @Query("SELECT * FROM reminder_states WHERE patientId = :patientId AND originalVisitId = :visitId AND vaccineName = :vaccineName AND isDeleted = 0 LIMIT 1")
+    suspend fun getDueReminder(patientId: String, visitId: String, vaccineName: String): ReminderEntity?
+
+    @Query("SELECT * FROM reminder_states WHERE id = :id LIMIT 1")
+    suspend fun getReminderById(id: Long): ReminderEntity?
+
+    @Query("SELECT * FROM reminder_states WHERE patientId = :pId AND originalVisitId = :vId AND vaccineName = :name LIMIT 1")
+    suspend fun getReminderByStableId(pId: String, vId: String, name: String): ReminderEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertDueReminder(reminder: DueReminderEntity): Long
+    suspend fun insertReminder(reminder: ReminderEntity): Long
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertDueReminders(reminders: List<DueReminderEntity>)
+    suspend fun insertReminders(reminders: List<ReminderEntity>)
 
     @Update
-    suspend fun updateDueReminder(reminder: DueReminderEntity)
+    suspend fun updateReminder(reminder: ReminderEntity)
 
-    @Query("DELETE FROM due_reminders WHERE patientId = :patientId AND originalVisitId = :visitId AND vaccineName = :vaccineName")
-    suspend fun deleteDueReminder(patientId: String, visitId: String, vaccineName: String)
+    @Query("DELETE FROM reminder_states WHERE patientId = :patientId AND originalVisitId = :visitId AND vaccineName = :vaccineName")
+    suspend fun deleteReminder(patientId: String, visitId: String, vaccineName: String)
 
-    @Query("UPDATE due_reminders SET isDeleted = 1, isSynced = 0 WHERE id = :id")
-    suspend fun softDeleteDueReminder(id: Long)
+    @Query("UPDATE reminder_states SET isDeleted = 1, isSynced = 0 WHERE id = :id")
+    suspend fun softDeleteReminder(id: Long)
 
-    // Completed Reminders
-    @Query("SELECT * FROM completed_reminders WHERE isDeleted = 0 ORDER BY completionDate DESC")
-    fun getAllCompletedReminders(): Flow<List<CompletedReminderEntity>>
+    // Legacy Support Mappings (redirected to unified table)
+    
+    suspend fun insertDueReminder(reminder: DueReminderEntity) = insertReminder(reminder)
+    suspend fun insertCompletedReminder(reminder: CompletedReminderEntity) = insertReminder(reminder)
+    suspend fun insertDismissedReminder(reminder: DismissedReminderEntity) = insertReminder(reminder)
+    suspend fun insertExternalReminder(reminder: ExternalReminderEntity) = insertReminder(reminder)
+    
+    @Query("UPDATE reminder_states SET isDeleted = 1, isSynced = 0 WHERE id = :id")
+    suspend fun softDeleteDueReminder(id: Long) = softDeleteReminder(id)
 
-    @Query("SELECT * FROM completed_reminders WHERE id = :id LIMIT 1")
-    suspend fun getCompletedReminderById(id: Long): CompletedReminderEntity?
+    @Query("UPDATE reminder_states SET patientId = :masterId, isSynced = 0 WHERE patientId = :duplicateId")
+    suspend fun updatePatientId(duplicateId: String, masterId: String)
 
-    @Query("SELECT * FROM completed_reminders WHERE patientId = :pId AND originalVisitId = :vId AND vaccineName = :name LIMIT 1")
-    suspend fun getCompletedReminderByStableId(pId: String, vId: String, name: String): CompletedReminderEntity?
+    @Query("SELECT * FROM reminder_states WHERE isDeleted = 0")
+    fun getAllReminders(): Flow<List<ReminderEntity>>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertCompletedReminder(reminder: CompletedReminderEntity): Long
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertCompletedReminders(reminders: List<CompletedReminderEntity>)
-
-    @Query("DELETE FROM completed_reminders WHERE patientId = :patientId AND originalVisitId = :visitId AND vaccineName = :vaccineName")
-    suspend fun deleteCompletedReminder(patientId: String, visitId: String, vaccineName: String)
-
-    // Dismissed Reminders
-    @Query("SELECT * FROM dismissed_reminders WHERE isDeleted = 0 ORDER BY dismissalDate DESC")
-    fun getAllDismissedReminders(): Flow<List<DismissedReminderEntity>>
-
-    @Query("SELECT * FROM dismissed_reminders WHERE id = :id LIMIT 1")
-    suspend fun getDismissedReminderById(id: Long): DismissedReminderEntity?
-
-    @Query("SELECT * FROM dismissed_reminders WHERE patientId = :pId AND originalVisitId = :vId AND vaccineName = :name LIMIT 1")
-    suspend fun getDismissedReminderByStableId(pId: String, vId: String, name: String): DismissedReminderEntity?
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertDismissedReminder(reminder: DismissedReminderEntity): Long
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertDismissedReminders(reminders: List<DismissedReminderEntity>)
-
-    @Query("DELETE FROM dismissed_reminders WHERE patientId = :patientId AND originalVisitId = :visitId AND vaccineName = :vaccineName")
-    suspend fun deleteDismissedReminder(patientId: String, visitId: String, vaccineName: String)
-
-    // External Reminders
-    @Query("SELECT * FROM external_reminders WHERE isDeleted = 0 ORDER BY dueDate ASC")
-    fun getAllExternalReminders(): Flow<List<ExternalReminderEntity>>
-
-    @Query("SELECT * FROM external_reminders WHERE id = :id LIMIT 1")
-    suspend fun getExternalReminderById(id: Long): ExternalReminderEntity?
-
-    @Query("SELECT * FROM external_reminders WHERE patientId = :pId AND originalVisitId = :vId AND vaccineName = :name LIMIT 1")
-    suspend fun getExternalReminderByStableId(pId: String, vId: String, name: String): ExternalReminderEntity?
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertExternalReminder(reminder: ExternalReminderEntity): Long
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertExternalReminders(reminders: List<ExternalReminderEntity>)
-
-    @Query("DELETE FROM external_reminders WHERE patientId = :patientId AND originalVisitId = :visitId AND vaccineName = :vaccineName")
-    suspend fun deleteExternalReminder(patientId: String, visitId: String, vaccineName: String)
-
-    @Query("DELETE FROM reminders WHERE patientId = :patientId AND originalVisitId = :visitId AND vaccineName = :vaccineName")
-    suspend fun deleteOldReminder(patientId: String, visitId: String, vaccineName: String)
-
-    // Common
-    @Query("SELECT * FROM due_reminders WHERE patientId = :patientId AND isDeleted = 0")
-    fun getDueRemindersForPatient(patientId: String): Flow<List<DueReminderEntity>>
-
-    @Query("SELECT * FROM completed_reminders WHERE patientId = :patientId AND isDeleted = 0")
-    fun getCompletedRemindersForPatient(patientId: String): Flow<List<CompletedReminderEntity>>
-
-    @Query("SELECT * FROM dismissed_reminders WHERE patientId = :patientId AND isDeleted = 0")
-    fun getDismissedRemindersForPatient(patientId: String): Flow<List<DismissedReminderEntity>>
-
-    @Query("SELECT * FROM external_reminders WHERE patientId = :patientId AND isDeleted = 0")
-    fun getExternalRemindersForPatient(patientId: String): Flow<List<ExternalReminderEntity>>
+    @Query("SELECT * FROM reminder_states WHERE patientId = :patientId AND isDeleted = 0")
+    fun getDueRemindersForPatient(patientId: String): Flow<List<ReminderEntity>>
 
     @Transaction
     suspend fun getLocalPriority(pId: String, vId: String, name: String): Int {
-        if (getExternalReminderByStableId(pId, vId, name) != null) return 4
-        if (getCompletedReminderByStableId(pId, vId, name) != null) return 3
-        if (getDismissedReminderByStableId(pId, vId, name) != null) return 2
-        if (getDueReminderByStableId(pId, vId, name) != null) return 1
-        return 0
+        val reminder = getReminderByStableId(pId, vId, name) ?: return 0
+        return when (reminder.status) {
+            "EXTERNAL" -> 4
+            "COMPLETED" -> 3
+            "DISMISSED" -> 2
+            "ACTIVE", "RESCHEDULED" -> 1
+            else -> 0
+        }
     }
 
     @Transaction
     suspend fun isLocalUnsynced(pId: String, vId: String, name: String): Boolean {
-        if (getExternalReminderByStableId(pId, vId, name)?.isSynced == false) return true
-        if (getCompletedReminderByStableId(pId, vId, name)?.isSynced == false) return true
-        if (getDismissedReminderByStableId(pId, vId, name)?.isSynced == false) return true
-        if (getDueReminderByStableId(pId, vId, name)?.isSynced == false) return true
-        return false
+        return getReminderByStableId(pId, vId, name)?.isSynced == false
     }
 
     @Transaction
     suspend fun clearAllStates(patientId: String, visitId: String, vaccineName: String) {
-        deleteDueReminder(patientId, visitId, vaccineName)
-        deleteCompletedReminder(patientId, visitId, vaccineName)
-        deleteDismissedReminder(patientId, visitId, vaccineName)
-        deleteExternalReminder(patientId, visitId, vaccineName)
-        deleteOldReminder(patientId, visitId, vaccineName)
+        deleteReminder(patientId, visitId, vaccineName)
     }
 
     @Transaction
-    suspend fun moveDueToCompleted(reminder: DueReminderEntity, completedBy: String, notes: String? = null): Long {
-        val completed = CompletedReminderEntity(
-            patientId = reminder.patientId,
-            originalVisitId = reminder.originalVisitId,
-            vaccineName = reminder.vaccineName,
-            dueDate = reminder.dueDate,
+    suspend fun moveDueToCompleted(reminder: ReminderEntity, completedBy: String, notes: String? = null): Long {
+        val updated = reminder.copy(
+            status = "COMPLETED",
             completionDate = System.currentTimeMillis(),
-            completedBy = completedBy,
-            notes = notes ?: reminder.notes
+            performedBy = completedBy,
+            notes = notes ?: reminder.notes,
+            updatedAt = System.currentTimeMillis(),
+            isSynced = false
         )
-        clearAllStates(reminder.patientId, reminder.originalVisitId, reminder.vaccineName)
-        return insertCompletedReminder(completed)
+        return insertReminder(updated)
     }
 
     @Transaction
-    suspend fun moveDueToDismissed(reminder: DueReminderEntity, dismissedBy: String, reason: String? = null): Long {
-        val dismissed = DismissedReminderEntity(
-            patientId = reminder.patientId,
-            originalVisitId = reminder.originalVisitId,
-            vaccineName = reminder.vaccineName,
-            dueDate = reminder.dueDate,
+    suspend fun moveDueToDismissed(reminder: ReminderEntity, dismissedBy: String, reason: String? = null): Long {
+        val updated = reminder.copy(
+            status = "DISMISSED",
             dismissalDate = System.currentTimeMillis(),
-            dismissedBy = dismissedBy,
-            reason = reason
+            performedBy = dismissedBy,
+            dismissalReason = reason,
+            updatedAt = System.currentTimeMillis(),
+            isSynced = false
         )
-        clearAllStates(reminder.patientId, reminder.originalVisitId, reminder.vaccineName)
-        return insertDismissedReminder(dismissed)
+        return insertReminder(updated)
     }
 
     @Transaction
-    suspend fun moveDueToExternal(reminder: DueReminderEntity, source: String, externalDate: String, recordedBy: String, notes: String? = null): Long {
-        val external = ExternalReminderEntity(
-            patientId = reminder.patientId,
-            originalVisitId = reminder.originalVisitId,
-            vaccineName = reminder.vaccineName,
-            dueDate = reminder.dueDate,
+    suspend fun moveDueToExternal(reminder: ReminderEntity, source: String, externalDate: String, recordedBy: String, notes: String? = null): Long {
+        val updated = reminder.copy(
+            status = "EXTERNAL",
             externalDate = externalDate,
             source = source,
-            recordedBy = recordedBy,
-            notes = notes ?: reminder.notes
+            performedBy = recordedBy,
+            notes = notes ?: reminder.notes,
+            updatedAt = System.currentTimeMillis(),
+            isSynced = false
         )
-        clearAllStates(reminder.patientId, reminder.originalVisitId, reminder.vaccineName)
-        return insertExternalReminder(external)
+        return insertReminder(updated)
     }
 }

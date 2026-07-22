@@ -13,6 +13,13 @@ data class VaccineEntity(
     val type: String,
     val brandName: String,
     val companyName: String,
+    
+    // Structure Updates
+    val manufacturer: String? = null,
+    val category: String? = null, // e.g. Mandatory, Optional, Adult
+    val doseSchedule: String? = null, // JSON
+    val storageDetails: String? = null,
+    
     val lowStockThreshold: Int = 5,
     val lastUpdated: Long = System.currentTimeMillis(),
     val isDeleted: Boolean = false
@@ -28,7 +35,7 @@ data class VaccineEntity(
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index("vaccineId")]
+    indices = [Index("vaccineId"), Index("batchNumber")]
 )
 data class VaccineBatchEntity(
     @PrimaryKey val batchId: String,
@@ -38,7 +45,14 @@ data class VaccineBatchEntity(
     val purchaseDate: String,
     val expiryDate: String,
     val purchaseQuantity: Int,
-    val remainingQuantity: Int,
+    val remainingQuantity: Int, // Cached for performance, but module calculates from source
+    
+    // Detailed tracking
+    val reservedQuantity: Int = 0,
+    val usedQuantity: Int = 0,
+    val wastedQuantity: Int = 0,
+    val borrowedQuantity: Int = 0,
+
     val supplier: String,
     val purchaseCost: Double,
     val sellingPrice: Double,

@@ -1,46 +1,65 @@
 package com.clinic.neochild.data.local.entity
 
 import androidx.room.Entity
+import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.clinic.neochild.domain.model.Vaccination
 
+/**
+ * Represents a Clinic Visit for vaccination.
+ * Organized under Patient as primary business entity.
+ */
 @Entity(
-    tableName = "vaccinations",
+    tableName = "patient_visits",
     indices = [
-        Index(value = ["patientId"]), 
-        Index(value = ["receiptNumber"]),
-        Index(value = ["isSynced"]), 
-        Index(value = ["isDeleted"])
+        Index("patientId"), 
+        Index("receiptNumber"),
+        Index("doctor"),
+        Index("isSynced")
+    ],
+    foreignKeys = [
+        ForeignKey(
+            entity = PatientEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["patientId"],
+            onDelete = ForeignKey.CASCADE
+        )
     ]
 )
-data class VaccinationEntity(
+data class VisitEntity(
     @PrimaryKey val id: String,
-    val receiptNumber: String = "",
     val patientId: String,
+    val dateGiven: String,
+    val doctor: String = "",
     val vaccineNames: String,
     val vaccineIds: String = "",
-    val nxtVaccineNames: String,
-    val dateGiven: String,
-    val nextDueDate: String,
-    val cost: Double,
-    val cashAmount: Double,
-    val onlineAmount: Double,
-    val totalPaid: Double,
-    val withFees: Boolean,
-    val doctorsAcc: Boolean,
-    val isDone: Boolean,
-    val source: String = "CLINIC",
+    val batchIds: String = "", // Comma separated list of batch UUIDs
+    val materialsUsed: String? = null,
     val notes: String = "",
-    val rescheduleReason: String = "",
-    val performedBy: String = "",
-    val batchNumbers: String = "",
-    val expiryDates: String = "",
+    val receiptNumber: String = "",
+    val totalPaid: Double = 0.0,
+    val paymentId: String? = null, // Linked to finance_transactions
+    
+    // Legacy support / reminders logic preserved
+    val nxtVaccineNames: String = "",
+    val nextDueDate: String = "",
+    val cost: Double = 0.0,
+    val cashAmount: Double = 0.0,
+    val onlineAmount: Double = 0.0,
+    val withFees: Boolean = false,
+    val doctorsAcc: Boolean = false,
+    val isDone: Boolean = true,
+    val source: String = "CLINIC",
+    
     val isSynced: Boolean = true,
     val isDeleted: Boolean = false
 )
 
-fun VaccinationEntity.toVaccination() = Vaccination(
+// Map legacy VaccinationEntity name to VisitEntity for easier refactoring
+typealias VaccinationEntity = VisitEntity
+
+fun VisitEntity.toVaccination() = Vaccination(
     id = id,
     receiptNumber = receiptNumber,
     patientId = patientId,
@@ -58,13 +77,12 @@ fun VaccinationEntity.toVaccination() = Vaccination(
     isDone = isDone,
     source = source,
     notes = notes,
-    rescheduleReason = rescheduleReason,
-    performedBy = performedBy,
-    batchNumbers = if (batchNumbers.isBlank()) emptyList() else batchNumbers.split(","),
-    expiryDates = if (expiryDates.isBlank()) emptyList() else expiryDates.split(",")
+    performedBy = doctor,
+    batchNumbers = if (batchIds.isBlank()) emptyList() else batchIds.split(","),
+    expiryDates = emptyList() // Not stored directly in visit anymore, link to batch
 )
 
-fun Vaccination.toEntity(isSynced: Boolean = true) = VaccinationEntity(
+fun Vaccination.toEntity(isSynced: Boolean = true) = VisitEntity(
     id = id,
     receiptNumber = receiptNumber,
     patientId = patientId,
@@ -82,9 +100,7 @@ fun Vaccination.toEntity(isSynced: Boolean = true) = VaccinationEntity(
     isDone = isDone,
     source = source,
     notes = notes,
-    rescheduleReason = rescheduleReason,
-    performedBy = performedBy,
-    batchNumbers = batchNumbers.joinToString(","),
-    expiryDates = expiryDates.joinToString(","),
+    doctor = performedBy,
+    batchIds = batchNumbers.joinToString(","),
     isSynced = isSynced
 )

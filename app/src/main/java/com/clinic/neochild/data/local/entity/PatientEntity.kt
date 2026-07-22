@@ -7,7 +7,13 @@ import com.clinic.neochild.domain.model.Patient
 
 @Entity(
     tableName = "patients",
-    indices = [Index(value = ["isSynced"]), Index(value = ["isDeleted"])]
+    indices = [
+        Index(value = ["patientClinicId"], unique = true),
+        Index(value = ["name"]),
+        Index(value = ["phone"]),
+        Index(value = ["isSynced"]), 
+        Index(value = ["isDeleted"])
+    ]
 )
 data class PatientEntity(
     @PrimaryKey val id: String,
@@ -15,12 +21,19 @@ data class PatientEntity(
     val name: String,
     val parentName: String = "",
     val phone: String,
-    val alternatePhone: String,
+    val alternatePhone: String = "",
     val dob: String,
     val gender: String,
     val village: String = "",
     val address: String = "",
-    val registrationDate: String,
+    val registrationDate: String = "",
+    
+    // Structure Updates
+    val notes: String? = null,
+    val guardianRelation: String? = null,
+    val guardianPhone: String? = null,
+    val attachments: String? = null, // JSON path or metadata
+
     val isSynced: Boolean = true,
     val isDeleted: Boolean = false
 )

@@ -21,39 +21,72 @@ class AuditLogger @Inject constructor(
     private val scope = CoroutineScope(Dispatchers.IO)
 
     /**
-     * Logs a sensitive action to both Local Room and Firestore.
+     * Centralized logging for all business modules.
      */
-    fun logAction(action: String, patientId: String?, details: String = "") {
+    fun log(
+        module: String,
+        entityType: String,
+        entityId: String,
+        action: String,
+        patientId: String? = null,
+        oldValue: String? = null,
+        newValue: String? = null,
+        remarks: String? = null
+    ) {
         val user = auth.currentUser
         val userEmail = user?.email ?: "Unknown"
         val timestamp = System.currentTimeMillis()
         val device = "${Build.MANUFACTURER} ${Build.MODEL}"
 
+        val logEntity = AuditLogEntity(
+            timestamp = timestamp,
+            user = userEmail,
+            module = module,
+            entityType = entityType,
+            entityId = entityId,
+            action = action,
+            oldValue = oldValue,
+            newValue = newValue,
+            remarks = remarks,
+            device = device,
+            patientId = patientId,
+            isSynced = false
+        )
+
         // 1. Local Log
         scope.launch {
-            auditLogDao.insertLog(
-                AuditLogEntity(
-                    patientId = patientId,
-                    action = action,
-                    details = details,
-                    staffMember = userEmail,
-                    timestamp = timestamp,
-                    device = device
-                )
-            )
+            auditLogDao.insertLog(logEntity)
         }
 
         // 2. Remote Log
-        val log = hashMapOf(
+        val remoteLog = hashMapOf(
             "timestamp" to Date(timestamp),
-            "userId" to (user?.uid ?: "Unknown"),
-            "userEmail" to userEmail,
+            "user" to userEmail,
+            "module" to module,
+            "entityType" to entityType,
+            "entityId" to entityId,
             "action" to action,
-            "patientId" to patientId,
-            "details" to details,
-            "device" to device
+            "oldValue" to oldValue,
+            "newValue" to newValue,
+            "remarks" to remarks,
+            "device" to device,
+            "patientId" to patientId
         )
         
-        firestore.collection("audit_logs").add(log)
+        firestore.collection("audit_logs").add(remoteLog)
+    }
+
+    /**
+     * Legacy support mapper.
+     */
+    fun logAction(action: String, patientId: String?, details: String = "") {
+        log(
+            module = "LEGACY",
+            entityType = "UNKNOWN",
+            entityId = "0",
+            action = action,
+            patientId = patientId,
+            remarks = details
+        )
     }
 }

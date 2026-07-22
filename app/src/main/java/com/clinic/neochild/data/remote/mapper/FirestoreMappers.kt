@@ -1,10 +1,10 @@
 package com.clinic.neochild.data.remote.mapper
 
 import com.clinic.neochild.core.model.BorrowedVaccine
-
 import com.clinic.neochild.data.local.entity.*
 import com.clinic.neochild.domain.model.*
 import com.google.firebase.firestore.DocumentSnapshot
+import java.util.Date
 
 object FirestoreMappers {
 
@@ -161,20 +161,25 @@ object FirestoreMappers {
         }
     }
 
-    fun toDueReminderEntity(doc: DocumentSnapshot): DueReminderEntity? {
+    fun toReminderEntity(doc: DocumentSnapshot): ReminderEntity? {
         return try {
-            DueReminderEntity(
+            ReminderEntity(
                 patientId = doc.getString("patientId") ?: "",
                 originalVisitId = doc.getString("originalVisitId") ?: "",
                 vaccineName = doc.getString("vaccineName") ?: "",
                 dueDate = doc.getString("dueDate") ?: "",
-                reminderDate = doc.getString("reminderDate") ?: "",
                 status = doc.getString("status") ?: "ACTIVE",
+                reminderDate = doc.getString("reminderDate"),
                 priority = doc.getString("priority") ?: "NORMAL",
                 reminderEnabled = doc.getBoolean("reminderEnabled") ?: true,
                 category = doc.getString("category") ?: "VACCINATION",
                 notes = doc.getString("notes"),
-                performedBy = doc.getString("performedBy") ?: "",
+                completionDate = doc.getLong("completionDate"),
+                performedBy = doc.getString("performedBy"),
+                dismissalDate = doc.getLong("dismissalDate"),
+                dismissalReason = doc.getString("dismissalReason"),
+                externalDate = doc.getString("externalDate"),
+                source = doc.getString("source"),
                 lastReminderTime = doc.getLong("lastReminderTime") ?: 0L,
                 notificationSent = doc.getBoolean("notificationSent") ?: false,
                 createdAt = doc.getLong("createdAt") ?: System.currentTimeMillis(),
@@ -186,55 +191,9 @@ object FirestoreMappers {
         }
     }
 
-    fun toCompletedReminderEntity(doc: DocumentSnapshot): CompletedReminderEntity? {
-        return try {
-            CompletedReminderEntity(
-                patientId = doc.getString("patientId") ?: "",
-                originalVisitId = doc.getString("originalVisitId") ?: "",
-                vaccineName = doc.getString("vaccineName") ?: "",
-                dueDate = doc.getString("dueDate") ?: "",
-                completionDate = doc.getLong("completionDate") ?: System.currentTimeMillis(),
-                completedBy = doc.getString("completedBy") ?: "Unknown",
-                notes = doc.getString("notes"),
-                isSynced = true
-            )
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    fun toDismissedReminderEntity(doc: DocumentSnapshot): DismissedReminderEntity? {
-        return try {
-            DismissedReminderEntity(
-                patientId = doc.getString("patientId") ?: "",
-                originalVisitId = doc.getString("originalVisitId") ?: "",
-                vaccineName = doc.getString("vaccineName") ?: "",
-                dueDate = doc.getString("dueDate") ?: "",
-                dismissalDate = doc.getLong("dismissalDate") ?: System.currentTimeMillis(),
-                dismissedBy = doc.getString("dismissedBy") ?: "Unknown",
-                reason = doc.getString("reason"),
-                isSynced = true
-            )
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    fun toExternalReminderEntity(doc: DocumentSnapshot): ExternalReminderEntity? {
-        return try {
-            ExternalReminderEntity(
-                patientId = doc.getString("patientId") ?: "",
-                originalVisitId = doc.getString("originalVisitId") ?: "",
-                vaccineName = doc.getString("vaccineName") ?: "",
-                dueDate = doc.getString("dueDate") ?: "",
-                externalDate = doc.getString("externalDate") ?: "",
-                source = doc.getString("source") ?: "EXTERNAL",
-                recordedBy = doc.getString("recordedBy") ?: "Unknown",
-                notes = doc.getString("notes"),
-                isSynced = true
-            )
-        } catch (_: Exception) {
-            null
-        }
-    }
+    // Legacy Support Wrappers
+    fun toDueReminderEntity(doc: DocumentSnapshot) = toReminderEntity(doc)
+    fun toCompletedReminderEntity(doc: DocumentSnapshot) = toReminderEntity(doc)
+    fun toDismissedReminderEntity(doc: DocumentSnapshot) = toReminderEntity(doc)
+    fun toExternalReminderEntity(doc: DocumentSnapshot) = toReminderEntity(doc)
 }

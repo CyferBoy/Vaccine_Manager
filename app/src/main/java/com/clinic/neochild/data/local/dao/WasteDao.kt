@@ -27,6 +27,9 @@ interface WasteDao {
     @Query("UPDATE waste_records SET isSynced = 1 WHERE id = :id")
     suspend fun markSynced(id: String)
 
+    @Query("SELECT * FROM waste_records WHERE vaccineId = :vaccineId AND isDeleted = 0 ORDER BY dateWasted DESC")
+    fun getWasteForVaccine(vaccineId: String): Flow<List<WasteEntity>>
+
     @Query("SELECT COUNT(*) FROM waste_records WHERE isDeleted = 0")
     fun getWasteCount(): Flow<Int>
 }

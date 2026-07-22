@@ -67,7 +67,7 @@ fun FollowUpManagementScreen(
                 ) {
                     val grouped = followUps.groupBy { 
                         when {
-                            it.completed -> "Completed"
+                            it.status == ReminderStatus.COMPLETED.name -> "Completed"
                             it.status == ReminderStatus.EXTERNAL.name -> "External"
                             it.status == ReminderStatus.DISMISSED.name -> "Cancelled/Dismissed"
                             else -> "Active Follow-ups"
@@ -167,7 +167,7 @@ fun FollowUpActionBottomSheet(
                 modifier = Modifier.padding(16.dp)
             )
             
-            if (!reminder.completed && reminder.status != ReminderStatus.DISMISSED.name) {
+            if (reminder.status != ReminderStatus.COMPLETED.name && reminder.status != ReminderStatus.DISMISSED.name) {
                 ListItem(
                     headlineContent = { Text("Mark as Completed") },
                     leadingContent = { Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF4CAF50)) },

@@ -3,13 +3,16 @@ package com.clinic.neochild.data.local.entity
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "reminder_audits")
+/**
+ * Legacy data class for UI support.
+ * No longer a Room Entity - replaced by AuditLogEntity.
+ */
 data class ReminderAuditEntity(
-    @PrimaryKey(autoGenerate = true) val auditId: Long = 0,
+    val auditId: Long = 0,
     val patientId: String,
     val originalVisitId: String,
     val vaccineName: String,
-    val action: String, // COMPLETED, RESCHEDULED, DISMISSED, etc.
+    val action: String,
     val oldStatus: String?,
     val newStatus: String,
     val oldDate: String?,

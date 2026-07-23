@@ -36,9 +36,9 @@ fun ManageStaffScreen(
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var isSearchActive by rememberSaveable { mutableStateOf(false) }
     var showAddDialog by rememberSaveable { mutableStateOf(false) }
-    var showEditDialog by rememberSaveable { mutableStateOf(false) }
-    var staffToEdit by remember { mutableStateOf<Staff?>(null) }
+    var showResetPasswordDialog by rememberSaveable { mutableStateOf(false) }
     var staffToDelete by remember { mutableStateOf<Staff?>(null) }
+    var staffToResetPassword by remember { mutableStateOf<Staff?>(null) }
 
     val filteredStaff = remember(uiState.staffList, searchQuery) {
         if (searchQuery.isBlank()) uiState.staffList
@@ -72,19 +72,20 @@ fun ManageStaffScreen(
         onAddStaff = { name, email, pass ->
             viewModel.createStaffAccount(name, email, pass)
         },
-        showEditDialog = showEditDialog,
-        staffToEdit = staffToEdit,
-        onStaffEditRequest = { 
-            staffToEdit = it
-            showEditDialog = true
+        showResetPasswordDialog = showResetPasswordDialog,
+        staffToResetPassword = staffToResetPassword,
+        onStaffResetPasswordRequest = {
+            staffToResetPassword = it
+            showResetPasswordDialog = true
         },
-        onEditDialogDismiss = {
-            showEditDialog = false
-            staffToEdit = null
-            viewModel.clearMessages()
+        onResetPasswordConfirm = {
+            staffToResetPassword?.let { viewModel.resetStaffPassword(it.email) }
+            showResetPasswordDialog = false
+            staffToResetPassword = null
         },
-        onUpdateStaff = { id, name, role ->
-            viewModel.updateStaffAccount(id, name, role)
+        onResetPasswordCancel = {
+            showResetPasswordDialog = false
+            staffToResetPassword = null
         },
         onClearMessages = { viewModel.clearMessages() }
     )
@@ -108,11 +109,11 @@ private fun ManageStaffContent(
     showAddDialog: Boolean,
     onAddDialogDismiss: () -> Unit,
     onAddStaff: (String, String, String) -> Unit,
-    showEditDialog: Boolean,
-    staffToEdit: Staff?,
-    onStaffEditRequest: (Staff) -> Unit,
-    onEditDialogDismiss: () -> Unit,
-    onUpdateStaff: (String, String, String) -> Unit,
+    showResetPasswordDialog: Boolean,
+    staffToResetPassword: Staff?,
+    onStaffResetPasswordRequest: (Staff) -> Unit,
+    onResetPasswordConfirm: () -> Unit,
+    onResetPasswordCancel: () -> Unit,
     onClearMessages: () -> Unit
 ) {
     DeleteConfirmationDialog(
@@ -123,6 +124,24 @@ private fun ManageStaffContent(
         message = "Are you sure you want to delete ${staffToDelete?.name}? This will remove their record from Firestore."
     )
 
+    if (showResetPasswordDialog) {
+        AlertDialog(
+            onDismissRequest = onResetPasswordCancel,
+            title = { Text("Reset Password") },
+            text = { Text("Send a password reset email to ${staffToResetPassword?.email}?") },
+            confirmButton = {
+                Button(onClick = onResetPasswordConfirm) {
+                    Text("Send Email")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onResetPasswordCancel) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
     if (showAddDialog) {
         AddStaffDialog(
             isLoading = uiState.isLoading,
@@ -130,17 +149,6 @@ private fun ManageStaffContent(
             success = uiState.success,
             onDismiss = onAddDialogDismiss,
             onAdd = onAddStaff
-        )
-    }
-
-    if (showEditDialog && staffToEdit != null) {
-        EditStaffDialog(
-            staff = staffToEdit,
-            isLoading = uiState.isLoading,
-            error = uiState.error,
-            success = uiState.success,
-            onDismiss = onEditDialogDismiss,
-            onUpdate = onUpdateStaff
         )
     }
 
@@ -157,7 +165,7 @@ private fun ManageStaffContent(
                 )
             },
             floatingActionButton = {
-                if (!showAddDialog && !showEditDialog) {
+                if (!showAddDialog && !showResetPasswordDialog) {
                     FloatingActionButton(
                         onClick = onAddClick,
                         containerColor = MaterialTheme.colorScheme.primary,
@@ -174,7 +182,7 @@ private fun ManageStaffContent(
                 isLoading = uiState.isLoading && uiState.staffList.isEmpty(),
                 staffMembers = filteredStaff,
                 onDeleteRequest = onStaffDeleteRequest,
-                onEditRequest = onStaffEditRequest
+                onResetPasswordRequest = onStaffResetPasswordRequest
             )
         }
     }
@@ -186,7 +194,7 @@ private fun StaffList(
     isLoading: Boolean,
     staffMembers: List<Staff>,
     onDeleteRequest: (Staff) -> Unit,
-    onEditRequest: (Staff) -> Unit
+    onResetPasswordRequest: (Staff) -> Unit
 ) {
     if (isLoading) {
         Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
@@ -209,7 +217,7 @@ private fun StaffList(
                 StaffCard(
                     staff = staff, 
                     onDeleteRequest = { onDeleteRequest(staff) },
-                    onEditRequest = { onEditRequest(staff) }
+                    onResetPasswordRequest = { onResetPasswordRequest(staff) }
                 )
             }
         }
@@ -221,7 +229,7 @@ private fun StaffList(
 private fun StaffCard(
     staff: Staff,
     onDeleteRequest: () -> Unit,
-    onEditRequest: () -> Unit
+    onResetPasswordRequest: () -> Unit
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
 
@@ -229,7 +237,7 @@ private fun StaffCard(
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(
-                onClick = onEditRequest,
+                onClick = onResetPasswordRequest,
                 onLongClick = { menuExpanded = true }
             ),
         colors = CardDefaults.cardColors(
@@ -286,98 +294,13 @@ private fun StaffCard(
                 ActionDropdownMenu(
                     expanded = menuExpanded,
                     onDismiss = { menuExpanded = false },
-                    onEdit = onEditRequest,
+                    onEdit = onResetPasswordRequest,
+                    editText = "Reset Password",
                     onDelete = onDeleteRequest
                 )
             }
         }
     }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun EditStaffDialog(
-    staff: Staff,
-    isLoading: Boolean,
-    error: String?,
-    success: String?,
-    onDismiss: () -> Unit,
-    onUpdate: (String, String, String) -> Unit
-) {
-    var name by rememberSaveable { mutableStateOf(staff.name) }
-    var role by rememberSaveable { mutableStateOf(staff.role) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Edit Staff") },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text("Email: ${staff.email}", style = MaterialTheme.typography.bodyMedium)
-                
-                StandardTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = "Full Name",
-                    placeholder = "Enter staff name"
-                )
-                
-                var expanded by remember { mutableStateOf(false) }
-                val roles = listOf("Staff", "Nurse", "Doctor", "Admin")
-                
-                ExposedDropdownMenuBox(
-                    expanded = expanded,
-                    onExpandedChange = { expanded = it }
-                ) {
-                    OutlinedTextField(
-                        value = role,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Role") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                        modifier = Modifier.menuAnchor().fillMaxWidth()
-                    )
-                    ExposedDropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false }
-                    ) {
-                        roles.forEach { r ->
-                            DropdownMenuItem(
-                                text = { Text(r) },
-                                onClick = {
-                                    role = r
-                                    expanded = false
-                                }
-                            )
-                        }
-                    }
-                }
-                
-                if (error != null) {
-                    Text(text = error, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
-                }
-                if (success != null) {
-                    Text(text = success, color = Color(0xFF4CAF50), fontSize = 12.sp)
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { onUpdate(staff.id, name, role) },
-                enabled = !isLoading
-            ) {
-                if (isLoading) CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.onPrimary)
-                else Text("Update")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
-    )
 }
 
 @Composable
@@ -467,11 +390,11 @@ private fun ManageStaffPreview() {
             showAddDialog = false,
             onAddDialogDismiss = {},
             onAddStaff = { _, _, _ -> },
-            showEditDialog = false,
-            staffToEdit = null,
-            onStaffEditRequest = {},
-            onEditDialogDismiss = {},
-            onUpdateStaff = { _, _, _ -> },
+            showResetPasswordDialog = false,
+            staffToResetPassword = null,
+            onStaffResetPasswordRequest = {},
+            onResetPasswordConfirm = {},
+            onResetPasswordCancel = {},
             onClearMessages = {}
         )
     }

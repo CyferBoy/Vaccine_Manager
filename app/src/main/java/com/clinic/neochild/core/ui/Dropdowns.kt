@@ -28,7 +28,8 @@ fun ActionDropdownMenu(
     onPrint: (() -> Unit)? = null,
     onDownload: (() -> Unit)? = null,
     onMerge: (() -> Unit)? = null,
-    onMarkAsDone: (() -> Unit)? = null
+    onMarkAsDone: (() -> Unit)? = null,
+    editText: String = "Edit"
 ) {
     DropdownMenu(
         expanded = expanded,
@@ -66,12 +67,12 @@ fun ActionDropdownMenu(
             )
         }
         DropdownMenuItem(
-            text = { Text("Edit") },
+            text = { Text(editText) },
             onClick = {
                 onDismiss()
                 onEdit()
             },
-            leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) }
+            leadingIcon = { Icon(if (editText == "Edit") Icons.Default.Edit else Icons.Default.LockReset, contentDescription = null) }
         )
         if (onMerge != null) {
             DropdownMenuItem(

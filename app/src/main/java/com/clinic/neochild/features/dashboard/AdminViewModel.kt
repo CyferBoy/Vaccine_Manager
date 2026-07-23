@@ -36,15 +36,38 @@ class AdminViewModel @Inject constructor(
 
     fun fetchStaff() {
         _uiState.value = _uiState.value.copy(isLoading = true)
-        db.collection("staff")
-            .get()
-            .addOnSuccessListener { result ->
-                val list = result.documents.mapNotNull { FirestoreMappers.toStaff(it) }
-                _uiState.value = _uiState.value.copy(staffList = list, isLoading = false)
+        
+        // Fetch from 'staff' collection (profiles with roles)
+        db.collection("staff").get().addOnSuccessListener { staffResult ->
+            val staffProfiles = staffResult.documents.mapNotNull { FirestoreMappers.toStaff(it) }
+            
+            // Also fetch from 'users' collection (all users who ever logged in/registered tokens)
+            db.collection("users").get().addOnSuccessListener { usersResult ->
+                val authUsers = usersResult.documents.mapNotNull { doc ->
+                    val email = doc.getString("email") ?: ""
+                    if (email.isBlank()) return@mapNotNull null
+                    
+                    // If this user isn't already in staffProfiles, create a basic entry
+                    if (staffProfiles.none { it.email.equals(email, ignoreCase = true) }) {
+                        Staff(
+                            id = doc.id,
+                            email = email,
+                            name = email.split("@").firstOrNull()?.replaceFirstChar { it.uppercase() } ?: "User",
+                            role = "Pending Approval",
+                            createdAt = 0L
+                        )
+                    } else null
+                }
+                
+                val combinedList = (staffProfiles + authUsers).sortedBy { it.name }
+                _uiState.value = _uiState.value.copy(staffList = combinedList, isLoading = false)
+            }.addOnFailureListener {
+                // If users fetch fails, just show staff
+                _uiState.value = _uiState.value.copy(staffList = staffProfiles.sortedBy { it.name }, isLoading = false)
             }
-            .addOnFailureListener {
-                _uiState.value = _uiState.value.copy(error = it.message, isLoading = false)
-            }
+        }.addOnFailureListener {
+            _uiState.value = _uiState.value.copy(error = it.message, isLoading = false)
+        }
     }
 
     fun createStaffAccount(name: String, email: String, pass: String) {
@@ -108,39 +131,33 @@ class AdminViewModel @Inject constructor(
 
     fun deleteStaff(staffId: String) {
         _uiState.value = _uiState.value.copy(isLoading = true)
+        
+        // Delete from 'staff'
         db.collection("staff").document(staffId).delete()
             .addOnSuccessListener {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    success = "Staff deleted successfully"
-                )
-                fetchStaff()
+                // Also delete from 'users' (FCM tokens etc)
+                db.collection("users").document(staffId).delete()
+                    .addOnCompleteListener {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            success = "Staff and user data deleted successfully"
+                        )
+                        fetchStaff()
+                    }
             }
             .addOnFailureListener {
                 _uiState.value = _uiState.value.copy(isLoading = false, error = it.message)
             }
     }
 
-    fun updateStaffAccount(staffId: String, name: String, role: String) {
-        if (name.isBlank() || role.isBlank()) {
-            _uiState.value = _uiState.value.copy(error = "Please fill all fields")
-            return
-        }
-
+    fun resetStaffPassword(email: String) {
         _uiState.value = _uiState.value.copy(isLoading = true, error = null, success = null)
-        
-        val updates = mapOf(
-            "name" to name,
-            "role" to role
-        )
-
-        db.collection("staff").document(staffId).update(updates)
+        FirebaseAuth.getInstance().sendPasswordResetEmail(email)
             .addOnSuccessListener {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    success = "Staff updated successfully!"
+                    success = "Password reset email sent to $email"
                 )
-                fetchStaff()
             }
             .addOnFailureListener {
                 _uiState.value = _uiState.value.copy(isLoading = false, error = it.message)

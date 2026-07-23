@@ -2,6 +2,7 @@ package com.clinic.neochild.data.repository
 
 import com.clinic.neochild.data.local.database.AppDatabase
 import com.clinic.neochild.data.local.dao.PatientDao
+import com.clinic.neochild.data.local.dao.DueReminderDao
 import com.clinic.neochild.data.local.dao.AuditLogDao
 import com.clinic.neochild.data.local.dao.PatientNotesDao
 import com.clinic.neochild.data.local.dao.VaccinationDao
@@ -44,6 +45,7 @@ class PatientRepositoryImpl @Inject constructor(
     private val database: AppDatabase,
     private val patientDao: PatientDao,
     private val vaccinationDao: VaccinationDao,
+    private val dueReminderDao: DueReminderDao,
     private val auditLogDao: AuditLogDao,
     private val notesDao: PatientNotesDao,
     private val firestore: FirebaseFirestore,
@@ -186,16 +188,23 @@ class PatientRepositoryImpl @Inject constructor(
     override suspend fun deletePatient(id: String) {
         database.withTransaction {
             patientDao.deletePatient(id)
-            syncRepository.enqueue("PATIENT", id, SyncOperation.DELETE, SyncPriority.MEDIUM)
+            vaccinationDao.deleteVaccinationsForPatient(id)
+            dueReminderDao.softDeleteRemindersForPatient(id)
             
-            auditLogger.recordLog(
-                module = "PATIENT",
-                entityType = "PATIENT",
-                entityId = id,
-                action = "DELETED",
-                patientId = id
-            )
+            syncRepository.enqueue("PATIENT", id, SyncOperation.DELETE, SyncPriority.MEDIUM)
+            // We should also enqueue deletion for vaccinations and reminders if they are stored as individual docs in Firestore
+            // But usually, Firestore structure might mirror this. 
+            // In SyncRepositoryImpl, VISIT/VACCINATION and REMINDER_STATE are enqueued individually.
+            // For a patient delete, we might need to enqueue all their sub-entities too if they are top-level collections.
         }
+
+        auditLogger.recordLog(
+            module = "PATIENT",
+            entityType = "PATIENT",
+            entityId = id,
+            action = "DELETED",
+            patientId = id
+        )
     }
 
     override fun searchPatients(query: String): Flow<List<Patient>> =

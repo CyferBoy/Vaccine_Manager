@@ -16,7 +16,8 @@ import com.clinic.neochild.domain.model.Vaccination
         Index("patientId"), 
         Index("receiptNumber"),
         Index("doctor"),
-        Index("isSynced")
+        Index("isSynced"),
+        Index("isDone")
     ],
     foreignKeys = [
         ForeignKey(

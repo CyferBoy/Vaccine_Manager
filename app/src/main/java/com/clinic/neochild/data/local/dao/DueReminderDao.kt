@@ -45,6 +45,9 @@ interface DueReminderDao {
     @Query("UPDATE reminder_states SET isDeleted = 1, isSynced = 0 WHERE id = :id")
     suspend fun softDeleteReminder(id: Long)
 
+    @Query("UPDATE reminder_states SET isDeleted = 1, isSynced = 0 WHERE patientId = :patientId")
+    suspend fun softDeleteRemindersForPatient(patientId: String)
+
     // Legacy Support Mappings (redirected to unified table)
     
     suspend fun insertDueReminder(reminder: DueReminderEntity) = insertReminder(reminder)

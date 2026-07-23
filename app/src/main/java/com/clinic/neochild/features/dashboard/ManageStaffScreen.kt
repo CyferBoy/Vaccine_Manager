@@ -36,6 +36,8 @@ fun ManageStaffScreen(
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var isSearchActive by rememberSaveable { mutableStateOf(false) }
     var showAddDialog by rememberSaveable { mutableStateOf(false) }
+    var showEditDialog by rememberSaveable { mutableStateOf(false) }
+    var staffToEdit by remember { mutableStateOf<Staff?>(null) }
     var staffToDelete by remember { mutableStateOf<Staff?>(null) }
 
     val filteredStaff = remember(uiState.staffList, searchQuery) {
@@ -70,6 +72,20 @@ fun ManageStaffScreen(
         onAddStaff = { name, email, pass ->
             viewModel.createStaffAccount(name, email, pass)
         },
+        showEditDialog = showEditDialog,
+        staffToEdit = staffToEdit,
+        onStaffEditRequest = { 
+            staffToEdit = it
+            showEditDialog = true
+        },
+        onEditDialogDismiss = {
+            showEditDialog = false
+            staffToEdit = null
+            viewModel.clearMessages()
+        },
+        onUpdateStaff = { id, name, role ->
+            viewModel.updateStaffAccount(id, name, role)
+        },
         onClearMessages = { viewModel.clearMessages() }
     )
 }
@@ -92,6 +108,11 @@ private fun ManageStaffContent(
     showAddDialog: Boolean,
     onAddDialogDismiss: () -> Unit,
     onAddStaff: (String, String, String) -> Unit,
+    showEditDialog: Boolean,
+    staffToEdit: Staff?,
+    onStaffEditRequest: (Staff) -> Unit,
+    onEditDialogDismiss: () -> Unit,
+    onUpdateStaff: (String, String, String) -> Unit,
     onClearMessages: () -> Unit
 ) {
     DeleteConfirmationDialog(
@@ -112,6 +133,17 @@ private fun ManageStaffContent(
         )
     }
 
+    if (showEditDialog && staffToEdit != null) {
+        EditStaffDialog(
+            staff = staffToEdit,
+            isLoading = uiState.isLoading,
+            error = uiState.error,
+            success = uiState.success,
+            onDismiss = onEditDialogDismiss,
+            onUpdate = onUpdateStaff
+        )
+    }
+
     AppBackground {
         Scaffold(
             topBar = {
@@ -125,12 +157,14 @@ private fun ManageStaffContent(
                 )
             },
             floatingActionButton = {
-                FloatingActionButton(
-                    onClick = onAddClick,
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "Add Staff")
+                if (!showAddDialog && !showEditDialog) {
+                    FloatingActionButton(
+                        onClick = onAddClick,
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "Add Staff")
+                    }
                 }
             },
             containerColor = Color.Transparent
@@ -139,7 +173,8 @@ private fun ManageStaffContent(
                 padding = padding,
                 isLoading = uiState.isLoading && uiState.staffList.isEmpty(),
                 staffMembers = filteredStaff,
-                onDeleteRequest = onStaffDeleteRequest
+                onDeleteRequest = onStaffDeleteRequest,
+                onEditRequest = onStaffEditRequest
             )
         }
     }
@@ -150,7 +185,8 @@ private fun StaffList(
     padding: PaddingValues,
     isLoading: Boolean,
     staffMembers: List<Staff>,
-    onDeleteRequest: (Staff) -> Unit
+    onDeleteRequest: (Staff) -> Unit,
+    onEditRequest: (Staff) -> Unit
 ) {
     if (isLoading) {
         Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
@@ -170,7 +206,11 @@ private fun StaffList(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(staffMembers, key = { it.id }) { staff ->
-                StaffCard(staff = staff, onDeleteRequest = { onDeleteRequest(staff) })
+                StaffCard(
+                    staff = staff, 
+                    onDeleteRequest = { onDeleteRequest(staff) },
+                    onEditRequest = { onEditRequest(staff) }
+                )
             }
         }
     }
@@ -180,7 +220,8 @@ private fun StaffList(
 @Composable
 private fun StaffCard(
     staff: Staff,
-    onDeleteRequest: () -> Unit
+    onDeleteRequest: () -> Unit,
+    onEditRequest: () -> Unit
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
 
@@ -188,7 +229,7 @@ private fun StaffCard(
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(
-                onClick = { /* Could show details */ },
+                onClick = onEditRequest,
                 onLongClick = { menuExpanded = true }
             ),
         colors = CardDefaults.cardColors(
@@ -230,6 +271,11 @@ private fun StaffCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                Text(
+                    text = "Role: ${staff.role}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
 
             Box {
@@ -240,12 +286,98 @@ private fun StaffCard(
                 ActionDropdownMenu(
                     expanded = menuExpanded,
                     onDismiss = { menuExpanded = false },
-                    onEdit = { /* Not implemented yet */ },
+                    onEdit = onEditRequest,
                     onDelete = onDeleteRequest
                 )
             }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EditStaffDialog(
+    staff: Staff,
+    isLoading: Boolean,
+    error: String?,
+    success: String?,
+    onDismiss: () -> Unit,
+    onUpdate: (String, String, String) -> Unit
+) {
+    var name by rememberSaveable { mutableStateOf(staff.name) }
+    var role by rememberSaveable { mutableStateOf(staff.role) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Staff") },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text("Email: ${staff.email}", style = MaterialTheme.typography.bodyMedium)
+                
+                StandardTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = "Full Name",
+                    placeholder = "Enter staff name"
+                )
+                
+                var expanded by remember { mutableStateOf(false) }
+                val roles = listOf("Staff", "Nurse", "Doctor", "Admin")
+                
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = it }
+                ) {
+                    OutlinedTextField(
+                        value = role,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Role") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                        modifier = Modifier.menuAnchor().fillMaxWidth()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        roles.forEach { r ->
+                            DropdownMenuItem(
+                                text = { Text(r) },
+                                onClick = {
+                                    role = r
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+                
+                if (error != null) {
+                    Text(text = error, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                }
+                if (success != null) {
+                    Text(text = success, color = Color(0xFF4CAF50), fontSize = 12.sp)
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onUpdate(staff.id, name, role) },
+                enabled = !isLoading
+            ) {
+                if (isLoading) CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.onPrimary)
+                else Text("Update")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @Composable
@@ -335,6 +467,11 @@ private fun ManageStaffPreview() {
             showAddDialog = false,
             onAddDialogDismiss = {},
             onAddStaff = { _, _, _ -> },
+            showEditDialog = false,
+            staffToEdit = null,
+            onStaffEditRequest = {},
+            onEditDialogDismiss = {},
+            onUpdateStaff = { _, _, _ -> },
             onClearMessages = {}
         )
     }

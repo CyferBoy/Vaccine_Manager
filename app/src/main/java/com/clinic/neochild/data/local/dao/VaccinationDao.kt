@@ -25,6 +25,9 @@ interface VaccinationDao {
     @Query("UPDATE patient_visits SET isDeleted = 1, isSynced = 0 WHERE id = :id")
     suspend fun deleteVaccination(id: String)
 
+    @Query("UPDATE patient_visits SET isDeleted = 1, isSynced = 0 WHERE patientId = :patientId")
+    suspend fun deleteVaccinationsForPatient(patientId: String)
+
     @Query("SELECT * FROM patient_visits WHERE isSynced = 0")
     suspend fun getUnsyncedVaccinations(): List<VisitEntity>
 

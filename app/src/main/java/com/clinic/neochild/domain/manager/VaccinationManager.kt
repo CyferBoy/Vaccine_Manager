@@ -72,8 +72,11 @@ class VaccinationManager @Inject constructor(
             }
 
             // 3. Reminder Engine Satisfaction
-            requirement?.let {
-                reminderRepository.markRequirementSatisfied(it, user)
+            if (requirement != null) {
+                reminderRepository.markRequirementSatisfied(requirement, user)
+            } else if (isNew) {
+                // Automatic satisfaction for manually added vaccines
+                satisfyRelatedReminders(vaccination, user)
             }
 
             // 4. Audit Logging
@@ -132,16 +135,36 @@ class VaccinationManager @Inject constructor(
         database.withTransaction {
             vaccinationRepository.markAsDone(vaccinationId)
 
-            val allVaccs = vaccinationRepository.allVaccinations.first()
-            val target = allVaccs.find { it.id == vaccinationId } ?: return@withTransaction
+            val target = vaccinationRepository.allVaccinations.first().find { it.id == vaccinationId } ?: return@withTransaction
+            satisfyRelatedReminders(target, user)
+        }
+    }
 
-            val allRequirements = ReminderEngine.getPotentialRequirements(allVaccs)
-            val matching = allRequirements.filter { req ->
-                req.patientId == target.patientId && target.nxtVaccineNames.contains(req.vaccineName)
-            }
-            
-            for (req in matching) {
-                reminderRepository.markRequirementSatisfied(req, user)
+    /**
+     * Finds and satisfies any existing reminders that match the vaccines given in this visit.
+     */
+    private suspend fun satisfyRelatedReminders(vaccination: Vaccination, user: String) {
+        val existingReminders = reminderRepository.getPatientFollowUps(vaccination.patientId).first()
+        val activeReminders = existingReminders.filter { 
+            (it.status == "ACTIVE" || it.status == "RESCHEDULED") && !it.isDeleted 
+        }
+
+        val givenCleaned = vaccination.vaccineNames.map { 
+            PatientUtils.cleanVaccineName(it).lowercase().trim() 
+        }
+
+        for (reminder in activeReminders) {
+            val reminderCleaned = PatientUtils.cleanVaccineName(reminder.vaccineName).lowercase().trim()
+            if (givenCleaned.contains(reminderCleaned)) {
+                reminderRepository.markRequirementSatisfied(
+                    PendingRequirement(
+                        patientId = reminder.patientId,
+                        vaccineName = reminder.vaccineName,
+                        dueDate = PatientUtils.parseDate(reminder.dueDate) ?: Date(),
+                        originalVisitId = reminder.originalVisitId
+                    ),
+                    user
+                )
             }
         }
     }

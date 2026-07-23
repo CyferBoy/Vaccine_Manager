@@ -121,6 +121,32 @@ class AdminViewModel @Inject constructor(
             }
     }
 
+    fun updateStaffAccount(staffId: String, name: String, role: String) {
+        if (name.isBlank() || role.isBlank()) {
+            _uiState.value = _uiState.value.copy(error = "Please fill all fields")
+            return
+        }
+
+        _uiState.value = _uiState.value.copy(isLoading = true, error = null, success = null)
+        
+        val updates = mapOf(
+            "name" to name,
+            "role" to role
+        )
+
+        db.collection("staff").document(staffId).update(updates)
+            .addOnSuccessListener {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    success = "Staff updated successfully!"
+                )
+                fetchStaff()
+            }
+            .addOnFailureListener {
+                _uiState.value = _uiState.value.copy(isLoading = false, error = it.message)
+            }
+    }
+
     fun clearMessages() {
         _uiState.value = _uiState.value.copy(error = null, success = null)
     }

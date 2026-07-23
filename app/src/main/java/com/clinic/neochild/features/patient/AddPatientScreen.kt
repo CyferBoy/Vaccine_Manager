@@ -36,6 +36,7 @@ fun AddPatientScreen(
     
     var isLoading by rememberSaveable { mutableStateOf(false) }
     var isEditMode by rememberSaveable { mutableStateOf(false) }
+    var registrationDate by rememberSaveable { mutableStateOf("") }
 
     val context = LocalContext.current
 
@@ -55,6 +56,7 @@ fun AddPatientScreen(
                 gender = patient.gender
                 village = patient.village
                 address = patient.address
+                registrationDate = patient.registrationDate
                 
                 val detailedAge = calculateDetailedAge(patient.dob)
                 ageValue = detailedAge.first.toString()
@@ -131,7 +133,7 @@ fun AddPatientScreen(
                     gender = gender,
                     village = village,
                     address = address,
-                    registrationDate = SimpleDateFormat(Constants.DATE_FORMAT, Locale.ENGLISH).format(Date())
+                    registrationDate = if (isEditMode) registrationDate else SimpleDateFormat(Constants.DATE_FORMAT, Locale.ENGLISH).format(Date())
                 )
 
                 viewModel.savePatient(patient) {

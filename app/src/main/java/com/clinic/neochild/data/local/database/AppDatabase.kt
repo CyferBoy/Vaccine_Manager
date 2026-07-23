@@ -30,7 +30,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         FinanceEntity::class,
         BorrowEntity::class
     ], 
-    version = 19,
+    version = 20,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -455,6 +455,16 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_19_20 = object : Migration(19, 20) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                Log.i(TAG, "Starting Migration 19 -> 20 (Adding performance indices)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_patient_visits_isDone` ON `patient_visits` (`isDone`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_sync_queue_status` ON `sync_queue` (`status`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_sync_queue_priority` ON `sync_queue` (`priority`)")
+                Log.i(TAG, "Migration 19 -> 20 completed.")
+            }
+        }
+
 
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
@@ -496,7 +506,7 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                 .openHelperFactory(factory)
                 .setJournalMode(JournalMode.TRUNCATE)
-                .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19)
+                .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20)
                 .fallbackToDestructiveMigrationOnDowngrade()
                 .build()
                 INSTANCE = instance

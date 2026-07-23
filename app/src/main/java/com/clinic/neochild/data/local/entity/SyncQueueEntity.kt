@@ -1,13 +1,17 @@
 package com.clinic.neochild.data.local.entity
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.clinic.neochild.core.model.SyncItem
 import com.clinic.neochild.core.model.SyncOperation
 import com.clinic.neochild.core.model.SyncPriority
 import com.clinic.neochild.core.model.SyncStatus
 
-@Entity(tableName = "sync_queue")
+@Entity(
+    tableName = "sync_queue",
+    indices = [Index("status"), Index("priority")]
+)
 data class SyncQueueEntity(
     @PrimaryKey(autoGenerate = true) val queueId: Long = 0,
     val entityName: String, // e.g., "PATIENT", "VACCINATION", "INVENTORY"

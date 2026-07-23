@@ -45,6 +45,7 @@ object VaccinationValidator {
             totalPaid = total,
             withFees = withFees,
             doctorsAcc = doctorsAcc,
+            isDone = true, // Ensure administered vaccinations are marked as done
             batchNumbers = batches,
             expiryDates = expiries,
             performedBy = performedBy

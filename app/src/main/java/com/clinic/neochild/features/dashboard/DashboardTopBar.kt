@@ -73,12 +73,12 @@ fun DashboardTopBar(
                         leadingIcon = { Icon(Icons.Default.Sync, contentDescription = null) }
                     )
                     DropdownMenuItem(
-                        text = { Text("Notification Settings") },
+                        text = { Text("Settings") },
                         onClick = {
                             profileMenuExpanded = false
                             onSettings()
                         },
-                        leadingIcon = { Icon(Icons.Default.Notifications, contentDescription = null) }
+                        leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) }
                     )
                     HorizontalDivider()
                     if (isAdmin) {

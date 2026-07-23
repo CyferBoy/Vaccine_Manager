@@ -13,6 +13,7 @@ import com.clinic.neochild.features.patient.AddPatientScreen
 import com.clinic.neochild.features.patient.PatientDetailsScreen
 import com.clinic.neochild.features.patient.PatientListScreen
 import com.clinic.neochild.features.sync.SyncScreen
+import com.clinic.neochild.features.settings.SettingsScreen
 import com.clinic.neochild.features.settings.NotificationSettingsScreen
 import com.clinic.neochild.features.reminder.DueScreen
 import com.clinic.neochild.features.statistics.MonthlyFinanceDetailsScreen
@@ -90,6 +91,13 @@ fun AppNavigation(
         }
 
         composable(Routes.SETTINGS) {
+            SettingsScreen(
+                onBack = { navController.popBackStack() },
+                onNavigateToNotifications = { navController.navigate(Routes.NOTIFICATION_SETTINGS) }
+            )
+        }
+
+        composable(Routes.NOTIFICATION_SETTINGS) {
             NotificationSettingsScreen(onBack = { navController.popBackStack() })
         }
 

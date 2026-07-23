@@ -17,6 +17,7 @@ object Routes {
     const val ADD_VACCINE_STOCK = "add_vaccine_stock"
     const val EDIT_VACCINE_STOCK = "edit_vaccine_stock/{vaccineId}"
     const val SETTINGS = "settings"
+    const val NOTIFICATION_SETTINGS = "notification_settings"
     const val SYNC = "sync"
     const val MANAGE_STAFF = "manage_staff"
     const val SEARCH = "search"

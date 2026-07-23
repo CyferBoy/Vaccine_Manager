@@ -111,6 +111,13 @@ fun DashboardScreen(
                         onDue = onDue,
                         onWaste = onWaste
                     )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    DashboardSystemActionsRow(
+                        onSync = onSync,
+                        onSettings = onSettings
+                    )
                     
                     Spacer(modifier = Modifier.height(40.dp))
                 }

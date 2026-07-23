@@ -78,7 +78,7 @@ class VaccinationRepositoryImpl @Inject constructor(
                 module = "PATIENT",
                 entityType = "VISIT",
                 entityId = vaccination.id,
-                action = if (existing == null) "CREATED" else "UPDATED",
+                action = "VACCINATION",
                 patientId = vaccination.patientId,
                 remarks = "Vaccines: ${vaccination.vaccineNames.joinToString(", ")}"
             )

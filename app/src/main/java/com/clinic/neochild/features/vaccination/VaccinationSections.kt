@@ -26,7 +26,6 @@ import com.clinic.neochild.core.ui.StandardButton
 @Composable
 fun VaccineSelectionSection(
     inventory: List<Vaccine>,
-    lowStockThreshold: Int = 5,
     selectedVaccines: List<String>,
     onVaccineSelected: (Vaccine) -> Unit,
     onRemoveVaccine: (Int) -> Unit
@@ -52,7 +51,7 @@ fun VaccineSelectionSection(
                 if (filteredInventory.isNotEmpty()) {
                     filteredInventory.forEach { v ->
                         val isOutOfStock = v.stock <= 0
-                        val isLowStock = !isOutOfStock && v.stock <= lowStockThreshold
+                        val isLowStock = v.isLowStock
 
                         DropdownMenuItem(
                             text = { 

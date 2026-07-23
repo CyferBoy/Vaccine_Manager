@@ -17,7 +17,8 @@ import javax.inject.Inject
 data class ProfileUiState(
     val staff: Staff? = null,
     val isLoading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val success: String? = null
 )
 
 @HiltViewModel
@@ -58,5 +59,30 @@ class ProfileViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(error = e.message, isLoading = false)
             }
         }
+    }
+
+    fun updateName(newName: String) {
+        if (newName.isBlank()) return
+        val currentUser = auth.currentUser ?: return
+        
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null, success = null)
+            try {
+                db.collection("staff").document(currentUser.uid).update("name", newName).await()
+                db.collection("users").document(currentUser.uid).update("name", newName).await()
+                
+                _uiState.value = _uiState.value.copy(
+                    staff = _uiState.value.staff?.copy(name = newName),
+                    isLoading = false,
+                    success = "Name updated successfully"
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(error = e.message, isLoading = false)
+            }
+        }
+    }
+
+    fun clearMessages() {
+        _uiState.value = _uiState.value.copy(error = null, success = null)
     }
 }

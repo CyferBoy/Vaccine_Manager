@@ -22,12 +22,16 @@ class GetPatientTimelineUseCase @Inject constructor(
                 TimelineEvent(
                     id = log.id.toString(),
                     type = when (log.action) {
-                        "CREATED" -> TimelineEventType.REGISTRATION
+                        "CREATED" -> if (log.entityType == "PATIENT") TimelineEventType.REGISTRATION else TimelineEventType.AUDIT_LOG
                         "VACCINATION", "VISIT" -> TimelineEventType.VACCINATION
                         "EXTERNAL" -> TimelineEventType.EXTERNAL_VACCINATION
+                        "FOLLOW_UP_SCHEDULED" -> TimelineEventType.FOLLOW_UP_SCHEDULED
+                        "COMPLETED" -> if (log.entityType == "REMINDER") TimelineEventType.FOLLOW_UP_COMPLETED else TimelineEventType.VACCINATION
+                        "RESCHEDULED" -> TimelineEventType.FOLLOW_UP_RESCHEDULED
+                        "DISMISSED" -> TimelineEventType.FOLLOW_UP_DISMISSED
                         else -> TimelineEventType.AUDIT_LOG
                     },
-                    title = log.action.lowercase().replaceFirstChar { it.uppercase() },
+                    title = log.action.lowercase().replace("_", " ").replaceFirstChar { it.uppercase() },
                     subtitle = log.remarks ?: "${log.entityType} ${log.entityId}",
                     timestamp = log.timestamp,
                     dateDisplay = PatientUtils.formatDate(java.util.Date(log.timestamp)),

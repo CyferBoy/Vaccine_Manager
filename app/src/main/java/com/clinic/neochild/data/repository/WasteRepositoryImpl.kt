@@ -61,7 +61,13 @@ class WasteRepositoryImpl @Inject constructor(
                 priority = SyncPriority.MEDIUM
             )
 
-            auditLogger.logAction("Waste recorded", null, "${record.brandName} x${record.quantity} - ${record.reason}")
+            auditLogger.log(
+                module = "INVENTORY",
+                entityType = "WASTE",
+                entityId = record.id,
+                action = "WASTE_RECORDED",
+                remarks = "${record.brandName} x${record.quantity} - ${record.reason}"
+            )
         }
     }
 

@@ -7,7 +7,6 @@ import com.clinic.neochild.core.logger.AuditLogger
 import com.clinic.neochild.domain.model.*
 import com.clinic.neochild.domain.repository.*
 import com.clinic.neochild.core.utils.PatientUtils
-import com.clinic.neochild.domain.logic.ReminderEngine
 import kotlinx.coroutines.flow.first
 import java.util.*
 import javax.inject.Inject
@@ -80,10 +79,13 @@ class VaccinationManager @Inject constructor(
             }
 
             // 4. Audit Logging
-            auditLogger.logAction(
-                action = if (isNew) "Vaccination Added" else "Vaccination Updated",
+            auditLogger.log(
+                module = "VACCINATION",
+                entityType = "VACCINATION",
+                entityId = vaccination.id,
+                action = "VACCINATION",
                 patientId = vaccination.patientId,
-                details = "${vaccination.vaccineNames.joinToString(", ")} recorded by $user"
+                remarks = "${vaccination.vaccineNames.joinToString(", ")} recorded by $user"
             )
         }
     }

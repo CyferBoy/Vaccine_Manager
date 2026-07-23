@@ -9,5 +9,6 @@ data class Vaccine(
     val batchNumber: String = "",
     val expiryDate: String = "",
     val mrp: Double = 0.0,
-    val netRate: Double = 0.0
+    val netRate: Double = 0.0,
+    val isLowStock: Boolean = false
 )

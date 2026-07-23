@@ -25,7 +25,6 @@ data class AddVaccinationUiState(
     val error: String? = null,
     val isSaved: Boolean = false,
     val savedVaccination: Vaccination? = null,
-    val lowStockThreshold: Int = 5,
     
     // Form State
     val patientId: String = "",
@@ -71,14 +70,15 @@ class AddVaccinationViewModel @Inject constructor(
             combine(
                 inventoryRepository.getInventoryItems(filter = InventoryFilter.AVAILABLE),
                 settingsManager.settingsFlow
-            ) { items, settings ->
+            ) { items, _ ->
                 val vaccines = items.map { item ->
                     Vaccine(
                         id = item.id,
                         type = item.type,
                         brandName = item.brandName,
                         companyName = item.company,
-                        stock = item.stock
+                        stock = item.stock,
+                        isLowStock = item.isLowStock
                     )
                 }
                 
@@ -91,8 +91,7 @@ class AddVaccinationViewModel @Inject constructor(
                 _uiState.update { 
                     it.copy(
                         availableVaccines = vaccines,
-                        activeBatches = batchesMap,
-                        lowStockThreshold = settings.lowStockThreshold
+                        activeBatches = batchesMap
                     )
                 }
             }.collect()

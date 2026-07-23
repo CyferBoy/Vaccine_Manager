@@ -54,7 +54,7 @@ class InventoryRepositoryImpl @Inject constructor(
                 
                 val hasExpired = batches.any { InventoryUtils.isExpired(it.expiryDate) }
                 val isNearExpiry = batches.any { InventoryUtils.isNearExpiry(it.expiryDate) }
-                val isLowStock = totalStock > 0 && totalStock <= globalThreshold
+                val isLowStock = totalStock <= globalThreshold
                 val isOutOfStock = totalStock <= 0
                 val activeBatches = batches.filter { it.remainingQuantity > 0 && !InventoryUtils.isExpired(it.expiryDate) }
 
@@ -62,7 +62,6 @@ class InventoryRepositoryImpl @Inject constructor(
                     id = vaccine.id,
                     brandName = vaccine.brandName,
                     stock = totalStock,
-                    threshold = globalThreshold,
                     type = vaccine.type,
                     company = vaccine.companyName,
                     batches = batches.sortedBy { parseDate(it.expiryDate) },

@@ -139,7 +139,6 @@ fun AddVaccinationScreen(
         onPatientIdChange = viewModel::onPatientIdChange,
         isPatientIdEnabled = initialPatientId.isEmpty(),
         inventory = uiState.availableVaccines,
-        lowStockThreshold = uiState.lowStockThreshold,
         selectedVaccines = uiState.selectedVaccines,
         onVaccineSelected = { v ->
             if (!uiState.selectedVaccines.contains(v.brandName)) {

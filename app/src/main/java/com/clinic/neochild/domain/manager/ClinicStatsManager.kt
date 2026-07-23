@@ -85,7 +85,7 @@ class ClinicStatsManager @Inject constructor(
                 monthlyRevenue = monthlyRevenue,
                 dueToday = dueToday,
                 overdue = overdue,
-                lowStockCount = inventory.count { it.stock <= it.threshold },
+                lowStockCount = inventory.count { it.isLowStock },
                 topVaccines = topVaccines
             )
         }

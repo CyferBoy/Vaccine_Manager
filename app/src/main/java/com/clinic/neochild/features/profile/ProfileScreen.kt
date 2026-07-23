@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.clinic.neochild.core.ui.AppBackground
+import com.clinic.neochild.core.ui.StandardTextField
 import com.clinic.neochild.core.utils.PatientUtils
 import java.util.*
 
@@ -29,6 +30,27 @@ fun ProfileScreen(
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    var showEditNameDialog by remember { mutableStateOf(false) }
+
+    if (showEditNameDialog && uiState.staff != null) {
+        EditNameDialog(
+            currentName = uiState.staff!!.name,
+            isLoading = uiState.isLoading,
+            onDismiss = { 
+                showEditNameDialog = false 
+                viewModel.clearMessages()
+            },
+            onConfirm = { newName ->
+                viewModel.updateName(newName)
+            }
+        )
+    }
+
+    LaunchedEffect(uiState.success) {
+        if (uiState.success != null) {
+            showEditNameDialog = false
+        }
+    }
 
     AppBackground {
         Scaffold(
@@ -80,11 +102,24 @@ fun ProfileScreen(
 
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        Text(
-                            text = staff.name,
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = staff.name,
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            IconButton(onClick = { showEditNameDialog = true }) {
+                                Icon(
+                                    Icons.Default.Edit,
+                                    contentDescription = "Edit Name",
+                                    modifier = Modifier.size(20.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
                         
                         Surface(
                             color = MaterialTheme.colorScheme.secondaryContainer,
@@ -153,4 +188,46 @@ fun ProfileInfoRow(icon: ImageVector, label: String, value: String) {
             Text(value, style = MaterialTheme.typography.bodyLarge)
         }
     }
+}
+
+@Composable
+fun EditNameDialog(
+    currentName: String,
+    isLoading: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var name by remember { mutableStateOf(currentName) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Name") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                StandardTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = "Full Name",
+                    placeholder = "Enter your full name"
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(name) },
+                enabled = !isLoading && name.isNotBlank() && name != currentName
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.onPrimary)
+                } else {
+                    Text("Save")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !isLoading) {
+                Text("Cancel")
+            }
+        }
+    )
 }

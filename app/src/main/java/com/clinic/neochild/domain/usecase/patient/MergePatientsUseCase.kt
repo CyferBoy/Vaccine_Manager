@@ -47,7 +47,14 @@ class MergePatientsUseCase @Inject constructor(
                 inventoryRepository.transferPatientTransactions(dupId, masterId)
 
                 // 4. Create an audit log for the merge
-                auditLogger.logAction("MERGE_PATIENT", masterId, "Merged with duplicate patient ID: $dupId")
+                auditLogger.log(
+                    module = "PATIENT",
+                    entityType = "PATIENT",
+                    entityId = masterId,
+                    action = "MERGE_PATIENT",
+                    patientId = masterId,
+                    remarks = "Merged with duplicate patient ID: $dupId"
+                )
 
                 // 5. Delete duplicate patient locally (this also queues sync)
                 patientRepository.deletePatient(dupId)

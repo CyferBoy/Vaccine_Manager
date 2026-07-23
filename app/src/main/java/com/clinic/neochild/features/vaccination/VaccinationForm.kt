@@ -26,7 +26,6 @@ fun AddVaccinationContent(
     onPatientIdChange: (String) -> Unit,
     isPatientIdEnabled: Boolean,
     inventory: List<Vaccine>,
-    lowStockThreshold: Int = 5,
     selectedVaccines: List<String>,
     onVaccineSelected: (Vaccine) -> Unit,
     onRemoveVaccine: (Int) -> Unit,
@@ -89,7 +88,6 @@ fun AddVaccinationContent(
 
                 VaccineSelectionSection(
                     inventory = inventory,
-                    lowStockThreshold = lowStockThreshold,
                     selectedVaccines = selectedVaccines,
                     onVaccineSelected = onVaccineSelected,
                     onRemoveVaccine = onRemoveVaccine

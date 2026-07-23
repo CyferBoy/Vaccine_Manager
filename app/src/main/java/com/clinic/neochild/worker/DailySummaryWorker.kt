@@ -44,7 +44,7 @@ class DailySummaryWorker @AssistedInject constructor(
         if (settings.lowStockEnabled) {
             val inventory = inventoryRepository.getInventoryItems().first()
             for (item in inventory) {
-                val isBelowThreshold = item.stock <= item.threshold
+                val isBelowThreshold = item.isLowStock
                 val alreadyNotified = settings.notifiedLowStockVaccines.contains(item.id)
 
                 if (isBelowThreshold && !alreadyNotified) {

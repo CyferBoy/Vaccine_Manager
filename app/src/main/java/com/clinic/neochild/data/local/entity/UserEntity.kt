@@ -15,6 +15,7 @@ data class UserEntity(
     val biometricEnabled: Boolean = false,
     val pinHash: String? = null,
     val lastLogin: Long = 0,
+    val fcmToken: String? = null,
     val devices: String? = null, // JSON list of device IDs
     val securityStamp: String = ""
 )

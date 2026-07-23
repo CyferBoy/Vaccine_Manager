@@ -5,5 +5,6 @@ data class Staff(
     val email: String = "",
     val name: String = "",
     val role: String = "Staff",
+    val fcmToken: String? = null,
     val createdAt: Long = System.currentTimeMillis()
 )

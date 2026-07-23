@@ -15,6 +15,7 @@ object FirestoreMappers {
                 email = doc.getString("email") ?: "",
                 name = doc.getString("name") ?: "",
                 role = doc.getString("role") ?: "Staff",
+                fcmToken = doc.getString("fcmToken"),
                 createdAt = doc.getLong("createdAt") ?: 0L
             )
         } catch (_: Exception) {
@@ -249,6 +250,7 @@ object FirestoreMappers {
                 role = doc.getString("role") ?: "Staff",
                 department = doc.getString("department"),
                 permissions = doc.getString("permissions"),
+                fcmToken = doc.getString("fcmToken"),
                 isActive = doc.getBoolean("isActive") ?: true,
                 createdAt = doc.getLong("createdAt") ?: System.currentTimeMillis(),
                 lastActive = doc.getLong("lastActive") ?: System.currentTimeMillis()
@@ -267,6 +269,7 @@ object FirestoreMappers {
                 biometricEnabled = doc.getBoolean("biometricEnabled") ?: false,
                 pinHash = doc.getString("pinHash"),
                 lastLogin = doc.getLong("lastLogin") ?: 0L,
+                fcmToken = doc.getString("fcmToken"),
                 devices = doc.getString("devices"),
                 securityStamp = doc.getString("securityStamp") ?: ""
             )

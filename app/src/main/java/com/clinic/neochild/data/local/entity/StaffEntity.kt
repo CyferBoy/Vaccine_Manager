@@ -15,6 +15,7 @@ data class StaffEntity(
     val role: String, // ADMIN, DOCTOR, NURSE, STAFF
     val department: String? = null,
     val permissions: String? = null, // JSON list
+    val fcmToken: String? = null,
     val isActive: Boolean = true,
     val createdAt: Long = System.currentTimeMillis(),
     val lastActive: Long = System.currentTimeMillis()

@@ -25,6 +25,7 @@ import com.clinic.neochild.features.settings.NotificationSettingsManager
 import com.clinic.neochild.notification.NotificationHelper
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import com.google.firebase.messaging.FirebaseMessaging
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.first
@@ -158,12 +159,15 @@ class MainActivity : FragmentActivity() {
     private fun fetchAndStoreFcmToken() {
         val currentUser = auth.currentUser ?: return
         messaging.token.addOnSuccessListener { token ->
+            val updateData = mapOf("fcmToken" to token)
+            
+            // 1. Update users collection (Always exists or should be created)
             firestore.collection("users").document(currentUser.uid)
-                .update("fcmToken", token)
-                .addOnFailureListener {
-                    val data = hashMapOf("fcmToken" to token, "email" to currentUser.email)
-                    firestore.collection("users").document(currentUser.uid).set(data)
-                }
+                .set(mapOf("email" to currentUser.email, "fcmToken" to token), SetOptions.merge())
+
+            // 2. Update staff collection (Only if user has a profile)
+            firestore.collection("staff").document(currentUser.uid)
+                .update(updateData)
         }
     }
 

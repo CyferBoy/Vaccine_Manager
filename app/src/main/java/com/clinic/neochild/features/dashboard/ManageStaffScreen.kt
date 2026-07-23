@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -282,11 +283,28 @@ private fun StaffCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Text(
-                    text = "Role: ${staff.role}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "Role: ${staff.role}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (!staff.fcmToken.isNullOrBlank()) {
+                        Icon(
+                            Icons.Default.NotificationsActive,
+                            contentDescription = "Push Notifications Active",
+                            modifier = Modifier.size(14.dp),
+                            tint = Color(0xFF4CAF50)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            "Push Active",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFF4CAF50)
+                        )
+                    }
+                }
             }
 
             Box {
@@ -384,7 +402,7 @@ private fun ManageStaffPreview() {
     NeoChildTheme {
         ManageStaffContent(
             uiState = AdminUiState(
-                staffList = listOf(Staff("1", "admin@clinic.com", "Admin User", "Admin", 0L))
+                staffList = listOf(Staff("1", "admin@clinic.com", "Admin User", "Admin", null, 0L))
             ),
             searchQuery = "",
             onSearchQueryChange = {},
@@ -396,7 +414,7 @@ private fun ManageStaffPreview() {
             onStaffDeleteRequest = {},
             onStaffDeleteConfirm = {},
             onStaffDeleteCancel = {},
-            filteredStaff = listOf(Staff("1", "admin@clinic.com", "Admin User", "Admin", 0L)),
+            filteredStaff = listOf(Staff("1", "admin@clinic.com", "Admin User", "Admin", null, 0L)),
             showAddDialog = false,
             onAddDialogDismiss = {},
             onAddStaff = { _, _, _ -> },

@@ -54,6 +54,7 @@ class AdminViewModel @Inject constructor(
                             email = email,
                             name = email.split("@").firstOrNull()?.replaceFirstChar { it.uppercase() } ?: "User",
                             role = "Pending Approval",
+                            fcmToken = doc.getString("fcmToken"),
                             createdAt = 0L
                         )
                     } else null

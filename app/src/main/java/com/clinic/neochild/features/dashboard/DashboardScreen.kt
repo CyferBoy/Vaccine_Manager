@@ -34,6 +34,7 @@ fun DashboardScreen(
     onSettings: () -> Unit = {},
     onSync: () -> Unit = {},
     onAuditLogs: () -> Unit = {},
+    onProfile: () -> Unit = {},
     onSearch: () -> Unit = {},
     authViewModel: AuthViewModel = hiltViewModel(),
     dashboardViewModel: DashboardViewModel = hiltViewModel()
@@ -62,6 +63,7 @@ fun DashboardScreen(
                     onSettings = onSettings,
                     onSync = onSync,
                     onAuditLogs = onAuditLogs,
+                    onProfile = onProfile,
                     onSearch = onSearch,
                     onLogout = {
                         authViewModel.logout()

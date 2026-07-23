@@ -15,6 +15,7 @@ import com.clinic.neochild.features.patient.PatientListScreen
 import com.clinic.neochild.features.sync.SyncScreen
 import com.clinic.neochild.features.audit.FullAuditLogScreen
 import com.clinic.neochild.features.settings.SettingsScreen
+import com.clinic.neochild.features.profile.ProfileScreen
 import com.clinic.neochild.features.reminder.DueScreen
 import com.clinic.neochild.features.statistics.MonthlyFinanceDetailsScreen
 import com.clinic.neochild.features.statistics.StatisticsScreen
@@ -82,6 +83,9 @@ fun AppNavigation(
                 onAuditLogs = {
                     navController.navigate(Routes.AUDIT_LOGS)
                 },
+                onProfile = {
+                    navController.navigate(Routes.PROFILE)
+                },
                 onSearch = {
                     navController.navigate(Routes.SEARCH)
                 },
@@ -96,6 +100,18 @@ fun AppNavigation(
         composable(Routes.SETTINGS) {
             SettingsScreen(
                 onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.PROFILE) {
+            ProfileScreen(
+                onBack = { navController.popBackStack() },
+                onLogout = {
+                    authViewModel.logout()
+                    navController.navigate(Routes.LOGIN) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                }
             )
         }
 

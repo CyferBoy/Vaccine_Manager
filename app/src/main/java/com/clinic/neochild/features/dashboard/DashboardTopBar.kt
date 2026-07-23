@@ -24,6 +24,7 @@ fun DashboardTopBar(
     onSettings: () -> Unit,
     onSync: () -> Unit,
     onAuditLogs: () -> Unit,
+    onProfile: () -> Unit,
     onSearch: () -> Unit,
     onLogout: () -> Unit
 ) {
@@ -58,10 +59,13 @@ fun DashboardTopBar(
                         text = { 
                             Column {
                                 Text(text = userName, fontWeight = FontWeight.Bold)
-                                Text("Profile", style = MaterialTheme.typography.bodySmall)
+                                Text("View Profile", style = MaterialTheme.typography.bodySmall)
                             }
                         },
-                        onClick = { profileMenuExpanded = false },
+                        onClick = { 
+                            profileMenuExpanded = false
+                            onProfile()
+                        },
                         leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) }
                     )
                     if (isAdmin) {

@@ -9,6 +9,9 @@ interface PatientNotesDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertNote(note: PatientNotesEntity): Long
 
+    @Query("SELECT * FROM patient_notes WHERE id = :id LIMIT 1")
+    suspend fun getNoteById(id: Long): PatientNotesEntity?
+
     @Query("SELECT * FROM patient_notes WHERE patientId = :patientId AND isDeleted = 0 ORDER BY timestamp DESC")
     fun getNotesForPatient(patientId: String): Flow<List<PatientNotesEntity>>
 

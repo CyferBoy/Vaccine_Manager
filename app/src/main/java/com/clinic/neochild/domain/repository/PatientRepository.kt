@@ -29,4 +29,6 @@ interface PatientRepository {
     fun getNotes(patientId: String): Flow<List<PatientNotesEntity>>
     suspend fun addNote(patientId: String, content: String, author: String)
     suspend fun deleteNote(noteId: Long)
+
+    suspend fun refreshNotes()
 }

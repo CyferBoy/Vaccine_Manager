@@ -139,6 +139,10 @@ class SyncRepositoryImpl @Inject constructor(
                 "TRANSACTION" -> database.vaccineDao().getTransactionById(entityId.toLongOrNull() ?: -1L)
                 "FINANCE" -> database.financeDao().getTransactionById(entityId.toLongOrNull() ?: -1L)
                 "AUDIT_LOG" -> database.auditLogDao().getLogById(entityId.toLongOrNull() ?: -1L)
+                "STAFF" -> database.staffDao().getStaffById(entityId)
+                "USER" -> database.staffDao().getUserById(entityId)
+                "BORROW" -> database.borrowDao().getRecordById(entityId)
+                "PATIENT_NOTE" -> database.patientNotesDao().getNoteById(entityId.toLongOrNull() ?: -1L)
                 else -> null
             }
         } catch (e: Exception) {

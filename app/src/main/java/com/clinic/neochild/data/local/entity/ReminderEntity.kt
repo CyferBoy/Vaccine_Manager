@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import kotlinx.serialization.Serializable
 
 /**
  * Legacy support for ReminderEntity.
@@ -25,6 +26,7 @@ import androidx.room.PrimaryKey
         Index("dueDate")
     ]
 )
+@Serializable
 data class ReminderEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val patientId: String,

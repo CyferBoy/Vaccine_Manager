@@ -1,6 +1,7 @@
 package com.clinic.neochild.data.repository
 
 import com.clinic.neochild.data.local.database.AppDatabase
+import androidx.room.withTransaction
 import com.clinic.neochild.data.local.dao.*
 import com.clinic.neochild.data.local.entity.*
 import com.clinic.neochild.domain.model.Vaccine
@@ -32,6 +33,7 @@ class VaccineRepositoryImpl @Inject constructor(
     private val wasteDao = database.wasteDao()
     private val borrowDao = database.borrowDao()
     private val auditLogDao = database.auditLogDao()
+    private val syncQueueDao = database.syncQueueDao()
 
     override fun getInventory(): Flow<List<Vaccine>> {
         return combine(
@@ -52,13 +54,26 @@ class VaccineRepositoryImpl @Inject constructor(
                 // 1. Refresh Vaccines
                 val snap = firestore.collection("vaccines").get().await()
                 val vaccines = snap.documents.mapNotNull { FirestoreMappers.toVaccineEntity(it) }
-                vaccineDao.insertVaccines(vaccines)
                 
                 // 2. Refresh Batches
                 val batchSnap = firestore.collection("batches").get().await()
                 val batches = batchSnap.documents.mapNotNull { FirestoreMappers.toVaccineBatchEntity(it) }
-                vaccineDao.insertBatches(batches)
-            } catch (_: Exception) {}
+
+                database.withTransaction {
+                    for (v in vaccines) {
+                        if (!syncQueueDao.isUnsynced("VACCINE", v.id)) {
+                            vaccineDao.insertVaccine(v)
+                        }
+                    }
+                    for (b in batches) {
+                        if (!syncQueueDao.isUnsynced("BATCH", b.batchId)) {
+                            vaccineDao.insertBatch(b)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("VaccineRepo", "Refresh failed", e)
+            }
         }
     }
 
@@ -101,5 +116,22 @@ class VaccineRepositoryImpl @Inject constructor(
 
     override fun getVaccineTimeline(vaccineId: String): Flow<List<AuditLogEntity>> {
         return auditLogDao.getLogsForEntity("VACCINE", vaccineId)
+    }
+
+    override suspend fun refreshBorrowRecords() {
+        withContext(Dispatchers.IO) {
+            try {
+                val snapshot = firestore.collection("borrow").get().await()
+                val records = snapshot.documents.mapNotNull { FirestoreMappers.toBorrowEntity(it) }
+                database.withTransaction {
+                    for (remote in records) {
+                        // Borrow records usually use UUIDs as PK, so we can just insert
+                        borrowDao.insertRecord(remote.copy(isSynced = true))
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("VaccineRepo", "Borrow refresh failed", e)
+            }
+        }
     }
 }

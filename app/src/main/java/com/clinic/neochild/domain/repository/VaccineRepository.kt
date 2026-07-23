@@ -26,4 +26,6 @@ interface VaccineRepository {
     
     // Inventory Timeline
     fun getVaccineTimeline(vaccineId: String): Flow<List<AuditLogEntity>>
+
+    suspend fun refreshBorrowRecords()
 }

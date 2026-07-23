@@ -55,7 +55,6 @@ interface ReminderRepository {
     // Infrastructure / Internal
     fun triggerImmediateCheck()
     suspend fun refreshReminders()
-    suspend fun syncWithRemote()
     
     // Legacy support
     suspend fun markCompleted(id: Long, timestamp: Long = System.currentTimeMillis())

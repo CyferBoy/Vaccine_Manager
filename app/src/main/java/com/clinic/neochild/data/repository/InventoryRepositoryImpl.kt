@@ -33,6 +33,7 @@ class InventoryRepositoryImpl @Inject constructor(
 ) : InventoryRepository {
 
     private val vaccineDao = database.vaccineDao()
+    private val syncQueueDao = database.syncQueueDao()
 
     override fun getInventoryItems(
         query: String,
@@ -418,12 +419,25 @@ class InventoryRepositoryImpl @Inject constructor(
             try {
                 val vaccineSnapshot = firestore.collection("vaccines").get().await()
                 val vaccines = vaccineSnapshot.documents.mapNotNull { FirestoreMappers.toVaccineEntity(it) }
-                vaccineDao.insertVaccines(vaccines)
-
-                val batchSnapshot = firestore.collection("vaccine_batches").get().await()
+                
+                val batchSnapshot = firestore.collection("batches").get().await()
                 val batches = batchSnapshot.documents.mapNotNull { FirestoreMappers.toVaccineBatchEntity(it) }
-                vaccineDao.insertBatches(batches)
-            } catch (_: Exception) {}
+
+                database.withTransaction {
+                    for (v in vaccines) {
+                        if (!syncQueueDao.isUnsynced("VACCINE", v.id)) {
+                            vaccineDao.insertVaccine(v)
+                        }
+                    }
+                    for (b in batches) {
+                        if (!syncQueueDao.isUnsynced("BATCH", b.batchId)) {
+                            vaccineDao.insertBatch(b)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("InventoryRepo", "Refresh failed", e)
+            }
         }
     }
 }

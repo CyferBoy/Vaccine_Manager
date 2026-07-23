@@ -23,4 +23,6 @@ interface FinanceRepository {
         remarks: String?,
         recordedBy: String
     )
+
+    suspend fun refreshTransactions()
 }

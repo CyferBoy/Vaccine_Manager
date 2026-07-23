@@ -26,6 +26,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.util.UUID
 import java.util.Calendar
 import java.util.Date
@@ -50,6 +53,32 @@ class ReminderRepositoryImpl @Inject constructor(
     private val auditLogger: AuditLogger,
     @ApplicationContext private val context: Context
 ) : ReminderRepository {
+
+    private val json = Json { ignoreUnknownKeys = true }
+
+    private suspend fun logReminderUndoableChange(
+        reminder: ReminderEntity?,
+        action: String,
+        remarks: String? = null,
+        newValue: String? = null,
+        explicitEntityId: String? = null
+    ) {
+        val oldValueJson = reminder?.let { json.encodeToString(it) }
+        val entityId = explicitEntityId ?: if (reminder != null) {
+            "${reminder.patientId}||${reminder.originalVisitId}||${reminder.vaccineName}"
+        } else "UNKNOWN"
+        
+        auditLogger.recordLog(
+            module = "PATIENT",
+            entityType = "REMINDER",
+            entityId = entityId,
+            patientId = reminder?.patientId,
+            action = action,
+            oldValue = oldValueJson,
+            newValue = newValue,
+            remarks = remarks
+        )
+    }
 
     /**
      * Shared logic to combine raw entities into a processed list of vaccinations.
@@ -236,14 +265,12 @@ class ReminderRepositoryImpl @Inject constructor(
                     )
                     dueReminderDao.insertReminder(reminder)
                     
-                    auditLogger.recordLog(
-                        module = "PATIENT",
-                        entityType = "REMINDER",
-                        entityId = "${patientId}||${originalVisitId}||${name}",
+                    logReminderUndoableChange(
+                        reminder = null, 
                         action = "SCHEDULED",
-                        patientId = patientId,
+                        remarks = "Follow-up scheduled by $performedBy",
                         newValue = dueDate,
-                        remarks = "Follow-up scheduled by $performedBy"
+                        explicitEntityId = "${patientId}||${originalVisitId}||${name}"
                     )
 
                     enqueueReminderSync("REMINDER_STATE", patientId, originalVisitId, name, SyncOperation.CREATE, SyncPriority.MEDIUM)
@@ -259,6 +286,7 @@ class ReminderRepositoryImpl @Inject constructor(
                 val existing = dueReminderDao.getReminderByStableId(requirement.patientId, requirement.originalVisitId, requirement.vaccineName)
                 
                 if (existing != null) {
+                    logReminderUndoableChange(existing, "COMPLETED", "${requirement.vaccineName} marked done by $performedBy")
                     dueReminderDao.moveDueToCompleted(existing, performedBy, "Requirement satisfied")
                     enqueueReminderSync("REMINDER_STATE", existing.patientId, existing.originalVisitId, existing.vaccineName, SyncOperation.UPDATE, SyncPriority.MEDIUM)
                 } else {
@@ -272,18 +300,10 @@ class ReminderRepositoryImpl @Inject constructor(
                         performedBy = performedBy,
                         notes = "Requirement satisfied"
                     )
+                    logReminderUndoableChange(null, "COMPLETED", "${requirement.vaccineName} marked done by $performedBy", explicitEntityId = "${requirement.patientId}||${requirement.originalVisitId}||${requirement.vaccineName}")
                     dueReminderDao.insertReminder(completed)
                     enqueueReminderSync("REMINDER_STATE", requirement.patientId, requirement.originalVisitId, requirement.vaccineName, SyncOperation.CREATE, SyncPriority.MEDIUM)
                 }
-
-                auditLogger.recordLog(
-                    module = "PATIENT",
-                    entityType = "REMINDER",
-                    entityId = "${requirement.patientId}||${requirement.originalVisitId}||${requirement.vaccineName}",
-                    action = "COMPLETED",
-                    patientId = requirement.patientId,
-                    remarks = "${requirement.vaccineName} marked done by $performedBy"
-                )
             }
             triggerImmediateCheck()
         }
@@ -314,15 +334,12 @@ class ReminderRepositoryImpl @Inject constructor(
 
                 dueReminderDao.insertReminder(updated)
 
-                auditLogger.recordLog(
-                    module = "PATIENT",
-                    entityType = "REMINDER",
-                    entityId = "${requirement.patientId}||${requirement.originalVisitId}||${requirement.vaccineName}",
+                logReminderUndoableChange(
+                    reminder = existing, 
                     action = "RESCHEDULED",
-                    patientId = requirement.patientId,
-                    oldValue = existing?.dueDate,
+                    remarks = "Rescheduled: $reason",
                     newValue = newDate,
-                    remarks = "Rescheduled: $reason"
+                    explicitEntityId = "${requirement.patientId}||${requirement.originalVisitId}||${requirement.vaccineName}"
                 )
                 
                 enqueueReminderSync("REMINDER_STATE", requirement.patientId, requirement.originalVisitId, requirement.vaccineName, SyncOperation.UPDATE, SyncPriority.MEDIUM)
@@ -350,6 +367,14 @@ class ReminderRepositoryImpl @Inject constructor(
 
                 // 2. Update Reminder State
                 val existing = dueReminderDao.getReminderByStableId(requirement.patientId, requirement.originalVisitId, requirement.vaccineName)
+                
+                logReminderUndoableChange(
+                    reminder = existing,
+                    action = "EXTERNAL",
+                    remarks = "Vaccinated elsewhere: ${source.name}",
+                    explicitEntityId = "${requirement.patientId}||${requirement.originalVisitId}||${requirement.vaccineName}"
+                )
+
                 if (existing != null) {
                     dueReminderDao.moveDueToExternal(existing, source.name, date, performedBy, notes)
                 } else {
@@ -366,15 +391,6 @@ class ReminderRepositoryImpl @Inject constructor(
                     )
                     dueReminderDao.insertReminder(external)
                 }
-
-                auditLogger.recordLog(
-                    module = "PATIENT",
-                    entityType = "REMINDER",
-                    entityId = "${requirement.patientId}||${requirement.originalVisitId}||${requirement.vaccineName}",
-                    action = "EXTERNAL",
-                    patientId = requirement.patientId,
-                    remarks = "Vaccinated elsewhere: ${source.name}"
-                )
                 
                 enqueueReminderSync("REMINDER_STATE", requirement.patientId, requirement.originalVisitId, requirement.vaccineName, SyncOperation.UPDATE, SyncPriority.MEDIUM)
             }
@@ -387,6 +403,13 @@ class ReminderRepositoryImpl @Inject constructor(
             database.withTransaction {
                 val existing = dueReminderDao.getReminderByStableId(requirement.patientId, requirement.originalVisitId, requirement.vaccineName)
                 
+                logReminderUndoableChange(
+                    reminder = existing,
+                    action = "DISMISSED",
+                    remarks = "Dismissed: $reason",
+                    explicitEntityId = "${requirement.patientId}||${requirement.originalVisitId}||${requirement.vaccineName}"
+                )
+
                 if (existing != null) {
                     dueReminderDao.moveDueToDismissed(existing, performedBy, reason)
                 } else {
@@ -423,6 +446,7 @@ class ReminderRepositoryImpl @Inject constructor(
             database.withTransaction {
                 val existing = dueReminderDao.getReminderByStableId(requirement.patientId, requirement.originalVisitId, requirement.vaccineName)
                 if (existing != null) {
+                    logReminderUndoableChange(existing, "RESTORED", explicitEntityId = "${requirement.patientId}||${requirement.originalVisitId}||${requirement.vaccineName}")
                     val restored = existing.copy(
                         status = "ACTIVE",
                         updatedAt = System.currentTimeMillis(),
@@ -430,14 +454,6 @@ class ReminderRepositoryImpl @Inject constructor(
                     )
                     dueReminderDao.insertReminder(restored)
 
-                    auditLogger.recordLog(
-                        module = "PATIENT",
-                        entityType = "REMINDER",
-                        entityId = "${requirement.patientId}||${requirement.originalVisitId}||${requirement.vaccineName}",
-                        action = "RESTORED",
-                        patientId = requirement.patientId
-                    )
-                    
                     enqueueReminderSync("REMINDER_STATE", requirement.patientId, requirement.originalVisitId, requirement.vaccineName, SyncOperation.UPDATE, SyncPriority.MEDIUM)
                 }
             }
@@ -450,15 +466,8 @@ class ReminderRepositoryImpl @Inject constructor(
             database.withTransaction {
                 val existing = dueReminderDao.getReminderByStableId(requirement.patientId, requirement.originalVisitId, requirement.vaccineName)
                 if (existing != null) {
+                    logReminderUndoableChange(existing, "DELETED", explicitEntityId = "${requirement.patientId}||${requirement.originalVisitId}||${requirement.vaccineName}")
                     dueReminderDao.softDeleteReminder(existing.id)
-                    
-                    auditLogger.recordLog(
-                        module = "PATIENT",
-                        entityType = "REMINDER",
-                        entityId = "${requirement.patientId}||${requirement.originalVisitId}||${requirement.vaccineName}",
-                        action = "DELETED",
-                        patientId = requirement.patientId
-                    )
                     
                     enqueueReminderSync("REMINDER_STATE", existing.patientId, existing.originalVisitId, existing.vaccineName, SyncOperation.UPDATE, SyncPriority.LOW)
                 }
@@ -472,7 +481,45 @@ class ReminderRepositoryImpl @Inject constructor(
     }
 
     override suspend fun undoAction(auditId: Long, performedBy: String) {
-        // Implementation for future medical correction
+        withContext(Dispatchers.IO) {
+            val log = auditLogDao.getLogById(auditId) ?: return@withContext
+            if (log.entityType != "REMINDER") return@withContext
+
+            database.withTransaction {
+                try {
+                    val previousState = log.oldValue?.let { json.decodeFromString<ReminderEntity>(it) }
+                    
+                    if (previousState != null) {
+                        // Restore state from snapshot
+                        dueReminderDao.insertReminder(previousState.copy(isSynced = false))
+                        
+                        auditLogger.recordLog(
+                            module = "PATIENT",
+                            entityType = "REMINDER",
+                            entityId = log.entityId,
+                            action = "UNDO",
+                            patientId = log.patientId,
+                            remarks = "Undid action: ${log.action} by $performedBy"
+                        )
+                        
+                        val parts = log.entityId.split("||")
+                        if (parts.size == 3) {
+                            enqueueReminderSync("REMINDER_STATE", parts[0], parts[1], parts[2], SyncOperation.UPDATE, SyncPriority.HIGH)
+                        }
+                    } else if (log.action == "SCHEDULED") {
+                        // Undoing a creation means deletion
+                        val parts = log.entityId.split("||")
+                        if (parts.size == 3) {
+                            dueReminderDao.deleteReminder(parts[0], parts[1], parts[2])
+                            enqueueReminderSync("REMINDER_STATE", parts[0], parts[1], parts[2], SyncOperation.DELETE, SyncPriority.HIGH)
+                        }
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("ReminderRepo", "Undo failed", e)
+                }
+            }
+            triggerImmediateCheck()
+        }
     }
 
     override fun getAuditTrail(patientId: String): Flow<List<ReminderAuditEntity>> {
@@ -501,24 +548,45 @@ class ReminderRepositoryImpl @Inject constructor(
     override suspend fun refreshReminders() {
         withContext(Dispatchers.IO) {
             try {
-                val snap = firestore.collection("reminder_states").get().await()
+                val snap = firestore.collection("reminders").get().await()
                 val entities = snap.documents.mapNotNull { 
-                    // Need FirestoreMappers.toReminderEntity
-                    null // Placeholder
+                    FirestoreMappers.toReminderEntity(it)
                 }
-                // Sync logic ...
+                database.withTransaction {
+                    for (remote in entities) {
+                        // Check if we have a local version and if it's unsynced
+                        val local = dueReminderDao.getReminderByStableId(
+                            remote.patientId, 
+                            remote.originalVisitId, 
+                            remote.vaccineName
+                        )
+                        
+                        if (local == null || local.isSynced) {
+                            // Safe to overwrite or insert
+                            // We preserve the local autoincrement id if it exists to avoid row replacement
+                            val toSave = remote.copy(
+                                id = local?.id ?: 0L,
+                                isSynced = true
+                            )
+                            dueReminderDao.insertReminder(toSave)
+                        } else {
+                            // Local has unsynced changes, keep it for now
+                            // The sync engine will eventually push local changes to Firestore
+                        }
+                    }
+                }
+                android.util.Log.d("ReminderRepo", "Refreshed ${entities.size} reminders")
             } catch (e: Exception) {
                 android.util.Log.e("ReminderRepo", "Refresh failed", e)
             }
         }
     }
 
-    override suspend fun syncWithRemote() {}
-
     override suspend fun markCompleted(id: Long, timestamp: Long) {
         withContext(Dispatchers.IO) {
             val existing = dueReminderDao.getReminderById(id)
             if (existing != null) {
+                logReminderUndoableChange(existing, "COMPLETED", "Marked done via notification", explicitEntityId = "${existing.patientId}||${existing.originalVisitId}||${existing.vaccineName}")
                 markRequirementSatisfied(
                     PendingRequirement(existing.patientId, existing.vaccineName, PatientUtils.parseDate(existing.dueDate) ?: Date(), existing.originalVisitId),
                     "SYSTEM_NOTIFICATION"

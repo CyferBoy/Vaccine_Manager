@@ -8,8 +8,13 @@ import com.clinic.neochild.domain.repository.FinanceRepository
 import com.clinic.neochild.domain.repository.SyncRepository
 import com.clinic.neochild.core.model.SyncOperation
 import com.clinic.neochild.core.model.SyncPriority
+import com.clinic.neochild.data.remote.mapper.FirestoreMappers
 import com.clinic.neochild.core.logger.AuditLogger
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -17,6 +22,7 @@ import javax.inject.Singleton
 class FinanceRepositoryImpl @Inject constructor(
     private val database: AppDatabase,
     private val financeDao: FinanceDao,
+    private val firestore: FirebaseFirestore,
     private val syncRepository: SyncRepository,
     private val auditLogger: AuditLogger
 ) : FinanceRepository {
@@ -95,6 +101,25 @@ class FinanceRepositoryImpl @Inject constructor(
                 newValue = amount.toString(),
                 remarks = "Expense of $amount recorded in $category"
             )
+        }
+    }
+
+    override suspend fun refreshTransactions() {
+        withContext(Dispatchers.IO) {
+            try {
+                val snapshot = firestore.collection("finance").get().await()
+                val transactions = snapshot.documents.mapNotNull { FirestoreMappers.toFinanceEntity(it) }
+                database.withTransaction {
+                    for (remote in transactions) {
+                        val local = financeDao.getTransactionById(remote.id)
+                        if (local == null || local.isSynced) {
+                            financeDao.insertTransaction(remote.copy(isSynced = true))
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("FinanceRepo", "Refresh failed", e)
+            }
         }
     }
 }

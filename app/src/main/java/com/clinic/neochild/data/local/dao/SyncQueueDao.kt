@@ -38,4 +38,7 @@ interface SyncQueueDao {
 
     @Query("DELETE FROM sync_queue WHERE status = 'SYNCED'")
     suspend fun clearSynced()
+
+    @Query("SELECT EXISTS(SELECT 1 FROM sync_queue WHERE entityName = :name AND entityId = :id AND status != 'SYNCED')")
+    suspend fun isUnsynced(name: String, id: String): Boolean
 }

@@ -31,6 +31,7 @@ class WasteRepositoryImpl @Inject constructor(
 ) : WasteRepository {
 
     private val wasteDao = database.wasteDao()
+    private val syncQueueDao = database.syncQueueDao()
 
     override fun getAllWaste(): Flow<List<WasteRecord>> = 
         wasteDao.getAllWaste().map { list -> list.map { it.toDomain() } }
@@ -128,9 +129,15 @@ class WasteRepositoryImpl @Inject constructor(
             try {
                 val snapshot = firestore.collection("waste").get().await()
                 val wasteRecords = snapshot.documents.mapNotNull { FirestoreMappers.toWasteRecord(it) }
-                wasteDao.insertWasteRecords(wasteRecords.map { it.toEntity(isSynced = true) })
+                database.withTransaction {
+                    for (remote in wasteRecords) {
+                        if (!syncQueueDao.isUnsynced("WASTE", remote.id)) {
+                            wasteDao.insertWaste(remote.toEntity(isSynced = true))
+                        }
+                    }
+                }
             } catch (e: Exception) {
-                // Error handling
+                android.util.Log.e("WasteRepo", "Refresh failed", e)
             }
         }
     }

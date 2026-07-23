@@ -205,10 +205,15 @@ abstract class AppDatabase : RoomDatabase() {
                 // 1. Refactor Patients (Handle NULLs and NOT NULL constraints)
                 Log.d(TAG, "Migrating patients table...")
                 
+                // Safety: Ensure patientClinicId column exists (handles cases where it wasn't added in v18)
+                try {
+                    db.execSQL("ALTER TABLE patients ADD COLUMN patientClinicId TEXT")
+                } catch (_: Exception) {}
+
                 // Repair data in old table first
                 // CRITICAL: We use 'TEMP-' + id to ensure UNIQUE constraint doesn't fail 
                 // for multiple legacy patients before the MigrationWorker assigns real IDs.
-                db.execSQL("UPDATE patients SET patientClinicId = 'TEMP-' || id WHERE patientClinicId IS NULL OR patientClinicId = ''")
+                db.execSQL("UPDATE patients SET patientClinicId = 'TEMP-' || id WHERE patientClinicId IS NULL OR patientClinicId = '' OR patientClinicId = ' '")
                 db.execSQL("UPDATE patients SET isSynced = 1 WHERE isSynced IS NULL")
                 db.execSQL("UPDATE patients SET isDeleted = 0 WHERE isDeleted IS NULL")
                 

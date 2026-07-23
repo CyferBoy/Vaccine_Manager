@@ -39,11 +39,19 @@ class VaccinationRepositoryImpl @Inject constructor(
     override suspend fun refreshVaccinations() {
         withContext(Dispatchers.IO) {
             try {
-                val snapshot = firestore.collection("vaccinations").get().await()
+                val snapshot = firestore.collection("visits").get().await()
                 val vaccinations = snapshot.documents.mapNotNull { FirestoreMappers.toVaccination(it) }
-                vaccinationDao.insertVaccinations(vaccinations.map { it.toEntity() })
+                database.withTransaction {
+                    for (remote in vaccinations) {
+                        val local = vaccinationDao.getVaccinationById(remote.id)
+                        if (local == null || local.isSynced) {
+                            vaccinationDao.insertVaccination(remote.toEntity(isSynced = true))
+                        }
+                    }
+                }
+                android.util.Log.d("VaccinationRepo", "Refreshed ${vaccinations.size} vaccinations")
             } catch (e: Exception) {
-                // Error handling
+                android.util.Log.e("VaccinationRepo", "Refresh failed", e)
             }
         }
     }

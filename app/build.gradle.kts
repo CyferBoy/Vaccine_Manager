@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.google.services)
     alias(libs.plugins.kotlin.ksp)
     alias(libs.plugins.hilt)
+    kotlin("plugin.serialization") version libs.versions.kotlin.get()
 }
 
 android {
@@ -122,6 +123,7 @@ dependencies {
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.hilt.work)
     ksp(libs.androidx.hilt.compiler)
+    implementation(libs.kotlinx.serialization.json)
 
     // Firebase App Check
     implementation("com.google.firebase:firebase-appcheck-playintegrity")

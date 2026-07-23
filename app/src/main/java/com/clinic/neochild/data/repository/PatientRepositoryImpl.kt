@@ -129,8 +129,10 @@ class PatientRepositoryImpl @Inject constructor(
                                 }
                             }
 
-                            // Insert/Update
-                            patientDao.insertPatient(patient.copy(patientClinicId = localClinicId).toEntity())
+                            // Insert/Update only if local doesn't exist or is already synced
+                            if (existingLocal == null || existingLocal.isSynced) {
+                                patientDao.insertPatient(patient.copy(patientClinicId = localClinicId).toEntity(isSynced = true))
+                            }
                         } catch (e: Exception) {
                             android.util.Log.e("PatientRepo", "Insert failed for patient ${patient.id}", e)
                         }
@@ -151,6 +153,9 @@ class PatientRepositoryImpl @Inject constructor(
             val finalClinicId = if (patient.patientClinicId.isBlank()) {
                 idGenerator.generateUniqueClinicId()
             } else {
+                if (patient.patientClinicId.startsWith("TEMP-")) {
+                    throw IllegalArgumentException("Invalid Clinic ID format.")
+                }
                 if (!idGenerator.isIdUnique(patient.patientClinicId, patient.id)) {
                     throw IllegalStateException("A patient with Clinic ID ${patient.patientClinicId} already exists.")
                 }
@@ -227,5 +232,22 @@ class PatientRepositoryImpl @Inject constructor(
     override suspend fun deleteNote(noteId: Long) {
         notesDao.deleteNote(noteId)
         syncRepository.enqueue("PATIENT_NOTE", noteId.toString(), SyncOperation.DELETE, SyncPriority.LOW)
+    }
+
+    override suspend fun refreshNotes() {
+        withContext(Dispatchers.IO) {
+            try {
+                val snap = firestore.collection("patient_notes").get().await()
+                val entities = snap.documents.mapNotNull { FirestoreMappers.toPatientNoteEntity(it) }
+                database.withTransaction {
+                    for (remote in entities) {
+                        val local = notesDao.getNoteById(remote.id)
+                        if (local == null || local.isSynced) {
+                            notesDao.insertNote(remote.copy(isSynced = true))
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+        }
     }
 }

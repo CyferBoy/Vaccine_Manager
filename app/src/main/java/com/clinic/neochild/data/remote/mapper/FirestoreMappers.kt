@@ -165,6 +165,7 @@ object FirestoreMappers {
     fun toReminderEntity(doc: DocumentSnapshot): ReminderEntity? {
         return try {
             ReminderEntity(
+                id = doc.id.toLongOrNull() ?: 0L,
                 patientId = doc.getString("patientId") ?: "",
                 originalVisitId = doc.getString("originalVisitId") ?: "",
                 vaccineName = doc.getString("vaccineName") ?: "",
@@ -197,4 +198,97 @@ object FirestoreMappers {
     fun toCompletedReminderEntity(doc: DocumentSnapshot) = toReminderEntity(doc)
     fun toDismissedReminderEntity(doc: DocumentSnapshot) = toReminderEntity(doc)
     fun toExternalReminderEntity(doc: DocumentSnapshot) = toReminderEntity(doc)
+
+    fun toFinanceEntity(doc: DocumentSnapshot): FinanceEntity? {
+        return try {
+            FinanceEntity(
+                id = doc.id.toLongOrNull() ?: 0L,
+                timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis(),
+                type = doc.getString("type") ?: "INCOME",
+                category = doc.getString("category") ?: "OTHER",
+                amount = doc.getDouble("amount") ?: 0.0,
+                currency = doc.getString("currency") ?: "INR",
+                paymentMethod = doc.getString("paymentMethod") ?: "CASH",
+                patientId = doc.getString("patientId"),
+                visitId = doc.getString("visitId"),
+                referenceNumber = doc.getString("referenceNumber"),
+                remarks = doc.getString("remarks"),
+                recordedBy = doc.getString("recordedBy") ?: "SYSTEM",
+                isSynced = true
+            )
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    fun toBorrowEntity(doc: DocumentSnapshot): BorrowEntity? {
+        return try {
+            BorrowEntity(
+                id = doc.id,
+                doctorName = doc.getString("doctorName") ?: "",
+                vaccineId = doc.getString("vaccineId") ?: "",
+                batchId = doc.getString("batchId") ?: "",
+                borrowedDate = doc.getString("borrowedDate") ?: "",
+                quantity = doc.getLong("quantity")?.toInt() ?: 1,
+                isReturned = doc.getBoolean("isReturned") ?: false,
+                returnedDate = doc.getString("returnedDate"),
+                type = doc.getString("type") ?: "BY",
+                notes = doc.getString("notes"),
+                isSynced = true
+            )
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    fun toStaffEntity(doc: DocumentSnapshot): StaffEntity? {
+        return try {
+            StaffEntity(
+                id = doc.id,
+                name = doc.getString("name") ?: "",
+                email = doc.getString("email") ?: "",
+                role = doc.getString("role") ?: "Staff",
+                department = doc.getString("department"),
+                permissions = doc.getString("permissions"),
+                isActive = doc.getBoolean("isActive") ?: true,
+                createdAt = doc.getLong("createdAt") ?: System.currentTimeMillis(),
+                lastActive = doc.getLong("lastActive") ?: System.currentTimeMillis()
+            )
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    fun toUserEntity(doc: DocumentSnapshot): UserEntity? {
+        return try {
+            UserEntity(
+                id = doc.id,
+                email = doc.getString("email") ?: "",
+                name = doc.getString("name") ?: "",
+                biometricEnabled = doc.getBoolean("biometricEnabled") ?: false,
+                pinHash = doc.getString("pinHash"),
+                lastLogin = doc.getLong("lastLogin") ?: 0L,
+                devices = doc.getString("devices"),
+                securityStamp = doc.getString("securityStamp") ?: ""
+            )
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    fun toPatientNoteEntity(doc: DocumentSnapshot): PatientNotesEntity? {
+        return try {
+            PatientNotesEntity(
+                id = doc.id.toLongOrNull() ?: 0L,
+                patientId = doc.getString("patientId") ?: "",
+                content = doc.getString("content") ?: "",
+                author = doc.getString("author") ?: "",
+                timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis(),
+                isSynced = true,
+                isDeleted = doc.getBoolean("isDeleted") ?: false
+            )
+        } catch (_: Exception) {
+            null
+        }
+    }
 }

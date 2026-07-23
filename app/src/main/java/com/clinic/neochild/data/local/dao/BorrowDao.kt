@@ -9,6 +9,9 @@ interface BorrowDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertRecord(record: BorrowEntity)
 
+    @Query("SELECT * FROM borrow_records WHERE id = :id LIMIT 1")
+    suspend fun getRecordById(id: String): BorrowEntity?
+
     @Query("SELECT * FROM borrow_records WHERE vaccineId = :vaccineId")
     fun getRecordsForVaccine(vaccineId: String): Flow<List<BorrowEntity>>
 

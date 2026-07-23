@@ -167,31 +167,3 @@ fun DashboardSmallActionsRow(
         )
     }
 }
-
-@Composable
-fun DashboardSystemActionsRow(
-    onSync: () -> Unit,
-    onSettings: () -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        DashboardCardSmall(
-            title = "Cloud Sync",
-            icon = Icons.Default.Sync,
-            containerColor = if (isSystemInDarkTheme()) Color(0xFF1A237E) else Color(0xFFE8EAF6),
-            contentColor = if (isSystemInDarkTheme()) Color(0xFF9FA8DA) else Color(0xFF283593),
-            modifier = Modifier.weight(1f),
-            onClick = onSync
-        )
-        DashboardCardSmall(
-            title = "Settings",
-            icon = Icons.Default.Settings,
-            containerColor = if (isSystemInDarkTheme()) Color(0xFF263238) else Color(0xFFECEFF1),
-            contentColor = if (isSystemInDarkTheme()) Color(0xFF90A4AE) else Color(0xFF37474F),
-            modifier = Modifier.weight(1f),
-            onClick = onSettings
-        )
-    }
-}

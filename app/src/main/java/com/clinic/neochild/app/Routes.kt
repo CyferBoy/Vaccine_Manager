@@ -19,6 +19,7 @@ object Routes {
     const val SETTINGS = "settings"
     const val NOTIFICATION_SETTINGS = "notification_settings"
     const val SYNC = "sync"
+    const val AUDIT_LOGS = "audit_logs"
     const val MANAGE_STAFF = "manage_staff"
     const val SEARCH = "search"
     const val ADD_VACCINE = "add_vaccine"

@@ -111,6 +111,10 @@ class PatientViewModel @Inject constructor(
         }
     }
 
+    fun getPatientHistory(patientId: String): Flow<List<Vaccination>> {
+        return getVaccinationsUseCase.forPatient(patientId)
+    }
+
     fun getAuditLogs(patientId: String): Flow<List<AuditLogEntity>> {
         return patientRepository.getPatientTimeline(patientId)
     }

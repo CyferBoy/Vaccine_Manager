@@ -33,6 +33,7 @@ fun DashboardScreen(
     onLogout: () -> Unit = {},
     onSettings: () -> Unit = {},
     onSync: () -> Unit = {},
+    onAuditLogs: () -> Unit = {},
     onSearch: () -> Unit = {},
     authViewModel: AuthViewModel = hiltViewModel(),
     dashboardViewModel: DashboardViewModel = hiltViewModel()
@@ -60,6 +61,7 @@ fun DashboardScreen(
                     onManageStaff = onManageStaff,
                     onSettings = onSettings,
                     onSync = onSync,
+                    onAuditLogs = onAuditLogs,
                     onSearch = onSearch,
                     onLogout = {
                         authViewModel.logout()
@@ -110,13 +112,6 @@ fun DashboardScreen(
                         onBorrowed = onBorrowed,
                         onDue = onDue,
                         onWaste = onWaste
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    DashboardSystemActionsRow(
-                        onSync = onSync,
-                        onSettings = onSettings
                     )
                     
                     Spacer(modifier = Modifier.height(40.dp))

@@ -23,6 +23,7 @@ fun DashboardTopBar(
     onManageStaff: () -> Unit,
     onSettings: () -> Unit,
     onSync: () -> Unit,
+    onAuditLogs: () -> Unit,
     onSearch: () -> Unit,
     onLogout: () -> Unit
 ) {
@@ -33,6 +34,15 @@ fun DashboardTopBar(
         actions = {
             IconButton(onClick = onSearch) {
                 Icon(Icons.Default.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.onBackground)
+            }
+            IconButton(onClick = onSync) {
+                Icon(Icons.Default.Sync, contentDescription = "Sync", tint = MaterialTheme.colorScheme.onBackground)
+            }
+            IconButton(onClick = onAuditLogs) {
+                Icon(Icons.Default.History, contentDescription = "Audit Log", tint = MaterialTheme.colorScheme.onBackground)
+            }
+            IconButton(onClick = onSettings) {
+                Icon(Icons.Default.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.onBackground)
             }
             Box {
                 IconButton(onClick = { profileMenuExpanded = true }) {
@@ -62,23 +72,6 @@ fun DashboardTopBar(
                         },
                         onClick = { profileMenuExpanded = false },
                         leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) }
-                    )
-                    HorizontalDivider()
-                    DropdownMenuItem(
-                        text = { Text("Cloud Sync") },
-                        onClick = {
-                            profileMenuExpanded = false
-                            onSync()
-                        },
-                        leadingIcon = { Icon(Icons.Default.Sync, contentDescription = null) }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Settings") },
-                        onClick = {
-                            profileMenuExpanded = false
-                            onSettings()
-                        },
-                        leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) }
                     )
                     HorizontalDivider()
                     if (isAdmin) {

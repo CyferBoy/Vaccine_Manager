@@ -399,7 +399,7 @@ abstract class AppDatabase : RoomDatabase() {
                 // Map old column names if they differed (e.g., performedBy -> doctor, batchNumbers -> batchIds)
                 db.execSQL("""
                     INSERT INTO patient_visits (id, patientId, dateGiven, doctor, vaccineNames, vaccineIds, batchIds, notes, receiptNumber, totalPaid, nxtVaccineNames, nextDueDate, cost, cashAmount, onlineAmount, withFees, doctorsAcc, isDone, source, isSynced, isDeleted)
-                    SELECT id, patientId, dateGiven, performedBy, vaccineNames, vaccineIds, batchNumbers, notes, receiptNumber, totalPaid, nxtVaccineNames, nextDueDate, cost, cashAmount, onlineAmount, withFees, doctorsAcc, isDone, source, isSynced, isDeleted
+                    SELECT id, patientId, dateGiven, doctor, vaccineNames, vaccineIds, batchNumbers, notes, receiptNumber, totalPaid, nxtVaccineNames, nextDueDate, cost, cashAmount, onlineAmount, withFees, doctorsAcc, isDone, source, isSynced, isDeleted
                     FROM patient_visits_old
                 """)
                 db.execSQL("DROP TABLE `patient_visits_old`")

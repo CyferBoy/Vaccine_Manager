@@ -13,8 +13,8 @@ import com.clinic.neochild.features.patient.AddPatientScreen
 import com.clinic.neochild.features.patient.PatientDetailsScreen
 import com.clinic.neochild.features.patient.PatientListScreen
 import com.clinic.neochild.features.sync.SyncScreen
+import com.clinic.neochild.features.audit.FullAuditLogScreen
 import com.clinic.neochild.features.settings.SettingsScreen
-import com.clinic.neochild.features.settings.NotificationSettingsScreen
 import com.clinic.neochild.features.reminder.DueScreen
 import com.clinic.neochild.features.statistics.MonthlyFinanceDetailsScreen
 import com.clinic.neochild.features.statistics.StatisticsScreen
@@ -79,6 +79,9 @@ fun AppNavigation(
                 onSync = {
                     navController.navigate(Routes.SYNC)
                 },
+                onAuditLogs = {
+                    navController.navigate(Routes.AUDIT_LOGS)
+                },
                 onSearch = {
                     navController.navigate(Routes.SEARCH)
                 },
@@ -92,17 +95,16 @@ fun AppNavigation(
 
         composable(Routes.SETTINGS) {
             SettingsScreen(
-                onBack = { navController.popBackStack() },
-                onNavigateToNotifications = { navController.navigate(Routes.NOTIFICATION_SETTINGS) }
+                onBack = { navController.popBackStack() }
             )
-        }
-
-        composable(Routes.NOTIFICATION_SETTINGS) {
-            NotificationSettingsScreen(onBack = { navController.popBackStack() })
         }
 
         composable(Routes.SYNC) {
             SyncScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(Routes.AUDIT_LOGS) {
+            FullAuditLogScreen(onBack = { navController.popBackStack() })
         }
 
         composable(Routes.MANAGE_STAFF) {

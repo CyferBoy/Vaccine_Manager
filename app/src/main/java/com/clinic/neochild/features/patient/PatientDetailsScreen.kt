@@ -28,12 +28,8 @@ fun PatientDetailsScreen(
     val allPatients by viewModel.allPatients.collectAsState()
     val patient = remember(patientId, allPatients) { allPatients.find { it.id == patientId } }
     
-    val allVaccinations by viewModel.allVaccinations.collectAsState()
-    
-    // Derived state for patient vaccinations
-    val patientVaccinations = remember(patientId, allVaccinations) {
-        allVaccinations.filter { it.patientId == patientId }.sortedByDescending { parseDate(it.dateGiven) }
-    }
+    // Correct way to observe patient-specific history
+    val patientVaccinations by viewModel.getPatientHistory(patientId).collectAsState(initial = emptyList())
 
     var vaccinationToDelete by remember { mutableStateOf<Vaccination?>(null) }
     var vaccinationToMarkDone by remember { mutableStateOf<Vaccination?>(null) }

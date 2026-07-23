@@ -167,7 +167,7 @@ class MainActivity : FragmentActivity() {
 
             // 2. Update staff collection (Only if user has a profile)
             firestore.collection("staff").document(currentUser.uid)
-                .update(updateData)
+                .set(updateData, SetOptions.merge())
         }
     }
 

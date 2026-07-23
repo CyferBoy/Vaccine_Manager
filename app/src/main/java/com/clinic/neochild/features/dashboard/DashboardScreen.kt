@@ -57,7 +57,7 @@ fun DashboardScreen(
             containerColor = Color.Transparent,
             topBar = {
                 DashboardTopBar(
-                    userName = authViewModel.currentUser?.email?.split("@")?.firstOrNull()?.replaceFirstChar { it.uppercase() } ?: "User",
+                    userName = uiState.userName,
                     isAdmin = isAdmin,
                     onManageStaff = onManageStaff,
                     onSettings = onSettings,

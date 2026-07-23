@@ -29,6 +29,7 @@ fun ActionDropdownMenu(
     onDownload: (() -> Unit)? = null,
     onMerge: (() -> Unit)? = null,
     onMarkAsDone: (() -> Unit)? = null,
+    onEditRole: (() -> Unit)? = null,
     editText: String = "Edit"
 ) {
     DropdownMenu(
@@ -74,6 +75,16 @@ fun ActionDropdownMenu(
             },
             leadingIcon = { Icon(if (editText == "Edit") Icons.Default.Edit else Icons.Default.LockReset, contentDescription = null) }
         )
+        if (onEditRole != null) {
+            DropdownMenuItem(
+                text = { Text("Change Role") },
+                onClick = {
+                    onDismiss()
+                    onEditRole()
+                },
+                leadingIcon = { Icon(Icons.Default.AdminPanelSettings, contentDescription = null) }
+            )
+        }
         if (onMerge != null) {
             DropdownMenuItem(
                 text = { Text("Merge") },

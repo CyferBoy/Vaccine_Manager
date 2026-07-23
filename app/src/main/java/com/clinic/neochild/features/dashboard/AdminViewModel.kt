@@ -165,6 +165,21 @@ class AdminViewModel @Inject constructor(
             }
     }
 
+    fun updateStaffRole(staffId: String, newRole: String) {
+        _uiState.value = _uiState.value.copy(isLoading = true, error = null, success = null)
+        db.collection("staff").document(staffId).set(mapOf("role" to newRole), com.google.firebase.firestore.SetOptions.merge())
+            .addOnSuccessListener {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    success = "Role updated to $newRole"
+                )
+                fetchStaff()
+            }
+            .addOnFailureListener {
+                _uiState.value = _uiState.value.copy(isLoading = false, error = it.message)
+            }
+    }
+
     fun clearMessages() {
         _uiState.value = _uiState.value.copy(error = null, success = null)
     }

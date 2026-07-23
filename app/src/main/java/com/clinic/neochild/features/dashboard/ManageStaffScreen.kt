@@ -2,6 +2,7 @@ package com.clinic.neochild.features.dashboard
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -41,8 +42,10 @@ fun ManageStaffScreen(
     var isSearchActive by rememberSaveable { mutableStateOf(false) }
     var showAddDialog by rememberSaveable { mutableStateOf(false) }
     var showResetPasswordDialog by rememberSaveable { mutableStateOf(false) }
+    var showChangeRoleDialog by rememberSaveable { mutableStateOf(false) }
     var staffToDelete by remember { mutableStateOf<Staff?>(null) }
     var staffToResetPassword by remember { mutableStateOf<Staff?>(null) }
+    var staffToChangeRole by remember { mutableStateOf<Staff?>(null) }
 
     val filteredStaff = remember(uiState.staffList, searchQuery) {
         if (searchQuery.isBlank()) uiState.staffList
@@ -91,6 +94,21 @@ fun ManageStaffScreen(
             showResetPasswordDialog = false
             staffToResetPassword = null
         },
+        showChangeRoleDialog = showChangeRoleDialog,
+        staffToChangeRole = staffToChangeRole,
+        onStaffChangeRoleRequest = {
+            staffToChangeRole = it
+            showChangeRoleDialog = true
+        },
+        onConfirmRoleChange = { newRole ->
+            staffToChangeRole?.let { viewModel.updateStaffRole(it.id, newRole) }
+            showChangeRoleDialog = false
+            staffToChangeRole = null
+        },
+        onCancelRoleChange = {
+            showChangeRoleDialog = false
+            staffToChangeRole = null
+        },
         onClearMessages = { viewModel.clearMessages() }
     )
 }
@@ -118,6 +136,11 @@ private fun ManageStaffContent(
     onStaffResetPasswordRequest: (Staff) -> Unit,
     onResetPasswordConfirm: () -> Unit,
     onResetPasswordCancel: () -> Unit,
+    showChangeRoleDialog: Boolean,
+    staffToChangeRole: Staff?,
+    onStaffChangeRoleRequest: (Staff) -> Unit,
+    onConfirmRoleChange: (String) -> Unit,
+    onCancelRoleChange: () -> Unit,
     onClearMessages: () -> Unit
 ) {
     DeleteConfirmationDialog(
@@ -143,6 +166,14 @@ private fun ManageStaffContent(
                     Text("Cancel")
                 }
             }
+        )
+    }
+
+    if (showChangeRoleDialog && staffToChangeRole != null) {
+        ChangeRoleDialog(
+            staff = staffToChangeRole,
+            onDismiss = onCancelRoleChange,
+            onConfirm = onConfirmRoleChange
         )
     }
 
@@ -186,7 +217,8 @@ private fun ManageStaffContent(
                 isLoading = uiState.isLoading && uiState.staffList.isEmpty(),
                 staffMembers = filteredStaff,
                 onDeleteRequest = onStaffDeleteRequest,
-                onResetPasswordRequest = onStaffResetPasswordRequest
+                onResetPasswordRequest = onStaffResetPasswordRequest,
+                onChangeRoleRequest = onStaffChangeRoleRequest
             )
         }
     }
@@ -198,7 +230,8 @@ private fun StaffList(
     isLoading: Boolean,
     staffMembers: List<Staff>,
     onDeleteRequest: (Staff) -> Unit,
-    onResetPasswordRequest: (Staff) -> Unit
+    onResetPasswordRequest: (Staff) -> Unit,
+    onChangeRoleRequest: (Staff) -> Unit
 ) {
     if (isLoading) {
         Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
@@ -221,7 +254,8 @@ private fun StaffList(
                 StaffCard(
                     staff = staff, 
                     onDeleteRequest = { onDeleteRequest(staff) },
-                    onResetPasswordRequest = { onResetPasswordRequest(staff) }
+                    onResetPasswordRequest = { onResetPasswordRequest(staff) },
+                    onChangeRoleRequest = { onChangeRoleRequest(staff) }
                 )
             }
         }
@@ -233,7 +267,8 @@ private fun StaffList(
 private fun StaffCard(
     staff: Staff,
     onDeleteRequest: () -> Unit,
-    onResetPasswordRequest: () -> Unit
+    onResetPasswordRequest: () -> Unit,
+    onChangeRoleRequest: () -> Unit
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
 
@@ -317,6 +352,7 @@ private fun StaffCard(
                     onDismiss = { menuExpanded = false },
                     onEdit = onResetPasswordRequest,
                     editText = "Reset Password",
+                    onEditRole = onChangeRoleRequest,
                     onDelete = onDeleteRequest
                 )
             }
@@ -396,6 +432,55 @@ private fun AddStaffDialog(
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ChangeRoleDialog(
+    staff: Staff,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var selectedRole by remember { mutableStateOf(staff.role) }
+    val roles = listOf("Staff", "Nurse", "Doctor", "Admin")
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Change Role for ${staff.name}") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                roles.forEach { role ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .selectable(
+                                selected = selectedRole == role,
+                                onClick = { selectedRole = role }
+                            )
+                            .padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = selectedRole == role,
+                            onClick = { selectedRole = role }
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(role)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onConfirm(selectedRole) }) {
+                Text("Confirm")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
 @Preview(showBackground = true)
 @Composable
 private fun ManageStaffPreview() {
@@ -423,6 +508,11 @@ private fun ManageStaffPreview() {
             onStaffResetPasswordRequest = {},
             onResetPasswordConfirm = {},
             onResetPasswordCancel = {},
+            showChangeRoleDialog = false,
+            staffToChangeRole = null,
+            onStaffChangeRoleRequest = {},
+            onConfirmRoleChange = {},
+            onCancelRoleChange = {},
             onClearMessages = {}
         )
     }

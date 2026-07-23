@@ -3,11 +3,17 @@
 Neo Child Clinic is a modern Android application designed for pediatric clinics to manage patient records, vaccination schedules, and consultations efficiently.
 
 ## Recent Updates (v1.2)
+- **Biometric Security Lock:** Integrated Android Biometric API for secure app access with configurable inactivity timeouts and "Always Authenticate" options.
+- **Full Clinic Audit Log:** App-wide historical tracking for every medical and administrative action, including patient registration, vaccinations, and inventory changes.
+- **Redesigned Expandable Settings:** Consolidated notification, inventory, backup, and security settings into a clean, accordion-style user interface.
+- **Comprehensive Profile Page:** Personalized user view showing clinic role, membership duration, and administrative actions.
+- **Staff Management Upgrades:** Ability to reset staff passwords via automated emails and a unified view of all authenticated clinic users.
 - **Sequential Clinic ID System:** Replaced random ID generation with a production-safe sequential system (`NEO-1000`, `NEO-1001`). 
 - **Automated Legacy Migration:** One-time background migration job to assign sequential IDs to all existing patients without data loss.
 - **Improved Room Schema Integrity:** Critical repair of the database migration path to ensure 100% schema alignment and prevent crashes on existing installations.
+- **Enhanced Data Integrity:** Automated "Requirement Satisfaction" logic that closes alerts when matching vaccines are administered manually.
+- **UI/UX Refinements:** Added password visibility toggles, organized navigation menus with dividers, and optimized dashboard tiles for better readability.
 - **Offline-First ID Assignment:** New IDs are assigned locally and queued for background sync, ensuring functionality even without internet.
-- **Enhanced UI Visibility:** Patients without assigned IDs are now clearly marked as "Not Assigned" instead of being hidden, ensuring full database visibility.
 - **Data Deduplication Logic:** Intelligent conflict resolution that preserves unique clinic IDs across multiple devices and sync cycles.
 
 ## Previous Updates (v1.1)

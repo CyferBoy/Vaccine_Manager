@@ -20,7 +20,6 @@ data class VaccineEntity(
     val doseSchedule: String? = null, // JSON
     val storageDetails: String? = null,
     
-    val lowStockThreshold: Int = 5,
     val lastUpdated: Long = System.currentTimeMillis(),
     val isDeleted: Boolean = false
 )

@@ -103,8 +103,7 @@ object FirestoreMappers {
                 id = doc.id,
                 type = doc.getString("type") ?: "",
                 brandName = doc.getString("brandName") ?: "",
-                companyName = doc.getString("companyName") ?: "",
-                lowStockThreshold = doc.getLong("lowStockThreshold")?.toInt() ?: 5
+                companyName = doc.getString("companyName") ?: ""
             )
         } catch (_: Exception) {
             null

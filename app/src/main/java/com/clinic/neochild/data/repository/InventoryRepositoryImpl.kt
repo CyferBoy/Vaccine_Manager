@@ -14,6 +14,7 @@ import com.clinic.neochild.data.remote.mapper.FirestoreMappers
 import com.clinic.neochild.domain.model.*
 import com.clinic.neochild.domain.repository.InventoryRepository
 import com.clinic.neochild.domain.repository.SyncRepository
+import com.clinic.neochild.features.settings.NotificationSettingsManager
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -29,7 +30,8 @@ class InventoryRepositoryImpl @Inject constructor(
     private val database: AppDatabase,
     private val firestore: FirebaseFirestore,
     private val syncRepository: SyncRepository,
-    private val auditLogger: AuditLogger
+    private val auditLogger: AuditLogger,
+    private val settingsManager: NotificationSettingsManager
 ) : InventoryRepository {
 
     private val vaccineDao = database.vaccineDao()
@@ -42,15 +44,17 @@ class InventoryRepositoryImpl @Inject constructor(
     ): Flow<List<InventoryItem>> {
         return combine(
             vaccineDao.getAllVaccines(),
-            vaccineDao.getAllBatches()
-        ) { vaccines, allBatches ->
+            vaccineDao.getAllBatches(),
+            settingsManager.settingsFlow
+        ) { vaccines, allBatches, settings ->
+            val globalThreshold = settings.lowStockThreshold
             vaccines.map { vaccine ->
                 val batches = allBatches.filter { it.vaccineId == vaccine.id && !it.isDeleted }
                 val totalStock = batches.sumOf { it.remainingQuantity }
                 
                 val hasExpired = batches.any { InventoryUtils.isExpired(it.expiryDate) }
                 val isNearExpiry = batches.any { InventoryUtils.isNearExpiry(it.expiryDate) }
-                val isLowStock = totalStock > 0 && totalStock <= vaccine.lowStockThreshold
+                val isLowStock = totalStock > 0 && totalStock <= globalThreshold
                 val isOutOfStock = totalStock <= 0
                 val activeBatches = batches.filter { it.remainingQuantity > 0 && !InventoryUtils.isExpired(it.expiryDate) }
 
@@ -58,7 +62,7 @@ class InventoryRepositoryImpl @Inject constructor(
                     id = vaccine.id,
                     brandName = vaccine.brandName,
                     stock = totalStock,
-                    threshold = vaccine.lowStockThreshold,
+                    threshold = globalThreshold,
                     type = vaccine.type,
                     company = vaccine.companyName,
                     batches = batches.sortedBy { parseDate(it.expiryDate) },

@@ -30,7 +30,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         FinanceEntity::class,
         BorrowEntity::class
     ], 
-    version = 20,
+    version = 21,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -465,6 +465,42 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_20_21 = object : Migration(20, 21) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                Log.i(TAG, "Starting Migration 20 -> 21 (Removing lowStockThreshold from vaccines)")
+                
+                // Create temporary table
+                db.execSQL("""
+                    CREATE TABLE `vaccines_new` (
+                        `id` TEXT NOT NULL, 
+                        `type` TEXT NOT NULL, 
+                        `brandName` TEXT NOT NULL, 
+                        `companyName` TEXT NOT NULL, 
+                        `manufacturer` TEXT, 
+                        `category` TEXT, 
+                        `doseSchedule` TEXT, 
+                        `storageDetails` TEXT, 
+                        `lastUpdated` INTEGER NOT NULL, 
+                        `isDeleted` INTEGER NOT NULL, 
+                        PRIMARY KEY(`id`)
+                    )
+                """)
+                
+                // Copy data
+                db.execSQL("""
+                    INSERT INTO vaccines_new (id, type, brandName, companyName, manufacturer, category, doseSchedule, storageDetails, lastUpdated, isDeleted)
+                    SELECT id, type, brandName, companyName, manufacturer, category, doseSchedule, storageDetails, lastUpdated, isDeleted
+                    FROM vaccines
+                """)
+                
+                // Switch tables
+                db.execSQL("DROP TABLE vaccines")
+                db.execSQL("ALTER TABLE vaccines_new RENAME TO vaccines")
+                
+                Log.i(TAG, "Migration 20 -> 21 completed.")
+            }
+        }
+
 
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
@@ -506,7 +542,7 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                 .openHelperFactory(factory)
                 .setJournalMode(JournalMode.TRUNCATE)
-                .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20)
+                .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21)
                 .fallbackToDestructiveMigrationOnDowngrade()
                 .build()
                 INSTANCE = instance

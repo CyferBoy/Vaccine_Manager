@@ -35,15 +35,6 @@ fun DashboardTopBar(
             IconButton(onClick = onSearch) {
                 Icon(Icons.Default.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.onBackground)
             }
-            IconButton(onClick = onSync) {
-                Icon(Icons.Default.Sync, contentDescription = "Sync", tint = MaterialTheme.colorScheme.onBackground)
-            }
-            IconButton(onClick = onAuditLogs) {
-                Icon(Icons.Default.History, contentDescription = "Audit Log", tint = MaterialTheme.colorScheme.onBackground)
-            }
-            IconButton(onClick = onSettings) {
-                Icon(Icons.Default.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.onBackground)
-            }
             Box {
                 IconButton(onClick = { profileMenuExpanded = true }) {
                     Surface(
@@ -73,7 +64,6 @@ fun DashboardTopBar(
                         onClick = { profileMenuExpanded = false },
                         leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) }
                     )
-                    HorizontalDivider()
                     if (isAdmin) {
                         DropdownMenuItem(
                             text = { Text("Manage Staff") },
@@ -83,8 +73,33 @@ fun DashboardTopBar(
                             },
                             leadingIcon = { Icon(Icons.Default.AdminPanelSettings, contentDescription = null) }
                         )
-                        HorizontalDivider()
                     }
+                    HorizontalDivider()
+                    DropdownMenuItem(
+                        text = { Text("Cloud Sync") },
+                        onClick = {
+                            profileMenuExpanded = false
+                            onSync()
+                        },
+                        leadingIcon = { Icon(Icons.Default.Sync, contentDescription = null) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Audit Log") },
+                        onClick = {
+                            profileMenuExpanded = false
+                            onAuditLogs()
+                        },
+                        leadingIcon = { Icon(Icons.Default.History, contentDescription = null) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Settings") },
+                        onClick = {
+                            profileMenuExpanded = false
+                            onSettings()
+                        },
+                        leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) }
+                    )
+                    HorizontalDivider()
                     DropdownMenuItem(
                         text = { Text("Logout") },
                         onClick = {

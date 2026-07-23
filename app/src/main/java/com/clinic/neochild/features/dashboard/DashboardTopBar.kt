@@ -55,13 +55,16 @@ fun DashboardTopBar(
                     expanded = profileMenuExpanded,
                     onDismissRequest = { profileMenuExpanded = false }
                 ) {
+                    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                        Text(
+                            text = userName,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                     DropdownMenuItem(
-                        text = { 
-                            Column {
-                                Text(text = userName, fontWeight = FontWeight.Bold)
-                                Text("View Profile", style = MaterialTheme.typography.bodySmall)
-                            }
-                        },
+                        text = { Text("View Profile") },
                         onClick = { 
                             profileMenuExpanded = false
                             onProfile()

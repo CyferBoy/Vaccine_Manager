@@ -165,9 +165,9 @@ class MainActivity : FragmentActivity() {
             firestore.collection("users").document(currentUser.uid)
                 .set(mapOf("email" to currentUser.email, "fcmToken" to token), SetOptions.merge())
 
-            // 2. Update staff collection (Only if user has a profile)
+            // 2. Update staff collection (ONLY if user already has a profile)
             firestore.collection("staff").document(currentUser.uid)
-                .set(updateData, SetOptions.merge())
+                .update(updateData)
         }
     }
 

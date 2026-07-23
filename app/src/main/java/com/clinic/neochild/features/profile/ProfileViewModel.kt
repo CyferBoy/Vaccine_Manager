@@ -76,10 +76,18 @@ class ProfileViewModel @Inject constructor(
                 }
                 currentUser.updateProfile(profileUpdates).await()
 
-                // 2. Update Firestore documents (using set with merge to ensure it works even if doc doesn't exist)
+                // 2. Update Firestore documents
                 val updateData = mapOf("name" to newName)
-                db.collection("staff").document(currentUser.uid).set(updateData, SetOptions.merge()).await()
+                
+                // Update users (Always exists for logged in users)
                 db.collection("users").document(currentUser.uid).set(updateData, SetOptions.merge()).await()
+                
+                // Update staff ONLY if it already exists (do not auto-create)
+                try {
+                    db.collection("staff").document(currentUser.uid).update(updateData).await()
+                } catch (_: Exception) {
+                    // Ignore if staff doc doesn't exist
+                }
                 
                 _uiState.value = _uiState.value.copy(
                     staff = _uiState.value.staff?.copy(name = newName),

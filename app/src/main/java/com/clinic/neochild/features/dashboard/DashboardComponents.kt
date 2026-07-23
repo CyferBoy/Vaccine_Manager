@@ -161,7 +161,6 @@ fun DashboardSmallActionsRow(
             icon = Icons.Default.DeleteSweep,
             containerColor = if (isSystemInDarkTheme()) DarkRedContainer else Color(0xFFFBE9E7),
             contentColor = if (isSystemInDarkTheme()) DarkOnRedContainer else Color(0xFFBF360C),
-            badge = if (uiState.wasteCount > 0) uiState.wasteCount.toString() else null,
             modifier = Modifier.weight(1f),
             onClick = onWaste
         )

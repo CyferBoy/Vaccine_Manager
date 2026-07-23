@@ -1,6 +1,5 @@
 package com.clinic.neochild.features.profile
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -14,8 +13,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import android.widget.Toast
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.clinic.neochild.core.ui.AppBackground
 import com.clinic.neochild.core.ui.StandardTextField
@@ -31,6 +32,7 @@ fun ProfileScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showEditNameDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     if (showEditNameDialog && uiState.staff != null) {
         EditNameDialog(
@@ -46,9 +48,15 @@ fun ProfileScreen(
         )
     }
 
-    LaunchedEffect(uiState.success) {
-        if (uiState.success != null) {
+    LaunchedEffect(uiState.success, uiState.error) {
+        uiState.success?.let {
+            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
             showEditNameDialog = false
+            viewModel.clearMessages()
+        }
+        uiState.error?.let {
+            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+            viewModel.clearMessages()
         }
     }
 

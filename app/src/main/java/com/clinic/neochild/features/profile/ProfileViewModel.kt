@@ -5,7 +5,9 @@ import androidx.lifecycle.viewModelScope
 import com.clinic.neochild.data.remote.mapper.FirestoreMappers
 import com.clinic.neochild.domain.model.Staff
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.userProfileChangeRequest
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -68,8 +70,16 @@ class ProfileViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null, success = null)
             try {
-                db.collection("staff").document(currentUser.uid).update("name", newName).await()
-                db.collection("users").document(currentUser.uid).update("name", newName).await()
+                // 1. Update Firebase Auth Profile
+                val profileUpdates = userProfileChangeRequest {
+                    displayName = newName
+                }
+                currentUser.updateProfile(profileUpdates).await()
+
+                // 2. Update Firestore documents (using set with merge to ensure it works even if doc doesn't exist)
+                val updateData = mapOf("name" to newName)
+                db.collection("staff").document(currentUser.uid).set(updateData, SetOptions.merge()).await()
+                db.collection("users").document(currentUser.uid).set(updateData, SetOptions.merge()).await()
                 
                 _uiState.value = _uiState.value.copy(
                     staff = _uiState.value.staff?.copy(name = newName),
@@ -77,7 +87,7 @@ class ProfileViewModel @Inject constructor(
                     success = "Name updated successfully"
                 )
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(error = e.message, isLoading = false)
+                _uiState.value = _uiState.value.copy(error = e.message ?: "Update failed", isLoading = false)
             }
         }
     }

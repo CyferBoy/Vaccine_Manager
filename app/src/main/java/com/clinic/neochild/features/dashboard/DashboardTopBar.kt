@@ -8,6 +8,7 @@ import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
@@ -43,12 +44,14 @@ fun DashboardTopBar(
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.primaryContainer
                     ) {
-                        Icon(
-                            Icons.Default.Person,
-                            contentDescription = "Profile",
-                            modifier = Modifier.padding(4.dp),
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = userName,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
                     }
                 }
                 DropdownMenu(
@@ -57,7 +60,7 @@ fun DashboardTopBar(
                 ) {
                     Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                         Text(
-                            text = userName,
+                            text = userName.replaceFirstChar { it.uppercase() },
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary

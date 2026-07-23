@@ -51,7 +51,7 @@ class ProfileViewModel @Inject constructor(
                     val staff = Staff(
                         id = currentUser.uid,
                         email = currentUser.email ?: "",
-                        name = currentUser.displayName ?: currentUser.email?.split("@")?.firstOrNull() ?: "User",
+                        name = currentUser.displayName ?: currentUser.email ?: "User",
                         role = "User",
                         createdAt = currentUser.metadata?.creationTimestamp ?: 0L
                     )

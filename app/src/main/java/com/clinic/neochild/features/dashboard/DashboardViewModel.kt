@@ -38,9 +38,8 @@ class DashboardViewModel @Inject constructor(
 
     private fun fetchUserName() {
         val currentUser = auth.currentUser ?: return
-        val email = currentUser.email ?: ""
-        val fallbackName = email.split("@").firstOrNull()?.replaceFirstChar { it.uppercase() } ?: "User"
-        _userName.value = fallbackName
+        val email = currentUser.email ?: "User"
+        _userName.value = email // Use full email as fallback
 
         db.collection("staff").document(currentUser.uid).get()
             .addOnSuccessListener { doc ->

@@ -23,4 +23,5 @@ data class Vaccination(
     val status: ReminderStatus = ReminderStatus.ACTIVE,
     val batchNumbers: List<String> = emptyList(),
     val expiryDates: List<String> = emptyList(),
+    val inventoryStatus: String = "PENDING"
 )

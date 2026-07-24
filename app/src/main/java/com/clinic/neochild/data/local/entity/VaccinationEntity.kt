@@ -52,6 +52,7 @@ data class VisitEntity(
     val doctorsAcc: Boolean = false,
     val isDone: Boolean = true,
     val source: String = "CLINIC",
+    val inventoryStatus: String = "PENDING",
     
     val isSynced: Boolean = true,
     val isDeleted: Boolean = false
@@ -80,7 +81,8 @@ fun VisitEntity.toVaccination() = Vaccination(
     notes = notes,
     performedBy = doctor,
     batchNumbers = if (batchIds.isBlank()) emptyList() else batchIds.split(","),
-    expiryDates = emptyList() // Not stored directly in visit anymore, link to batch
+    expiryDates = emptyList(), // Not stored directly in visit anymore, link to batch
+    inventoryStatus = inventoryStatus
 )
 
 fun Vaccination.toEntity(isSynced: Boolean = true) = VisitEntity(
@@ -103,5 +105,6 @@ fun Vaccination.toEntity(isSynced: Boolean = true) = VisitEntity(
     notes = notes,
     doctor = performedBy,
     batchIds = batchNumbers.joinToString(","),
+    inventoryStatus = inventoryStatus,
     isSynced = isSynced
 )

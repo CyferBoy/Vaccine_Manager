@@ -7,6 +7,7 @@ import com.clinic.neochild.data.local.entity.VaccineBatchEntity
 import com.clinic.neochild.domain.model.InventoryFilter
 import com.clinic.neochild.domain.model.Vaccination
 import com.clinic.neochild.domain.model.Vaccine
+import com.clinic.neochild.domain.usecase.inventory.ReconcileInventoryUseCase
 import com.clinic.neochild.domain.usecase.vaccination.CompleteVaccinationUseCase
 import com.clinic.neochild.domain.usecase.vaccination.GetVaccinationsUseCase
 import com.clinic.neochild.domain.repository.InventoryRepository
@@ -51,6 +52,7 @@ class AddVaccinationViewModel @Inject constructor(
     private val inventoryRepository: InventoryRepository,
     private val completeVaccinationUseCase: CompleteVaccinationUseCase,
     private val getVaccinationsUseCase: GetVaccinationsUseCase,
+    private val reconcileInventoryUseCase: ReconcileInventoryUseCase,
     private val reminderRepository: ReminderRepository,
     private val settingsManager: NotificationSettingsManager
 ) : ViewModel() {
@@ -68,7 +70,7 @@ class AddVaccinationViewModel @Inject constructor(
     private fun observeInventory() {
         viewModelScope.launch {
             combine(
-                inventoryRepository.getInventoryItems(filter = InventoryFilter.AVAILABLE),
+                inventoryRepository.getInventoryItems(filter = InventoryFilter.ALL),
                 settingsManager.settingsFlow
             ) { items, _ ->
                 val vaccines = items.map { item ->
@@ -100,9 +102,12 @@ class AddVaccinationViewModel @Inject constructor(
 
     fun onVaccineSelected(vaccine: Vaccine) {
         val batches = _uiState.value.activeBatches[vaccine.id] ?: emptyList()
-        if (batches.size == 1) {
+        if (batches.isEmpty()) {
+            // Out of stock case
+            addVaccineToForm(vaccine, null)
+        } else if (batches.size == 1) {
             addVaccineToForm(vaccine, batches.first())
-        } else if (batches.size > 1) {
+        } else {
             _uiState.update { it.copy(vaccineRequiringBatchSelection = vaccine) }
         }
     }
@@ -116,14 +121,14 @@ class AddVaccinationViewModel @Inject constructor(
         _uiState.update { it.copy(vaccineRequiringBatchSelection = null) }
     }
 
-    private fun addVaccineToForm(vaccine: Vaccine, batch: VaccineBatchEntity) {
+    private fun addVaccineToForm(vaccine: Vaccine, batch: VaccineBatchEntity?) {
         _uiState.update { state ->
             state.copy(
                 selectedVaccines = state.selectedVaccines + vaccine.brandName,
                 selectedVaccineIds = state.selectedVaccineIds + vaccine.id,
-                selectedBatchIds = state.selectedBatchIds + batch.batchId,
-                batchNumbers = state.batchNumbers + batch.batchNumber,
-                expiryDates = state.expiryDates + batch.expiryDate
+                selectedBatchIds = state.selectedBatchIds + (batch?.batchId ?: ""),
+                batchNumbers = state.batchNumbers + (batch?.batchNumber ?: ""),
+                expiryDates = state.expiryDates + (batch?.expiryDate ?: "")
             )
         }
     }
@@ -158,12 +163,31 @@ class AddVaccinationViewModel @Inject constructor(
                     user = user,
                     selectedBatchIds = selectedBatchIds
                 )
-                _uiState.update { it.copy(isSaved = true, savedVaccination = vaccination, isLoading = false) }
+                _uiState.update { it.copy(
+                    isSaved = true, 
+                    savedVaccination = vaccination, 
+                    isLoading = false
+                ) }
                 onSuccess()
+                
+                // STEP 5: Trigger reconciliation after save (fire-and-forget, non-blocking)
+                if (isNew) {
+                    viewModelScope.launch {
+                        try {
+                            reconcileInventoryUseCase.execute(user)
+                        } catch (e: Exception) {
+                            android.util.Log.e("AddVaccinationVM", "Reconciliation failed: ${e.message}")
+                        }
+                    }
+                }
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message, isLoading = false) }
             }
         }
+    }
+
+    fun clearError() {
+        _uiState.update { it.copy(error = null) }
     }
 
     fun prefillForm(v: Vaccination) {

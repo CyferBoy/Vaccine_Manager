@@ -1,11 +1,24 @@
-- `[ ]` Domain Layer
-    - `[x]` Ensure `ADJUSTMENT` exists in `InventoryEnums.kt`
-    - `[/]` Create/Verify `BackfillInventoryUsageUseCase.kt`
-- `[ ]` Dependency Injection
-    - `[ ]` Register `BackfillInventoryUsageUseCase` in `UseCaseModule.kt`
-- `[ ]` ViewModel Layer
-    - `[ ]` Update `NotificationSettingsViewModel.kt` with backfill logic
-- `[ ]` UI Layer
-    - `[ ]` Update `SettingsScreen.kt` with maintenance button and dialogs
-- `[ ]` Verification
-    - `[ ]` Gradle Build
+- `[x]` STEP 1: inventoryStatus and Migration
+    - `[x]` Update `VisitEntity` (VaccinationEntity.kt)
+    - `[x]` Update `Vaccination` domain model
+    - `[x]` Update mappers (toVaccination, toEntity)
+    - `[x]` Update `VaccinationValidator.createVaccination`
+- `[x]` STEP 2: InventoryDeductionEntity and DAO
+    - `[x]` Create `InventoryDeductionEntity.kt`
+    - `[x]` Create `InventoryDeductionDao.kt`
+    - `[x]` Update `AppDatabase.kt` (Entities, DAOs, Migration 23->24)
+- `[x]` STEP 3: DAO Updates
+    - `[x]` Add `getBatchByVaccineAndNumber` to `VaccineDao`
+    - `[x]` Add `getVaccinationsPendingReconciliation` and `updateInventoryStatus` to `VaccinationDao`
+- `[x]` STEP 4: ReconcileInventoryUseCase
+    - `[x]` Implement `ReconcileInventoryUseCase.kt`
+- `[x]` STEP 5: Trigger Reconciliation
+    - `[x]` Update `AddVaccinationViewModel.saveVaccination`
+- `[x]` STEP 6: Reversal Logic
+    - `[x]` Add `reverseDeduction` to `InventoryRepository`
+    - `[x]` Update `VaccinationRepositoryImpl.deleteVaccination`
+- `[x]` STEP 7: UI Enhancements
+    - `[x]` Update `VaccinationRecordCard` with status badge
+    - `[x]` Add deduction details dialog
+- `[x]` Verification
+    - `[x]` Gradle Build

@@ -1,61 +1,81 @@
-# Implementation Plan - Inventory Backfill Utility
+# Implementation Plan - Vaccination↔Inventory Reconciliation Architecture
 
-Create a one-time manual inventory backfill utility to reconcile historical vaccine usage with current stock levels.
+Refactor the vaccination workflow to decouple clinical record saving from inventory stock deduction, ensuring data integrity and providing a robust reconciliation mechanism.
 
 ## User Review Required
 
 > [!IMPORTANT]
-> This utility will deduct stock from current active batches using FEFO logic based on ALL historical vaccination records found in the local database. This is a destructive, one-time operation intended to synchronize inventory levels with past activity.
+> - **Migration**: Database version will be bumped to 24. Existing vaccinations will be marked as `SKIPPED` for inventory reconciliation to avoid double-deducting historical data.
+> - **Asynchronous Processing**: Inventory deduction will now happen as a background task after the vaccination is saved. If it fails, the vaccination record is still preserved.
 
 ## Proposed Changes
 
-### 1. Domain Model
+### 1. Data Layer (Entities & Room)
 
-#### [MODIFY] [InventoryEnums.kt](file:///C:/Users/Nadeem/Desktop/vaccine_manager_app/app/src/main/java/com/clinic/neochild/domain/model/InventoryEnums.kt)
-- Add `ADJUSTMENT` to `InventoryTransactionType` enum (if not already present).
+#### [MODIFY] [VaccinationEntity.kt](file:///C:/Users/Nadeem/Desktop/vaccine_manager_app/app/src/main/java/com/clinic/neochild/data/local/entity/VaccinationEntity.kt)
+- Update `VisitEntity`: set default `inventoryStatus` to `"PENDING"`.
+- Update `toVaccination` and `toEntity` mappers to include `inventoryStatus`.
 
-### 2. Domain Layer (Use Case)
+#### [MODIFY] [Vaccination.kt](file:///C:/Users/Nadeem/Desktop/vaccine_manager_app/app/src/main/java/com/clinic/neochild/domain/model/Vaccination.kt)
+- Add `inventoryStatus: String = "PENDING"`.
 
-#### [NEW] [BackfillInventoryUsageUseCase.kt](file:///C:/Users/Nadeem/Desktop/vaccine_manager_app/app/src/main/java/com/clinic/neochild/domain/usecase/inventory/BackfillInventoryUsageUseCase.kt)
-- **Goal**: Reconcile total vaccine usage from history.
-- **Logic**:
-    - Fetch all vaccinations via `vaccinationRepository.allVaccinations`.
-    - Flatten and count occurrences of every vaccine brand name used (case-insensitive, trimmed).
-    - Match names to inventory vaccines using brand name fuzzy matching.
-    - Call `inventoryRepository.deductStock` for each match with `InventoryTransactionType.ADJUSTMENT`.
-    - Return a summary of successes and failures per vaccine.
+#### [NEW] [InventoryDeductionEntity.kt](file:///C:/Users/Nadeem/Desktop/vaccine_manager_app/app/src/main/java/com/clinic/neochild/data/local/entity/InventoryDeductionEntity.kt)
+- Track per-vaccine deduction status for each visit.
 
-### 3. Dependency Injection
+#### [NEW] [InventoryDeductionDao.kt](file:///C:/Users/Nadeem/Desktop/vaccine_manager_app/app/src/main/java/com/clinic/neochild/data/local/dao/InventoryDeductionDao.kt)
+- Manage `InventoryDeductionEntity` records.
 
-#### [MODIFY] [UseCaseModule.kt](file:///C:/Users/Nadeem/Desktop/vaccine_manager_app/app/src/main/java/com/clinic/neochild/di/UseCaseModule.kt)
-- Register `BackfillInventoryUsageUseCase`.
+#### [MODIFY] [AppDatabase.kt](file:///C:/Users/Nadeem/Desktop/vaccine_manager_app/app/src/main/java/com/clinic/neochild/data/local/database/AppDatabase.kt)
+- Bump version to 24.
+- Register new entity and DAO.
+- Implement `MIGRATION_23_24`:
+    - Ensure `inventoryStatus` exists in `patient_visits`.
+    - Update all existing rows to `SKIPPED`.
+    - Create `inventory_deductions` table.
 
-### 4. ViewModel Layer
+### 2. DAOs & Repository Enhancements
 
-#### [MODIFY] [NotificationSettingsViewModel.kt](file:///C:/Users/Nadeem/Desktop/vaccine_manager_app/app/src/main/java/com/clinic/neochild/features/settings/NotificationSettingsViewModel.kt)
-- Inject `BackfillInventoryUsageUseCase` and `FirebaseAuth`.
-- Expose `isAdmin` status.
-- Add `runInventoryBackfill()` method to trigger the use case.
-- Expose `backfillResults` and `isBackfilling` states for UI feedback.
+#### [MODIFY] [VaccineDao.kt](file:///C:/Users/Nadeem/Desktop/vaccine_manager_app/app/src/main/java/com/clinic/neochild/data/local/dao/VaccineDao.kt)
+- Add `getBatchByVaccineAndNumber(vaccineId, batchNumber)`.
 
-### 5. UI Layer
+#### [MODIFY] [VaccinationDao.kt](file:///C:/Users/Nadeem/Desktop/vaccine_manager_app/app/src/main/java/com/clinic/neochild/data/local/dao/VaccinationDao.kt)
+- Add `getVaccinationsPendingReconciliation()`.
 
-#### [MODIFY] [SettingsScreen.kt](file:///C:/Users/Nadeem/Desktop/vaccine_manager_app/app/src/main/java/com/clinic/neochild/features/settings/SettingsScreen.kt)
-- Add an "Admin Maintenance" expandable section (visible only to admins).
-- Add a "Backfill Inventory From History" button.
-- Implement a confirmation dialog ("This cannot be undone").
-- Implement a results dialog to display a scrollable list of the backfill outcomes.
+#### [MODIFY] [InventoryRepository.kt](file:///C:/Users/Nadeem/Desktop/vaccine_manager_app/app/src/main/java/com/clinic/neochild/domain/repository/InventoryRepository.kt)
+- Add `reverseDeduction(batchId, quantity, user)`.
+
+#### [MODIFY] [InventoryRepositoryImpl.kt](file:///C:/Users/Nadeem/Desktop/vaccine_manager_app/app/src/main/java/com/clinic/neochild/data/repository/InventoryRepositoryImpl.kt)
+- Implement `reverseDeduction`.
+
+### 3. Business Logic (Use Case)
+
+#### [NEW] [ReconcileInventoryUseCase.kt](file:///C:/Users/Nadeem/Desktop/vaccine_manager_app/app/src/main/java/com/clinic/neochild/domain/usecase/inventory/ReconcileInventoryUseCase.kt)
+- Core logic to process pending vaccinations.
+- Idempotent: checks for existing `COMPLETED` deductions.
+- Resolves batches using provided numbers or falls back to FEFO.
+
+---
+
+### 4. Integration & UI
+
+#### [MODIFY] [AddVaccinationViewModel.kt](file:///C:/Users/Nadeem/Desktop/vaccine_manager_app/app/src/main/java/com/clinic/neochild/features/vaccination/AddVaccinationViewModel.kt)
+- Trigger `reconcileInventoryUseCase.execute()` in a fire-and-forget coroutine after successful save.
+
+#### [MODIFY] [VaccinationRepositoryImpl.kt](file:///C:/Users/Nadeem/Desktop/vaccine_manager_app/app/src/main/java/com/clinic/neochild/data/repository/VaccinationRepositoryImpl.kt)
+- Update `deleteVaccination` to perform reversal of deductions before deleting the visit record.
+
+#### [MODIFY] [VaccinationCards.kt](file:///C:/Users/Nadeem/Desktop/vaccine_manager_app/app/src/main/java/com/clinic/neochild/features/patient/VaccinationCards.kt)
+- Display orange "Stock not updated" badge if status is `PARTIAL` or `FAILED`.
+- Show deduction details in a dialog on tap.
 
 ## Verification Plan
 
 ### Automated Tests
-- Run Gradle build: `./gradlew :app:assembleDebug`.
+- Run Gradle build: `./gradlew assembleDebug`.
+- Verify database migration 23 -> 24.
 
 ### Manual Verification
-1. Log in as an administrator.
-2. Go to **Settings**.
-3. Expand **Maintenance (Admin)**.
-4. Tap **Backfill Inventory From History**.
-5. Confirm the dialog.
-6. Verify that the summary correctly lists vaccines and usage counts.
-7. Verify that the inventory stock has decreased by the corresponding amounts in the Inventory screen.
+1. Save a vaccination with valid stock -> Status becomes COMPLETED.
+2. Save a vaccination with insufficient stock -> Record is saved, Status becomes FAILED, Badge appears in history.
+3. Delete a COMPLETED vaccination -> Verify stock is returned to the batch.
+4. Run Backfill utility -> Ensure consistency.

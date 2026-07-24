@@ -10,6 +10,8 @@ import com.clinic.neochild.core.logger.AuditLogger
 import com.clinic.neochild.domain.model.Vaccination
 import com.clinic.neochild.domain.repository.SyncRepository
 import com.clinic.neochild.domain.repository.VaccinationRepository
+import com.clinic.neochild.domain.repository.InventoryRepository
+import com.clinic.neochild.data.local.dao.InventoryDeductionDao
 import com.clinic.neochild.data.remote.mapper.FirestoreMappers
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.map
@@ -25,10 +27,12 @@ class VaccinationRepositoryImpl @Inject constructor(
     private val database: AppDatabase,
     private val firestore: FirebaseFirestore,
     private val syncRepository: SyncRepository,
+    private val inventoryRepository: InventoryRepository,
     private val auditLogger: AuditLogger
 ) : VaccinationRepository {
 
     private val vaccinationDao = database.vaccinationDao()
+    private val inventoryDeductionDao = database.inventoryDeductionDao()
 
     override val allVaccinations: Flow<List<Vaccination>> = 
         vaccinationDao.getAllVaccinations().map { list -> list.map { it.toVaccination() } }
@@ -88,6 +92,17 @@ class VaccinationRepositoryImpl @Inject constructor(
     override suspend fun deleteVaccination(id: String) {
         database.withTransaction {
             val existing = vaccinationDao.getVaccinationById(id)
+            
+            // STEP 6: Undo/delete handling - Reverse deductions
+            val user = "Unknown" // ideally pass from caller, but repository signature is limited
+            val deductions = inventoryDeductionDao.getCompletedForVaccination(id)
+            for (deduction in deductions) {
+                deduction.batchId?.let { batchId ->
+                    inventoryRepository.reverseDeduction(batchId, deduction.quantity, user)
+                }
+            }
+            inventoryDeductionDao.deleteForVaccination(id)
+
             vaccinationDao.deleteVaccination(id)
             
             syncRepository.enqueue(

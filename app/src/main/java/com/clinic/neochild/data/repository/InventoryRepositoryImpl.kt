@@ -394,6 +394,16 @@ class InventoryRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun reverseDeduction(batchId: String, quantity: Int, user: String) {
+        addStockToBatch(
+            batchId = batchId,
+            quantity = quantity,
+            user = user,
+            transactionType = InventoryTransactionType.REVERSAL,
+            notes = "Stock reversal from deleted/edited vaccination"
+        )
+    }
+
     override suspend fun adjustStock(batchId: String, newQuantity: Int, user: String, reason: String) {
         database.withTransaction {
             val batch = vaccineDao.getBatchById(batchId) ?: return@withTransaction

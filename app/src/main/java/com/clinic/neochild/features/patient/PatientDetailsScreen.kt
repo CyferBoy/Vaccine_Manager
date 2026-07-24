@@ -144,7 +144,8 @@ fun PatientDetailsScreen(
                     notes = notes,
                     onEditVaccination = onEditVaccination,
                     onDeleteVaccination = { vaccinationToDelete = it },
-                    onMarkAsDone = { vaccinationToMarkDone = it }
+                    onMarkAsDone = { vaccinationToMarkDone = it },
+                    viewModel = viewModel
                 )
             }
         }

@@ -22,8 +22,8 @@ class CompleteVaccinationUseCase @Inject constructor(
         user: String,
         requirement: PendingRequirement? = null,
         selectedBatchIds: List<String> = emptyList()
-    ) {
-        vaccinationManager.completeVaccination(
+    ): String? {
+        return vaccinationManager.completeVaccination(
             vaccination = vaccination,
             user = user,
             isNew = isNew,

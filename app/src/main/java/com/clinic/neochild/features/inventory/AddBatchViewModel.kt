@@ -8,10 +8,7 @@ import com.clinic.neochild.domain.model.BatchStatus
 import com.clinic.neochild.domain.repository.InventoryRepository
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -21,7 +18,8 @@ data class AddBatchUiState(
     val isLoading: Boolean = false,
     val isSaved: Boolean = false,
     val error: String? = null,
-    val batch: VaccineBatchEntity? = null
+    val batch: VaccineBatchEntity? = null,
+    val defaultBatch: VaccineBatchEntity? = null
 )
 
 @HiltViewModel
@@ -40,6 +38,15 @@ class AddBatchViewModel @Inject constructor(
                 _uiState.update { it.copy(batch = batch, isLoading = false) }
             } else {
                 _uiState.update { it.copy(isLoading = false, error = "Batch not found") }
+            }
+        }
+    }
+
+    fun loadDefaults(vaccineId: String) {
+        viewModelScope.launch {
+            inventoryRepository.getVaccineBatches(vaccineId).firstOrNull()?.let { batches ->
+                val latest = batches.maxByOrNull { it.purchaseDate } ?: batches.maxByOrNull { it.expiryDate }
+                _uiState.update { it.copy(defaultBatch = latest) }
             }
         }
     }

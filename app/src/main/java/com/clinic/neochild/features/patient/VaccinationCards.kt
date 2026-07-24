@@ -2,10 +2,11 @@ package com.clinic.neochild.features.patient
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,7 +33,8 @@ fun VaccinationRecordCard(
     patient: Patient,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
-    onMarkAsDone: (Vaccination) -> Unit
+    onMarkAsDone: (Vaccination) -> Unit,
+    onShowInventoryIssues: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
     var menuExpanded by remember { mutableStateOf(false) }
@@ -48,7 +50,7 @@ fun VaccinationRecordCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            VaccinationCardHeader(vaccination)
+            VaccinationCardHeader(vaccination, onShowInventoryIssues)
             
             if (vaccination.nxtVaccineNames.isNotEmpty()) {
                 val nextDisplayName = vaccination.nxtVaccineNames.joinToString(", ") { cleanVaccineName(it) }
@@ -88,10 +90,31 @@ fun VaccinationRecordCard(
 }
 
 @Composable
-fun VaccinationCardHeader(vaccination: Vaccination) {
+fun VaccinationCardHeader(vaccination: Vaccination, onShowInventoryIssues: (String) -> Unit) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         val displayName = vaccination.vaccineNames.joinToString(", ") { cleanVaccineName(it) }
-        Text(text = displayName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+        
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = displayName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            
+            if (vaccination.inventoryStatus == "FAILED" || vaccination.inventoryStatus == "PARTIAL" || vaccination.inventoryStatus == "PENDING") {
+                Surface(
+                    color = Color(0xFFFFF3E0), // Orange tint
+                    shape = RoundedCornerShape(4.dp),
+                    modifier = Modifier.clickable { onShowInventoryIssues(vaccination.id) }
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)) {
+                        Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFE65100), modifier = Modifier.size(12.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = "Stock not updated", 
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFFE65100)
+                        )
+                    }
+                }
+            }
+        }
         
         if (vaccination.isDone) {
             Icon(Icons.Default.CheckCircle, contentDescription = "Done", tint = Color(0xFF4CAF50), modifier = Modifier.size(20.dp))

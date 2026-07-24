@@ -10,7 +10,16 @@ enum class InventoryTransactionType {
     CONTAMINATED,
     OTHER,
     MANUAL_ADJUSTMENT,
-    ADJUSTMENT
+    ADJUSTMENT,
+    REVERSAL
+}
+
+enum class InventoryStatus {
+    PENDING,
+    COMPLETED,
+    PARTIAL,
+    FAILED,
+    SKIPPED
 }
 
 enum class BatchStatus {

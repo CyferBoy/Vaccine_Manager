@@ -41,20 +41,26 @@ fun AddBatchScreen(
     var netRate by rememberSaveable { mutableStateOf("") }
     var manufacturer by rememberSaveable { mutableStateOf("") }
 
-    LaunchedEffect(batchId) {
+    LaunchedEffect(batchId, vaccineId) {
         if (batchId != null) {
             viewModel.loadBatch(batchId)
+        } else {
+            viewModel.loadDefaults(vaccineId)
         }
     }
 
-    LaunchedEffect(uiState.batch) {
-        uiState.batch?.let {
-            batchNumber = it.batchNumber
-            quantity = it.remainingQuantity.toString()
-            expiryDate = it.expiryDate
-            mrp = it.sellingPrice.toString()
-            netRate = it.purchaseCost.toString()
-            manufacturer = it.manufacturer
+    LaunchedEffect(uiState.batch, uiState.defaultBatch) {
+        uiState.batch?.let { b ->
+            batchNumber = b.batchNumber
+            quantity = b.remainingQuantity.toString()
+            expiryDate = b.expiryDate
+            mrp = b.sellingPrice.toString()
+            netRate = b.purchaseCost.toString()
+            manufacturer = b.manufacturer
+        } ?: uiState.defaultBatch?.let { d ->
+            mrp = d.sellingPrice.toString()
+            netRate = d.purchaseCost.toString()
+            manufacturer = d.manufacturer
         }
     }
 

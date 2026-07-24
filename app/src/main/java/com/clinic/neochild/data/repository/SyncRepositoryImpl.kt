@@ -93,6 +93,7 @@ class SyncRepositoryImpl @Inject constructor(
             "USER" -> "users"
             "BORROW" -> "borrow"
             "AUDIT_LOG" -> "audit_logs"
+            "INVENTORY_TRANSACTION" -> "inventory_transactions"
             else -> throw IllegalArgumentException("Unknown entity: ${item.entityName}")
         }
 
@@ -143,6 +144,7 @@ class SyncRepositoryImpl @Inject constructor(
                 "USER" -> database.staffDao().getUserById(entityId)
                 "BORROW" -> database.borrowDao().getRecordById(entityId)
                 "PATIENT_NOTE" -> database.patientNotesDao().getNoteById(entityId.toLongOrNull() ?: -1L)
+                "INVENTORY_TRANSACTION" -> database.vaccineDao().getTransactionById(entityId.toLongOrNull() ?: -1L)
                 else -> null
             }
         } catch (e: Exception) {

@@ -20,6 +20,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         VaccineEntity::class,
         VaccineBatchEntity::class,
         InventoryTransactionEntity::class,
+        InventoryDeductionEntity::class,
         SyncQueueEntity::class,
         WasteEntity::class,
         WidgetDueEntity::class,
@@ -30,7 +31,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         FinanceEntity::class,
         BorrowEntity::class
     ], 
-    version = 22,
+    version = 24,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -50,6 +51,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun staffDao(): StaffDao
     abstract fun borrowDao(): BorrowDao
     abstract fun patientNotesDao(): PatientNotesDao
+    abstract fun inventoryDeductionDao(): InventoryDeductionDao
 
     companion object {
         private const val TAG = "AppDatabase"
@@ -511,6 +513,42 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
 
+        val MIGRATION_22_23 = object : Migration(22, 23) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // 1. Update patient_visits with inventoryStatus
+                db.execSQL("ALTER TABLE `patient_visits` ADD COLUMN `inventoryStatus` TEXT NOT NULL DEFAULT 'COMPLETED'")
+                
+                // 2. Enhance inventory_transactions
+                db.execSQL("ALTER TABLE `inventory_transactions` ADD COLUMN `status` TEXT NOT NULL DEFAULT 'COMPLETED'")
+                db.execSQL("ALTER TABLE `inventory_transactions` ADD COLUMN `failureReason` TEXT")
+                db.execSQL("ALTER TABLE `inventory_transactions` ADD COLUMN `processedAt` INTEGER")
+                db.execSQL("ALTER TABLE `inventory_transactions` ADD COLUMN `processedBy` TEXT")
+                db.execSQL("ALTER TABLE `inventory_transactions` ADD COLUMN `isSynced` INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val MIGRATION_23_24 = object : Migration(23, 24) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // 1. Mark existing vaccinations as SKIPPED to avoid reconciliation of historical data
+                db.execSQL("UPDATE patient_visits SET inventoryStatus = 'SKIPPED'")
+                
+                // 2. Create inventory_deductions table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `inventory_deductions` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, 
+                        `vaccinationId` TEXT NOT NULL, 
+                        `vaccineId` TEXT NOT NULL, 
+                        `vaccineName` TEXT NOT NULL, 
+                        `batchId` TEXT, 
+                        `quantity` INTEGER NOT NULL, 
+                        `status` TEXT NOT NULL, 
+                        `errorMessage` TEXT, 
+                        `resolvedAt` INTEGER NOT NULL
+                    )
+                """)
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val dbFile = context.getDatabasePath(DB_NAME)
@@ -551,7 +589,7 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                 .openHelperFactory(factory)
                 .setJournalMode(JournalMode.TRUNCATE)
-                .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22)
+                .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24)
                 .fallbackToDestructiveMigrationOnDowngrade()
                 .build()
                 INSTANCE = instance

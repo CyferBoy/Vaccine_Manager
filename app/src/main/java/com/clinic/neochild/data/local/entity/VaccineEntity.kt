@@ -75,7 +75,14 @@ data class InventoryTransactionEntity(
     val currentQuantity: Int,
     val timestamp: Long = System.currentTimeMillis(),
     val user: String,
-    val notes: String? = null
+    val notes: String? = null,
+    
+    // Detailed tracking
+    val status: String = "COMPLETED", // InventoryStatus
+    val failureReason: String? = null,
+    val processedAt: Long? = null,
+    val processedBy: String? = null,
+    val isSynced: Boolean = false
 )
 
 // Mappers for compatibility

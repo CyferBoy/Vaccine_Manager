@@ -86,7 +86,7 @@ fun VaccineSelectionSection(
                                     color = if (isOutOfStock || isLowStock) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
                                 ) 
                             },
-                            enabled = !isOutOfStock,
+                            enabled = true,
                             onClick = { onVaccineSelected(v); query = ""; expanded = false }
                         )
                     }

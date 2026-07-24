@@ -76,6 +76,13 @@ fun AddVaccinationScreen(
         }
     }
 
+    LaunchedEffect(uiState.error) {
+        uiState.error?.let {
+            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+            viewModel.clearError()
+        }
+    }
+
     if (showFollowUpDialog) {
         AlertDialog(
             onDismissRequest = { 

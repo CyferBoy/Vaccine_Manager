@@ -60,4 +60,13 @@ interface VaccinationDao {
 
     @Query("SELECT vaccineNames FROM patient_visits WHERE dateGiven LIKE :monthPattern AND isDone = 1 AND isDeleted = 0")
     fun getVaccineNamesForMonth(monthPattern: String): Flow<List<String>>
+
+    @Query("UPDATE patient_visits SET inventoryStatus = :status WHERE id = :id")
+    suspend fun updateInventoryStatus(id: String, status: String)
+
+    @Query("SELECT * FROM patient_visits WHERE inventoryStatus IN ('PENDING', 'FAILED', 'PARTIAL') AND isDeleted = 0")
+    suspend fun getVaccinationsPendingReconciliation(): List<VisitEntity>
+
+    @Query("SELECT * FROM patient_visits WHERE inventoryStatus != 'COMPLETED' AND isDeleted = 0")
+    fun getPendingInventoryVisits(): Flow<List<VisitEntity>>
 }

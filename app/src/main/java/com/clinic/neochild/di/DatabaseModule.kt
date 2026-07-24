@@ -16,6 +16,7 @@ import com.clinic.neochild.data.local.dao.WidgetDueDao
 import com.clinic.neochild.data.local.dao.FinanceDao
 import com.clinic.neochild.data.local.dao.StaffDao
 import com.clinic.neochild.data.local.dao.BorrowDao
+import com.clinic.neochild.data.local.dao.InventoryDeductionDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -101,5 +102,10 @@ object DatabaseModule {
     @Provides
     fun provideBorrowDao(database: AppDatabase): BorrowDao {
         return database.borrowDao()
+    }
+
+    @Provides
+    fun provideInventoryDeductionDao(database: AppDatabase): InventoryDeductionDao {
+        return database.inventoryDeductionDao()
     }
 }

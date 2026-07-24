@@ -3,6 +3,7 @@ package com.clinic.neochild.features.patient
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.clinic.neochild.data.local.entity.AuditLogEntity
+import com.clinic.neochild.data.local.database.AppDatabase
 import com.clinic.neochild.data.local.entity.ReminderEntity
 import com.clinic.neochild.data.local.entity.PatientNotesEntity
 import com.clinic.neochild.domain.model.Patient
@@ -36,7 +37,8 @@ class PatientViewModel @Inject constructor(
     private val completeVaccinationUseCase: CompleteVaccinationUseCase,
     private val refreshDataUseCase: RefreshDataUseCase,
     private val patientRepository: PatientRepository,
-    private val reminderRepository: ReminderRepository
+    private val reminderRepository: ReminderRepository,
+    private val database: AppDatabase
 ) : ViewModel() {
     
     val allPatients: StateFlow<List<Patient>>
@@ -129,5 +131,9 @@ class PatientViewModel @Inject constructor(
 
     fun getPatientNotes(patientId: String): Flow<List<PatientNotesEntity>> {
         return patientRepository.getNotes(patientId)
+    }
+
+    suspend fun getInventoryDeductions(vaccinationId: String): List<com.clinic.neochild.data.local.entity.InventoryDeductionEntity> {
+        return database.inventoryDeductionDao().getForVaccination(vaccinationId)
     }
 }

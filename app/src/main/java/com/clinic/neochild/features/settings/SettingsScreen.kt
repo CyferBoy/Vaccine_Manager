@@ -26,6 +26,7 @@ import com.clinic.neochild.core.ui.AppBackground
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
+    onNavigateToInventoryIssues: () -> Unit = {},
     viewModel: NotificationSettingsViewModel = hiltViewModel()
 ) {
     val settingsState by viewModel.settings.collectAsState()
@@ -248,6 +249,15 @@ fun SettingsScreen(
                                             Spacer(Modifier.width(8.dp))
                                             Text("Backfill Inventory From History")
                                         }
+                                    }
+
+                                    OutlinedButton(
+                                        onClick = onNavigateToInventoryIssues,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Icon(Icons.Default.ErrorOutline, contentDescription = null)
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("Manage Inventory Issues")
                                     }
                                 }
                             }

@@ -48,7 +48,8 @@ object VaccinationValidator {
             isDone = true, // Ensure administered vaccinations are marked as done
             batchNumbers = batches,
             expiryDates = expiries,
-            performedBy = performedBy
+            performedBy = performedBy,
+            inventoryStatus = "PENDING"
         )
     }
 }

@@ -29,4 +29,5 @@ object Routes {
     const val SEARCH = "search"
     const val ADD_VACCINE = "add_vaccine"
     const val ADD_VACCINE_FOR_PATIENT = "add_vaccine/{patientId}"
+    const val INVENTORY_ISSUES = "inventory_issues"
 }

@@ -58,6 +58,12 @@ interface InventoryRepository {
         notes: String? = null
     )
 
+    suspend fun reverseDeduction(
+        batchId: String,
+        quantity: Int,
+        user: String
+    )
+
     suspend fun adjustStock(
         batchId: String, 
         newQuantity: Int, 

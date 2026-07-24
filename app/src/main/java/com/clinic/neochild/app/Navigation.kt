@@ -26,6 +26,7 @@ import com.clinic.neochild.features.vaccination.AddVaccinationScreen
 import com.clinic.neochild.features.inventory.BorrowedScreen
 import com.clinic.neochild.features.inventory.VaccineInventoryScreen
 import com.clinic.neochild.features.inventory.WasteScreen
+import com.clinic.neochild.features.inventory.InventoryIssuesScreen
 
 @Composable
 fun AppNavigation(
@@ -100,7 +101,8 @@ fun AppNavigation(
 
         composable(Routes.SETTINGS) {
             SettingsScreen(
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onNavigateToInventoryIssues = { navController.navigate(Routes.INVENTORY_ISSUES) }
             )
         }
 
@@ -309,6 +311,10 @@ fun AppNavigation(
 
         composable(Routes.WASTE) {
             WasteScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(Routes.INVENTORY_ISSUES) {
+            InventoryIssuesScreen(onBack = { navController.popBackStack() })
         }
 
         composable(

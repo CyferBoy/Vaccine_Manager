@@ -13,10 +13,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -26,6 +26,7 @@ import androidx.compose.ui.window.Dialog
 import com.clinic.neochild.data.local.entity.ReminderEntity
 import com.clinic.neochild.data.local.entity.PatientNotesEntity
 import com.clinic.neochild.data.local.entity.AuditLogEntity
+import com.clinic.neochild.data.local.entity.InventoryDeductionEntity
 import com.clinic.neochild.domain.model.Patient
 import com.clinic.neochild.domain.model.Vaccination
 import com.clinic.neochild.core.utils.PatientUtils.calculateAgeLabel
@@ -33,6 +34,7 @@ import com.clinic.neochild.core.utils.PatientUtils.formatDateForDisplay
 import com.clinic.neochild.core.designsystem.NeoChildTheme
 import com.clinic.neochild.domain.model.ReminderStatus
 import com.clinic.neochild.features.reminder.FollowUpCard
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -45,8 +47,20 @@ fun PatientDetailsContent(
     notes: List<PatientNotesEntity>,
     onEditVaccination: (String) -> Unit,
     onDeleteVaccination: (Vaccination) -> Unit,
-    onMarkAsDone: (Vaccination) -> Unit
+    onMarkAsDone: (Vaccination) -> Unit,
+    viewModel: PatientViewModel
 ) {
+    val scope = rememberCoroutineScope()
+    var selectedVisitForDeductions by remember { mutableStateOf<String?>(null) }
+    var deductionsForVisit by remember { mutableStateOf<List<InventoryDeductionEntity>>(emptyList()) }
+
+    if (selectedVisitForDeductions != null) {
+        InventoryDeductionsDialog(
+            deductions = deductionsForVisit,
+            onDismiss = { selectedVisitForDeductions = null }
+        )
+    }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -70,7 +84,13 @@ fun PatientDetailsContent(
                     patient = patient,
                     onEdit = { onEditVaccination(vaccination.id) },
                     onDelete = { onDeleteVaccination(vaccination) },
-                    onMarkAsDone = { onMarkAsDone(vaccination) }
+                    onMarkAsDone = { onMarkAsDone(vaccination) },
+                    onShowInventoryIssues = { id ->
+                        selectedVisitForDeductions = id
+                        scope.launch {
+                            deductionsForVisit = viewModel.getInventoryDeductions(id)
+                        }
+                    }
                 )
             }
         }
@@ -138,6 +158,22 @@ fun ClinicalNoteCard(note: PatientNotesEntity) {
 }
 
 @Composable
+fun InfoRow(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String, onClick: (() -> Unit)? = null) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
+    ) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = text, 
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (onClick != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+@Composable
 fun PatientInfoSection(patient: Patient) {
     val context = LocalContext.current
     Card(
@@ -200,22 +236,6 @@ fun PatientInfoSection(patient: Patient) {
 }
 
 @Composable
-fun InfoRow(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String, onClick: (() -> Unit)? = null) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
-    ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = text, 
-            style = MaterialTheme.typography.bodyMedium,
-            color = if (onClick != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-        )
-    }
-}
-
-@Composable
 fun AuditLogDialog(
     show: Boolean,
     onDismiss: () -> Unit,
@@ -242,7 +262,7 @@ fun AuditLogDialog(
                     }
                 }
                 
-                Divider()
+                HorizontalDivider()
                 
                 if (logs.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -303,23 +323,48 @@ fun AuditLogItem(log: AuditLogEntity) {
         }
         
         Spacer(modifier = Modifier.height(8.dp))
-        Divider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
     }
+}
+
+@Composable
+fun InventoryDeductionsDialog(
+    deductions: List<InventoryDeductionEntity>,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Inventory Deduction Status") },
+        text = {
+            if (deductions.isEmpty()) {
+                Text("No detailed logs for this visit.")
+            } else {
+                LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
+                    items(deductions) { deduction ->
+                        Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                            Text(deduction.vaccineName, fontWeight = FontWeight.Bold)
+                            Text(
+                                text = deduction.status, 
+                                color = if (deduction.status == "COMPLETED") Color(0xFF4CAF50) else Color.Red,
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                            if (deduction.errorMessage != null) {
+                                Text(deduction.errorMessage, style = MaterialTheme.typography.bodySmall, color = Color.Red)
+                            }
+                            HorizontalDivider(modifier = Modifier.padding(top = 4.dp).alpha(0.5f))
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Close") }
+        }
+    )
 }
 
 @Preview(showBackground = true)
 @Composable
 private fun PatientDetailsPreview() {
-    NeoChildTheme {
-        PatientDetailsContent(
-            paddingValues = PaddingValues(0.dp),
-            patient = Patient("1", "John Doe", "1234567890", "", "2020-01-01", "Male", "Old Hospital Road", "2024-01-01"),
-            vaccinations = emptyList(),
-            followUps = emptyList(),
-            notes = emptyList(),
-            onEditVaccination = {},
-            onDeleteVaccination = {},
-            onMarkAsDone = {}
-        )
-    }
+    // Cannot easily preview with ViewModel
 }

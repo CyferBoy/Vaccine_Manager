@@ -85,7 +85,7 @@ class SyncRepositoryImpl @Inject constructor(
             "WASTE" -> "waste"
             "REMINDER_STATE", "DUE_REMINDER", "COMPLETED_REMINDER", "DISMISSED_REMINDER", "EXTERNAL_REMINDER" -> "reminders"
             "VACCINE" -> "vaccines"
-            "BATCH" -> "batches"
+            "BATCH" -> "vaccine_batches"
             "TRANSACTION" -> "transactions"
             "PATIENT_NOTE" -> "patient_notes"
             "FINANCE" -> "finance"

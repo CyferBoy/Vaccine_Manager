@@ -112,58 +112,60 @@ class InventoryRepositoryImpl @Inject constructor(
     override suspend fun getBatchById(batchId: String): VaccineBatchEntity? = 
         vaccineDao.getBatchById(batchId)
 
-    override suspend fun addStock(vaccine: VaccineEntity, batch: VaccineBatchEntity, user: String) {
+    override suspend fun addVaccine(vaccine: VaccineEntity, user: String) {
         database.withTransaction {
-            // Try to find existing vaccine by ID first, then by Name and Type to prevent duplicates
-            var finalVaccine = vaccineDao.getVaccineByIdIncludingDeleted(vaccine.id)
+            vaccineDao.insertVaccine(vaccine.copy(isDeleted = false))
+            syncRepository.enqueue("VACCINE", vaccine.id, SyncOperation.CREATE, SyncPriority.MEDIUM)
+            auditLogger.recordLog(
+                module = "VACCINE",
+                entityType = "VACCINE",
+                entityId = vaccine.id,
+                action = "CREATED",
+                remarks = "Vaccine Definition: ${vaccine.brandName}"
+            )
+        }
+    }
+
+    override suspend fun updateVaccine(vaccine: VaccineEntity, user: String) {
+        database.withTransaction {
+            vaccineDao.updateVaccine(vaccine.copy(lastUpdated = System.currentTimeMillis()))
+            syncRepository.enqueue("VACCINE", vaccine.id, SyncOperation.UPDATE, SyncPriority.MEDIUM)
+            auditLogger.recordLog(
+                module = "VACCINE",
+                entityType = "VACCINE",
+                entityId = vaccine.id,
+                action = "UPDATED",
+                remarks = "Vaccine Definition Updated: ${vaccine.brandName}"
+            )
+        }
+    }
+
+    override suspend fun addBatch(batch: VaccineBatchEntity, user: String) {
+        database.withTransaction {
+            val vaccine = vaccineDao.getVaccineById(batch.vaccineId) ?: throw IllegalStateException("Vaccine not found")
+            val currentTotal = vaccineDao.getTotalStockForVaccine(batch.vaccineId) ?: 0
             
-            if (finalVaccine == null) {
-                finalVaccine = vaccineDao.getVaccineByNameAndTypeIncludingDeleted(vaccine.brandName, vaccine.type)
-            }
-
-            val finalVaccineId = if (finalVaccine != null) {
-                if (finalVaccine.isDeleted) {
-                    // Restore archived vaccine
-                    vaccineDao.updateVaccine(finalVaccine.copy(isDeleted = false, lastUpdated = System.currentTimeMillis()))
-                    syncRepository.enqueue("VACCINE", finalVaccine.id, SyncOperation.UPDATE, SyncPriority.MEDIUM)
-                    auditLogger.recordLog(
-                        module = "VACCINE",
-                        entityType = "VACCINE",
-                        entityId = finalVaccine.id,
-                        action = "RESTORED",
-                        remarks = "Vaccine: ${finalVaccine.brandName}"
-                    )
-                }
-                finalVaccine.id
-            } else {
-                vaccineDao.insertVaccine(vaccine.copy(isDeleted = false))
-                syncRepository.enqueue("VACCINE", vaccine.id, SyncOperation.CREATE, SyncPriority.MEDIUM)
-                vaccine.id
-            }
-
-            val currentTotal = vaccineDao.getTotalStockForVaccine(finalVaccineId) ?: 0
-            val finalBatch = batch.copy(vaccineId = finalVaccineId)
-            vaccineDao.insertBatch(finalBatch)
+            vaccineDao.insertBatch(batch)
 
             vaccineDao.insertTransaction(InventoryTransactionEntity(
-                vaccineId = finalVaccineId,
-                batchId = finalBatch.batchId,
+                vaccineId = batch.vaccineId,
+                batchId = batch.batchId,
                 transactionType = InventoryTransactionType.PURCHASE.name,
-                quantity = finalBatch.purchaseQuantity,
+                quantity = batch.purchaseQuantity,
                 previousQuantity = currentTotal,
-                currentQuantity = currentTotal + finalBatch.purchaseQuantity,
+                currentQuantity = currentTotal + batch.purchaseQuantity,
                 user = user,
-                notes = "Stock Added: ${finalBatch.batchNumber}"
+                notes = "Batch Added: ${batch.batchNumber}"
             ))
 
             auditLogger.recordLog(
                 module = "INVENTORY",
                 entityType = "BATCH",
-                entityId = finalBatch.batchId,
+                entityId = batch.batchId,
                 action = "CREATED",
-                remarks = "Vaccine: ${vaccine.brandName}, Batch: ${finalBatch.batchNumber}, Qty: ${finalBatch.purchaseQuantity}"
+                remarks = "Vaccine: ${vaccine.brandName}, Batch: ${batch.batchNumber}, Qty: ${batch.purchaseQuantity}"
             )
-            syncRepository.enqueue("BATCH", finalBatch.batchId, SyncOperation.CREATE, SyncPriority.MEDIUM)
+            syncRepository.enqueue("BATCH", batch.batchId, SyncOperation.CREATE, SyncPriority.MEDIUM)
         }
     }
 
@@ -423,7 +425,7 @@ class InventoryRepositoryImpl @Inject constructor(
                 val vaccineSnapshot = firestore.collection("vaccines").get().await()
                 val vaccines = vaccineSnapshot.documents.mapNotNull { FirestoreMappers.toVaccineEntity(it) }
                 
-                val batchSnapshot = firestore.collection("batches").get().await()
+                val batchSnapshot = firestore.collection("vaccine_batches").get().await()
                 val batches = batchSnapshot.documents.mapNotNull { FirestoreMappers.toVaccineBatchEntity(it) }
 
                 database.withTransaction {

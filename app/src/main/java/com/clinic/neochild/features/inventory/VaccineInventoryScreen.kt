@@ -37,7 +37,9 @@ import com.clinic.neochild.domain.model.InventorySort
 fun VaccineInventoryScreen(
     onBack: () -> Unit = {},
     onAddVaccine: () -> Unit = {},
-    onEditBatch: (String) -> Unit = {},
+    onEditVaccine: (String) -> Unit = {},
+    onAddBatch: (String, String) -> Unit = { _, _ -> },
+    onEditBatch: (String, String, String) -> Unit = { _, _, _ -> },
     viewModel: VaccineInventoryViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -79,12 +81,10 @@ fun VaccineInventoryScreen(
         onFilterChange = viewModel::onFilterChange,
         onSortChange = viewModel::onSortChange,
         onAddVaccine = onAddVaccine,
+        onEditVaccine = onEditVaccine,
+        onAddBatch = onAddBatch,
         onEditBatch = onEditBatch,
         onDeleteBatch = { batchToDelete = it },
-        onEditVaccine = { vaccineId -> 
-            val item = uiState.inventory.find { it.id == vaccineId }
-            item?.batches?.firstOrNull()?.let { onEditBatch(it.batchId) }
-        },
         onDeleteVaccine = { vaccineToDelete = it }
     )
 }
@@ -99,9 +99,10 @@ private fun VaccineInventoryContent(
     onFilterChange: (InventoryFilter) -> Unit,
     onSortChange: (InventorySort) -> Unit,
     onAddVaccine: () -> Unit,
-    onEditBatch: (String) -> Unit,
-    onDeleteBatch: (VaccineBatchEntity) -> Unit,
     onEditVaccine: (String) -> Unit,
+    onAddBatch: (String, String) -> Unit,
+    onEditBatch: (String, String, String) -> Unit,
+    onDeleteBatch: (VaccineBatchEntity) -> Unit,
     onDeleteVaccine: (InventoryItem) -> Unit
 ) {
     var isSearchActive by remember { mutableStateOf(false) }
@@ -151,6 +152,7 @@ private fun VaccineInventoryContent(
                         items(uiState.inventory, key = { it.id }) { item ->
                             VaccineItemCard(
                                 item = item,
+                                onAddBatch = onAddBatch,
                                 onEditBatch = onEditBatch,
                                 onDeleteBatch = onDeleteBatch,
                                 onEditVaccine = onEditVaccine,
@@ -168,7 +170,8 @@ private fun VaccineInventoryContent(
 @Composable
 private fun VaccineItemCard(
     item: InventoryItem,
-    onEditBatch: (String) -> Unit,
+    onAddBatch: (String, String) -> Unit,
+    onEditBatch: (String, String, String) -> Unit,
     onDeleteBatch: (VaccineBatchEntity) -> Unit,
     onEditVaccine: (String) -> Unit,
     onDeleteVaccine: (InventoryItem) -> Unit
@@ -227,26 +230,28 @@ private fun VaccineItemCard(
             AnimatedVisibility(visible = expanded) {
                 Column(modifier = Modifier.padding(top = 16.dp)) {
                     HorizontalDivider()
-                    Spacer(Modifier.height(8.dp))
                     
-                    // Summary of MRP/Net Rate if batches exist
-                    if (item.batches.isNotEmpty()) {
-                        val latestBatch = item.batches.maxByOrNull { it.purchaseDate }
-                        latestBatch?.let {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text("Latest MRP: ₹${it.sellingPrice}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                                Text("Latest Net: ₹${it.purchaseCost}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                            }
-                            HorizontalDivider()
-                            Spacer(Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("Total Batches: ${item.batches.size}", style = MaterialTheme.typography.labelMedium)
+                            Text("Active Batches: ${item.activeBatchesCount}", style = MaterialTheme.typography.labelSmall)
+                        }
+                        TextButton(onClick = { onAddBatch(item.id, item.brandName) }) {
+                            Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Add Batch")
                         }
                     }
+                    
+                    HorizontalDivider()
+                    Spacer(Modifier.height(8.dp))
 
                     item.batches.forEach { batch ->
-                        BatchRow(batch, onEditBatch, onDeleteBatch)
+                        BatchRow(batch, onEditBatch, onDeleteBatch, item.brandName)
                     }
                 }
             }
@@ -257,8 +262,9 @@ private fun VaccineItemCard(
 @Composable
 private fun BatchRow(
     batch: VaccineBatchEntity,
-    onEditBatch: (String) -> Unit,
-    onDeleteBatch: (VaccineBatchEntity) -> Unit
+    onEditBatch: (String, String, String) -> Unit,
+    onDeleteBatch: (VaccineBatchEntity) -> Unit,
+    brandName: String
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
 
@@ -270,7 +276,6 @@ private fun BatchRow(
             Text("Batch: ${batch.batchNumber}", fontWeight = FontWeight.Bold)
             Text("Exp: ${formatDateForDisplay(batch.expiryDate)} • Qty: ${batch.remainingQuantity}")
             Text("MRP: ₹${batch.sellingPrice} • Net: ₹${batch.purchaseCost}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-            Text("Mfg: ${batch.manufacturer} • Pur: ${formatDateForDisplay(batch.purchaseDate)}", style = MaterialTheme.typography.labelSmall)
         }
         
         IconButton(onClick = { menuExpanded = true }) {
@@ -278,7 +283,7 @@ private fun BatchRow(
             DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                 DropdownMenuItem(
                     text = { Text("Edit") },
-                    onClick = { menuExpanded = false; onEditBatch(batch.batchId) }
+                    onClick = { menuExpanded = false; onEditBatch(batch.batchId, batch.vaccineId, brandName) }
                 )
                 DropdownMenuItem(
                     text = { Text("Delete", color = Color.Red) },

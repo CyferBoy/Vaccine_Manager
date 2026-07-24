@@ -2,7 +2,9 @@ package com.clinic.neochild.features.dashboard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.clinic.neochild.data.remote.mapper.FirestoreMappers
 import com.clinic.neochild.domain.model.ClinicStats
+import com.clinic.neochild.domain.model.Staff
 import com.clinic.neochild.domain.repository.PatientRepository
 import com.clinic.neochild.domain.repository.WasteRepository
 import com.clinic.neochild.domain.usecase.statistics.GetClinicStatsUseCase
@@ -15,7 +17,8 @@ data class DashboardUiState(
     val lowStockCount: Int = 0,
     val dueTodayCount: Int = 0,
     val wasteCount: Int = 0,
-    val userName: String = "User"
+    val userName: String = "User",
+    val staff: Staff? = null
 )
 
 /**
@@ -30,22 +33,28 @@ class DashboardViewModel @Inject constructor(
     private val db: com.google.firebase.firestore.FirebaseFirestore
 ) : ViewModel() {
 
-    private val _userName = MutableStateFlow("User")
+    private val _staff = MutableStateFlow<Staff?>(null)
 
     init {
-        fetchUserName()
+        fetchStaffProfile()
     }
 
-    private fun fetchUserName() {
+    private fun fetchStaffProfile() {
         val currentUser = auth.currentUser ?: return
-        val email = currentUser.email ?: "User"
-        _userName.value = email.replaceFirstChar { it.uppercase() } // Capitalize fallback email
-
+        
         db.collection("staff").document(currentUser.uid).get()
             .addOnSuccessListener { doc ->
-                val name = doc.getString("name")
-                if (!name.isNullOrBlank()) {
-                    _userName.value = name
+                if (doc.exists()) {
+                    _staff.value = FirestoreMappers.toStaff(doc)
+                } else {
+                    // Fallback staff object
+                    _staff.value = Staff(
+                        id = currentUser.uid,
+                        email = currentUser.email ?: "",
+                        name = currentUser.displayName ?: currentUser.email?.substringBefore("@") ?: "User",
+                        role = "User",
+                        createdAt = currentUser.metadata?.creationTimestamp ?: 0L
+                    )
                 }
             }
     }
@@ -54,14 +63,15 @@ class DashboardViewModel @Inject constructor(
         patientRepository.getPatientCount(),
         getClinicStatsUseCase(),
         wasteRepository.getWasteCount(),
-        _userName
-    ) { patientCount, stats, wasteCount, userName ->
+        _staff
+    ) { patientCount, stats, wasteCount, staff ->
         DashboardUiState(
             patientCount = patientCount,
             lowStockCount = stats.lowStockCount,
             dueTodayCount = stats.dueToday,
             wasteCount = wasteCount,
-            userName = userName
+            userName = staff?.name ?: "User",
+            staff = staff
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardUiState())
 }

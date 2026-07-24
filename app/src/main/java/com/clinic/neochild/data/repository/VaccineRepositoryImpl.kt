@@ -56,7 +56,7 @@ class VaccineRepositoryImpl @Inject constructor(
                 val vaccines = snap.documents.mapNotNull { FirestoreMappers.toVaccineEntity(it) }
                 
                 // 2. Refresh Batches
-                val batchSnap = firestore.collection("batches").get().await()
+                val batchSnap = firestore.collection("vaccine_batches").get().await()
                 val batches = batchSnap.documents.mapNotNull { FirestoreMappers.toVaccineBatchEntity(it) }
 
                 database.withTransaction {

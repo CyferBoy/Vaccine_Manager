@@ -20,11 +20,9 @@ interface InventoryRepository {
     fun getInventoryTransactions(vaccineId: String): Flow<List<InventoryTransactionEntity>>
     suspend fun getBatchById(batchId: String): VaccineBatchEntity?
     
-    suspend fun addStock(
-        vaccine: VaccineEntity,
-        batch: VaccineBatchEntity,
-        user: String
-    )
+    suspend fun addVaccine(vaccine: VaccineEntity, user: String)
+    suspend fun updateVaccine(vaccine: VaccineEntity, user: String)
+    suspend fun addBatch(batch: VaccineBatchEntity, user: String)
     
     suspend fun updateBatch(
         batch: VaccineBatchEntity,

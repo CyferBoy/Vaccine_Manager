@@ -57,7 +57,7 @@ fun DashboardScreen(
             containerColor = Color.Transparent,
             topBar = {
                 DashboardTopBar(
-                    userName = uiState.userName,
+                    staff = uiState.staff,
                     isAdmin = isAdmin,
                     onManageStaff = onManageStaff,
                     onSettings = onSettings,

@@ -8,18 +8,18 @@ import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.clinic.neochild.R
+import com.clinic.neochild.domain.model.Staff
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardTopBar(
-    userName: String,
+    staff: Staff?,
     isAdmin: Boolean,
     onManageStaff: () -> Unit,
     onSettings: () -> Unit,
@@ -44,14 +44,12 @@ fun DashboardTopBar(
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.primaryContainer
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(
-                                text = userName,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
+                        Icon(
+                            Icons.Default.Person,
+                            contentDescription = "Profile",
+                            modifier = Modifier.padding(4.dp),
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
                     }
                 }
                 DropdownMenu(
@@ -60,7 +58,7 @@ fun DashboardTopBar(
                 ) {
                     Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                         Text(
-                            text = userName.replaceFirstChar { it.uppercase() },
+                            text = staff?.name ?: "User",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary

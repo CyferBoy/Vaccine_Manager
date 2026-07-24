@@ -19,7 +19,8 @@ import com.clinic.neochild.features.profile.ProfileScreen
 import com.clinic.neochild.features.reminder.DueScreen
 import com.clinic.neochild.features.statistics.MonthlyFinanceDetailsScreen
 import com.clinic.neochild.features.statistics.StatisticsScreen
-import com.clinic.neochild.features.inventory.AddVaccineStockScreen
+import com.clinic.neochild.features.inventory.AddVaccineScreen
+import com.clinic.neochild.features.inventory.AddBatchScreen
 import com.clinic.neochild.features.search.SearchScreen
 import com.clinic.neochild.features.vaccination.AddVaccinationScreen
 import com.clinic.neochild.features.inventory.BorrowedScreen
@@ -209,9 +210,15 @@ fun AppNavigation(
         composable(Routes.VACCINE_INVENTORY) {
             VaccineInventoryScreen(
                 onBack = { navController.popBackStack() },
-                onAddVaccine = { navController.navigate(Routes.ADD_VACCINE_STOCK) },
-                onEditBatch = { id ->
-                    navController.navigate("edit_vaccine_stock/$id")
+                onAddVaccine = { navController.navigate(Routes.ADD_VACCINE_DEFINITION) },
+                onEditVaccine = { id ->
+                    navController.navigate("edit_vaccine_definition/$id")
+                },
+                onAddBatch = { vaccineId, brandName ->
+                    navController.navigate("add_batch/$vaccineId/$brandName")
+                },
+                onEditBatch = { batchId, vaccineId, brandName ->
+                    navController.navigate("edit_batch/$batchId?vaccineId=$vaccineId&brandName=$brandName")
                 }
             )
         }
@@ -237,6 +244,56 @@ fun AppNavigation(
             )
         }
 
+        composable(Routes.ADD_VACCINE_DEFINITION) {
+            AddVaccineScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(
+            route = Routes.EDIT_VACCINE_DEFINITION,
+            arguments = listOf(navArgument("vaccineId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val vaccineId = backStackEntry.arguments?.getString("vaccineId")
+            AddVaccineScreen(
+                vaccineId = vaccineId,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Routes.ADD_BATCH,
+            arguments = listOf(
+                navArgument("vaccineId") { type = NavType.StringType },
+                navArgument("brandName") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val vaccineId = backStackEntry.arguments?.getString("vaccineId") ?: ""
+            val brandName = backStackEntry.arguments?.getString("brandName") ?: ""
+            AddBatchScreen(
+                vaccineId = vaccineId,
+                brandName = brandName,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Routes.EDIT_BATCH,
+            arguments = listOf(
+                navArgument("batchId") { type = NavType.StringType },
+                navArgument("vaccineId") { type = NavType.StringType; nullable = true },
+                navArgument("brandName") { type = NavType.StringType; nullable = true }
+            )
+        ) { backStackEntry ->
+            val batchId = backStackEntry.arguments?.getString("batchId")
+            val vaccineId = backStackEntry.arguments?.getString("vaccineId") ?: ""
+            val brandName = backStackEntry.arguments?.getString("brandName") ?: ""
+            AddBatchScreen(
+                batchId = batchId,
+                vaccineId = vaccineId,
+                brandName = brandName,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
         composable(Routes.BORROWED) {
             BorrowedScreen(onBack = { navController.popBackStack() })
         }
@@ -254,17 +311,52 @@ fun AppNavigation(
             WasteScreen(onBack = { navController.popBackStack() })
         }
 
-        composable(Routes.ADD_VACCINE_STOCK) {
-            AddVaccineStockScreen(onBack = { navController.popBackStack() })
+        composable(Routes.ADD_VACCINE_DEFINITION) {
+            AddVaccineScreen(onBack = { navController.popBackStack() })
         }
 
         composable(
-            route = Routes.EDIT_VACCINE_STOCK,
-            arguments = listOf(navArgument("vaccineId") { type = NavType.StringType }),
+            route = Routes.EDIT_VACCINE_DEFINITION,
+            arguments = listOf(navArgument("vaccineId") { type = NavType.StringType })
         ) { backStackEntry ->
             val vaccineId = backStackEntry.arguments?.getString("vaccineId")
-            AddVaccineStockScreen(
-                batchId = vaccineId,
+            AddVaccineScreen(
+                vaccineId = vaccineId,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Routes.ADD_BATCH,
+            arguments = listOf(
+                navArgument("vaccineId") { type = NavType.StringType },
+                navArgument("brandName") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val vaccineId = backStackEntry.arguments?.getString("vaccineId") ?: ""
+            val brandName = backStackEntry.arguments?.getString("brandName") ?: ""
+            AddBatchScreen(
+                vaccineId = vaccineId,
+                brandName = brandName,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Routes.EDIT_BATCH,
+            arguments = listOf(
+                navArgument("batchId") { type = NavType.StringType },
+                navArgument("vaccineId") { type = NavType.StringType; nullable = true },
+                navArgument("brandName") { type = NavType.StringType; nullable = true }
+            )
+        ) { backStackEntry ->
+            val batchId = backStackEntry.arguments?.getString("batchId")
+            val vaccineId = backStackEntry.arguments?.getString("vaccineId") ?: ""
+            val brandName = backStackEntry.arguments?.getString("brandName") ?: ""
+            AddBatchScreen(
+                batchId = batchId,
+                vaccineId = vaccineId,
+                brandName = brandName,
                 onBack = { navController.popBackStack() }
             )
         }

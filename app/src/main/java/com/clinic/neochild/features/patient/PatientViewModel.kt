@@ -3,9 +3,12 @@ package com.clinic.neochild.features.patient
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.clinic.neochild.data.local.entity.AuditLogEntity
+import com.clinic.neochild.data.local.entity.ReminderEntity
+import com.clinic.neochild.data.local.entity.PatientNotesEntity
 import com.clinic.neochild.domain.model.Patient
 import com.clinic.neochild.domain.model.Vaccination
 import com.clinic.neochild.domain.repository.PatientRepository
+import com.clinic.neochild.domain.repository.ReminderRepository
 import com.clinic.neochild.domain.usecase.patient.DeletePatientUseCase
 import com.clinic.neochild.domain.usecase.patient.GetPatientByIdUseCase
 import com.clinic.neochild.domain.usecase.patient.GetPatientsUseCase
@@ -32,7 +35,8 @@ class PatientViewModel @Inject constructor(
     private val deleteVaccinationUseCase: DeleteVaccinationUseCase,
     private val completeVaccinationUseCase: CompleteVaccinationUseCase,
     private val refreshDataUseCase: RefreshDataUseCase,
-    private val patientRepository: PatientRepository
+    private val patientRepository: PatientRepository,
+    private val reminderRepository: ReminderRepository
 ) : ViewModel() {
     
     val allPatients: StateFlow<List<Patient>>
@@ -117,5 +121,13 @@ class PatientViewModel @Inject constructor(
 
     fun getAuditLogs(patientId: String): Flow<List<AuditLogEntity>> {
         return patientRepository.getPatientTimeline(patientId)
+    }
+
+    fun getPatientFollowUps(patientId: String): Flow<List<ReminderEntity>> {
+        return reminderRepository.getPatientFollowUps(patientId)
+    }
+
+    fun getPatientNotes(patientId: String): Flow<List<PatientNotesEntity>> {
+        return patientRepository.getNotes(patientId)
     }
 }

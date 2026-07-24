@@ -23,12 +23,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import com.clinic.neochild.data.local.entity.ReminderEntity
+import com.clinic.neochild.data.local.entity.PatientNotesEntity
 import com.clinic.neochild.data.local.entity.AuditLogEntity
 import com.clinic.neochild.domain.model.Patient
 import com.clinic.neochild.domain.model.Vaccination
 import com.clinic.neochild.core.utils.PatientUtils.calculateAgeLabel
 import com.clinic.neochild.core.utils.PatientUtils.formatDateForDisplay
 import com.clinic.neochild.core.designsystem.NeoChildTheme
+import com.clinic.neochild.domain.model.ReminderStatus
+import com.clinic.neochild.features.reminder.FollowUpCard
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -37,6 +41,8 @@ fun PatientDetailsContent(
     paddingValues: PaddingValues,
     patient: Patient,
     vaccinations: List<Vaccination>,
+    followUps: List<ReminderEntity>,
+    notes: List<PatientNotesEntity>,
     onEditVaccination: (String) -> Unit,
     onDeleteVaccination: (Vaccination) -> Unit,
     onMarkAsDone: (Vaccination) -> Unit
@@ -52,22 +58,11 @@ fun PatientDetailsContent(
         item { PatientInfoSection(patient) }
 
         item {
-            Text(
-                text = "Vaccination History",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(top = 8.dp)
-            )
+            SectionHeader("Vaccination History")
         }
 
         if (vaccinations.isEmpty()) {
-            item {
-                Text(
-                    text = "No vaccination records found.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            item { EmptySectionText("No vaccination records found.") }
         } else {
             itemsIndexed(vaccinations, key = { _, v -> v.id }) { _, vaccination ->
                 VaccinationRecordCard(
@@ -78,6 +73,66 @@ fun PatientDetailsContent(
                     onMarkAsDone = { onMarkAsDone(vaccination) }
                 )
             }
+        }
+
+        // Active Follow-ups Section
+        val activeFollowUps = followUps.filter { it.status == "ACTIVE" || it.status == "RESCHEDULED" }
+        if (activeFollowUps.isNotEmpty()) {
+            item { SectionHeader("Active Follow-ups") }
+            items(activeFollowUps, key = { it.id }) { followUp ->
+                FollowUpCard(
+                    reminder = followUp,
+                    onActionClick = { /* Can add actions here later if needed */ }
+                )
+            }
+        }
+
+        // Clinical Notes Section
+        if (notes.isNotEmpty()) {
+            item { SectionHeader("Clinical Notes") }
+            items(notes, key = { it.id }) { note ->
+                ClinicalNoteCard(note)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SectionHeader(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleLarge,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(top = 8.dp)
+    )
+}
+
+@Composable
+private fun EmptySectionText(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+}
+
+@Composable
+fun ClinicalNoteCard(note: PatientNotesEntity) {
+    val dateDisplay = remember(note.timestamp) { 
+        SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.ENGLISH).format(Date(note.timestamp)) 
+    }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(text = "By: ${note.author}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                Text(text = dateDisplay, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(text = note.content, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
@@ -221,6 +276,13 @@ fun AuditLogItem(log: AuditLogEntity) {
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary
         )
+        if (log.entityType == "VACCINATION" || log.entityType == "VISIT") {
+            Text(
+                text = "ID: ${log.entityId}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.secondary
+            )
+        }
         val details = log.remarks ?: ""
         if (details.isNotBlank()) {
             Text(text = details, style = MaterialTheme.typography.bodySmall)
@@ -253,6 +315,8 @@ private fun PatientDetailsPreview() {
             paddingValues = PaddingValues(0.dp),
             patient = Patient("1", "John Doe", "1234567890", "", "2020-01-01", "Male", "Old Hospital Road", "2024-01-01"),
             vaccinations = emptyList(),
+            followUps = emptyList(),
+            notes = emptyList(),
             onEditVaccination = {},
             onDeleteVaccination = {},
             onMarkAsDone = {}

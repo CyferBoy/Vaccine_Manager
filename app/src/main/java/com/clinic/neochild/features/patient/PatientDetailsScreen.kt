@@ -30,6 +30,8 @@ fun PatientDetailsScreen(
     
     // Correct way to observe patient-specific history
     val patientVaccinations by viewModel.getPatientHistory(patientId).collectAsState(initial = emptyList())
+    val followUps by viewModel.getPatientFollowUps(patientId).collectAsState(initial = emptyList())
+    val notes by viewModel.getPatientNotes(patientId).collectAsState(initial = emptyList())
 
     var vaccinationToDelete by remember { mutableStateOf<Vaccination?>(null) }
     var vaccinationToMarkDone by remember { mutableStateOf<Vaccination?>(null) }
@@ -138,6 +140,8 @@ fun PatientDetailsScreen(
                     paddingValues = paddingValues,
                     patient = patient,
                     vaccinations = patientVaccinations,
+                    followUps = followUps,
+                    notes = notes,
                     onEditVaccination = onEditVaccination,
                     onDeleteVaccination = { vaccinationToDelete = it },
                     onMarkAsDone = { vaccinationToMarkDone = it }

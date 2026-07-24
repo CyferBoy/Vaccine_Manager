@@ -134,28 +134,39 @@ object FirestoreMappers {
 
     fun toVaccination(doc: DocumentSnapshot): Vaccination? {
         return try {
+            val isDone = doc.getBoolean("isDone") ?: doc.getBoolean("done") ?: false
+            
+            fun getList(field: String): List<String> {
+                val value = doc.get(field)
+                return when (value) {
+                    is List<*> -> value.mapNotNull { it?.toString() }
+                    is String -> if (value.isBlank()) emptyList() else value.split(",").map { it.trim() }
+                    else -> emptyList()
+                }
+            }
+
             Vaccination(
                 id = doc.id,
                 receiptNumber = doc.getString("receiptNumber") ?: "",
                 patientId = doc.getString("patientId") ?: "",
-                vaccineNames = (doc.get("vaccineNames") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList(),
-                vaccineIds = (doc.get("vaccineIds") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList(),
-                nxtVaccineNames = (doc.get("nxtVaccineNames") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList(),
+                vaccineNames = getList("vaccineNames"),
+                vaccineIds = getList("vaccineIds"),
+                nxtVaccineNames = getList("nxtVaccineNames"),
                 dateGiven = doc.getString("dateGiven") ?: "",
                 nextDueDate = doc.getString("nextDueDate") ?: "",
-                cost = doc.getDouble("cost") ?: 0.0,
-                cashAmount = doc.getDouble("cashAmount") ?: 0.0,
-                onlineAmount = doc.getDouble("onlineAmount") ?: 0.0,
-                totalPaid = doc.getDouble("totalPaid") ?: 0.0,
+                cost = (doc.get("cost") as? Number)?.toDouble() ?: 0.0,
+                cashAmount = (doc.get("cashAmount") as? Number)?.toDouble() ?: 0.0,
+                onlineAmount = (doc.get("onlineAmount") as? Number)?.toDouble() ?: 0.0,
+                totalPaid = (doc.get("totalPaid") as? Number)?.toDouble() ?: 0.0,
                 withFees = doc.getBoolean("withFees") ?: false,
                 doctorsAcc = doc.getBoolean("doctorsAcc") ?: false,
-                isDone = doc.getBoolean("isDone") ?: false,
+                isDone = isDone,
                 source = doc.getString("source") ?: "CLINIC",
                 notes = doc.getString("notes") ?: "",
                 rescheduleReason = doc.getString("rescheduleReason") ?: "",
                 performedBy = doc.getString("performedBy") ?: "",
-                batchNumbers = (doc.get("batchNumbers") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList(),
-                expiryDates = (doc.get("expiryDates") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
+                batchNumbers = getList("batchNumbers"),
+                expiryDates = getList("expiryDates")
             )
         } catch (_: Exception) {
             null

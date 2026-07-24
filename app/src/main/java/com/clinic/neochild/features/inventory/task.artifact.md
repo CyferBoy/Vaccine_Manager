@@ -1,7 +1,4 @@
-- `[x]` Data Layer - Rename "visits" to "vaccinations"
-    - `[x]` Update `VaccinationRepositoryImpl.kt` (Firestore collection and Audit Logs)
-    - `[x]` Update `SyncRepositoryImpl.kt` (Mapping and Entity Data fetch)
-    - `[x]` Update `ReminderRepositoryImpl.kt` (Sync entity name)
+- `[x]` Update `AddVaccinationViewModel` with `scheduleFollowUp` logic
+- `[x]` Update `AddVaccinationScreen` to call automatic scheduling and navigate back
 - `[x]` Verification
-    - `[x]` Project-wide search for remaining "visits" strings
     - `[x]` Gradle Build

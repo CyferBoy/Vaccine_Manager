@@ -227,4 +227,22 @@ class AddVaccinationViewModel @Inject constructor(
             state.copy(onlineAmount = amount, totalPaid = cash + online)
         }
     }
+
+    fun scheduleFollowUp(v: Vaccination) {
+        if (v.nextDueDate.isBlank() || v.nxtVaccineNames.isEmpty()) return
+        
+        viewModelScope.launch {
+            val user = FirebaseAuth.getInstance().currentUser?.email ?: "Unknown"
+            reminderRepository.scheduleFollowUp(
+                patientId = v.patientId,
+                originalVisitId = v.id,
+                vaccineNames = v.nxtVaccineNames,
+                dueDate = v.nextDueDate,
+                notes = "Scheduled automatically from vaccination",
+                priority = "NORMAL",
+                reminderEnabled = true,
+                performedBy = user
+            )
+        }
+    }
 }

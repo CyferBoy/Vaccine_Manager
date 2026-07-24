@@ -27,7 +27,6 @@ fun AddVaccinationScreen(
     initialVaccineName: String? = null,
     vaccinationId: String? = null,
     onBack: () -> Unit = {},
-    onScheduleFollowUp: (String, String, List<String>) -> Unit = { _, _, _ -> },
     patientViewModel: PatientViewModel = hiltViewModel(),
     viewModel: AddVaccinationViewModel = hiltViewModel()
 ) {
@@ -89,9 +88,10 @@ fun AddVaccinationScreen(
                 Button(onClick = {
                     val saved = uiState.savedVaccination
                     if (saved != null) {
-                        onScheduleFollowUp(saved.patientId, saved.id, saved.nxtVaccineNames)
+                        viewModel.scheduleFollowUp(saved)
                     }
                     viewModel.resetSaveState()
+                    onBack()
                 }) { Text("Schedule Follow-up") }
             },
             dismissButton = {

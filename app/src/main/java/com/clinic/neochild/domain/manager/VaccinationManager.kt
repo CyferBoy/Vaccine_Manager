@@ -41,7 +41,18 @@ class VaccinationManager @Inject constructor(
     ) {
         database.withTransaction {
             // 1. Add/Update Vaccination Record
-            vaccinationRepository.addVaccination(vaccination)
+            // Enrich vaccination with batch info if missing but batches were selected
+            val finalVaccination = if (selectedBatchIds.isNotEmpty() && vaccination.expiryDates.isEmpty()) {
+                val batchDetails = selectedBatchIds.mapNotNull { id -> vaccineDao.getBatchById(id) }
+                vaccination.copy(
+                    batchNumbers = batchDetails.map { it.batchNumber },
+                    expiryDates = batchDetails.map { it.expiryDate }
+                )
+            } else {
+                vaccination
+            }
+            
+            vaccinationRepository.addVaccination(finalVaccination)
 
             // 2. Inventory Management (Only for new vaccinations to prevent duplicate deduction)
             if (isNew) {
@@ -112,18 +123,36 @@ class VaccinationManager @Inject constructor(
 
         // Automated Inventory Mapping
         val vaccines = vaccineDao.getAllVaccines().first()
-        val matchingVaccineId = vaccines.find { 
+        val matchingVaccine = vaccines.find { 
             it.brandName.contains(requirement.vaccineName, ignoreCase = true) 
-        }?.id
-
+        }
+        
+        val matchingVaccineId = matchingVaccine?.id
         val selectedIds = matchingVaccineId?.let { listOf(it) } ?: emptyList()
 
+        // Attempt to find FEFO batch to record expiry date even for automated completions
+        var enrichedVaccination = vaccination
+        val selectedBatchIds = mutableListOf<String>()
+        
+        if (matchingVaccineId != null) {
+            val activeBatches = vaccineDao.getActiveBatchesByExpiry(matchingVaccineId)
+            val firstBatch = activeBatches.firstOrNull { it.remainingQuantity > 0 && !com.clinic.neochild.core.utils.InventoryUtils.isExpired(it.expiryDate) }
+            if (firstBatch != null) {
+                enrichedVaccination = vaccination.copy(
+                    batchNumbers = listOf(firstBatch.batchNumber),
+                    expiryDates = listOf(firstBatch.expiryDate)
+                )
+                selectedBatchIds.add(firstBatch.batchId)
+            }
+        }
+
         completeVaccination(
-            vaccination = vaccination,
+            vaccination = enrichedVaccination,
             user = user,
             isNew = true,
             selectedVaccineIds = selectedIds,
-            requirement = requirement
+            requirement = requirement,
+            selectedBatchIds = selectedBatchIds
         )
     }
 

@@ -39,7 +39,7 @@ class VaccinationRepositoryImpl @Inject constructor(
     override suspend fun refreshVaccinations() {
         withContext(Dispatchers.IO) {
             try {
-                val snapshot = firestore.collection("visits").get().await()
+                val snapshot = firestore.collection("vaccinations").get().await()
                 val vaccinations = snapshot.documents.mapNotNull { FirestoreMappers.toVaccination(it) }
                 database.withTransaction {
                     for (remote in vaccinations) {
@@ -76,7 +76,7 @@ class VaccinationRepositoryImpl @Inject constructor(
             
             auditLogger.recordLog(
                 module = "PATIENT",
-                entityType = "VISIT",
+                entityType = "VACCINATION",
                 entityId = vaccination.id,
                 action = "VACCINATION",
                 patientId = vaccination.patientId,
@@ -99,7 +99,7 @@ class VaccinationRepositoryImpl @Inject constructor(
             
             auditLogger.recordLog(
                 module = "PATIENT",
-                entityType = "VISIT",
+                entityType = "VACCINATION",
                 entityId = id,
                 action = "DELETED",
                 patientId = existing?.patientId,
@@ -124,7 +124,7 @@ class VaccinationRepositoryImpl @Inject constructor(
                 
                 auditLogger.recordLog(
                     module = "PATIENT",
-                    entityType = "VISIT",
+                    entityType = "VACCINATION",
                     entityId = id,
                     action = "COMPLETED",
                     patientId = current.patientId,

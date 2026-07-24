@@ -363,7 +363,7 @@ class ReminderRepositoryImpl @Inject constructor(
                     isDone = true
                 )
                 vaccinationDao.insertVaccination(visit)
-                syncRepository.enqueue("VISIT", visit.id, SyncOperation.CREATE, SyncPriority.MEDIUM)
+                syncRepository.enqueue("VACCINATION", visit.id, SyncOperation.CREATE, SyncPriority.MEDIUM)
 
                 // 2. Update Reminder State
                 val existing = dueReminderDao.getReminderByStableId(requirement.patientId, requirement.originalVisitId, requirement.vaccineName)

@@ -1,19 +1,7 @@
-- `[x]` Navigation & Routes
-    - `[x]` Update `Routes.kt`
-    - `[x]` Update `Navigation.kt`
-- `[x]` Data Layer
-    - `[x]` Update `InventoryRepository` interface
-    - `[x]` Update `InventoryRepositoryImpl` (new methods, update collection names to `vaccine_batches`)
-    - `[x]` Update `VaccineRepositoryImpl` (update collection names to `vaccine_batches`)
-    - `[x]` Update `SyncRepositoryImpl` (update collection names to `vaccine_batches`)
-- `[x]` ViewModel Layer
-    - `[x]` Create `AddVaccineViewModel`
-    - `[x]` Create `AddBatchViewModel`
-    - `[x]` Update `VaccineInventoryViewModel`
-- `[x]` UI Layer
-    - `[x]` Create `AddVaccineScreen`
-    - `[x]` Create `AddBatchScreen`
-    - `[x]` Update `VaccineInventoryScreen`
+- `[x]` Data Layer - Rename "visits" to "vaccinations"
+    - `[x]` Update `VaccinationRepositoryImpl.kt` (Firestore collection and Audit Logs)
+    - `[x]` Update `SyncRepositoryImpl.kt` (Mapping and Entity Data fetch)
+    - `[x]` Update `ReminderRepositoryImpl.kt` (Sync entity name)
 - `[x]` Verification
+    - `[x]` Project-wide search for remaining "visits" strings
     - `[x]` Gradle Build
-    - `[x]` Manual check of Firestore collection names

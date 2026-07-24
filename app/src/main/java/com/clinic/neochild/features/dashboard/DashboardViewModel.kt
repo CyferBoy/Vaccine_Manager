@@ -10,6 +10,8 @@ import com.clinic.neochild.domain.repository.WasteRepository
 import com.clinic.neochild.domain.usecase.statistics.GetClinicStatsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
 data class DashboardUiState(
@@ -42,11 +44,26 @@ class DashboardViewModel @Inject constructor(
     private fun fetchStaffProfile() {
         val currentUser = auth.currentUser ?: return
         
-        db.collection("staff").document(currentUser.uid).get()
-            .addOnSuccessListener { doc ->
+        viewModelScope.launch {
+            try {
+                val doc = db.collection("staff").document(currentUser.uid).get().await()
                 if (doc.exists()) {
                     _staff.value = FirestoreMappers.toStaff(doc)
                 } else {
+                    // Try to find by email
+                    val email = currentUser.email
+                    if (email != null) {
+                        val query = db.collection("staff")
+                            .whereEqualTo("email", email)
+                            .get().await()
+                        
+                        if (query.documents.isNotEmpty()) {
+                            val staffDoc = query.documents.first()
+                            _staff.value = FirestoreMappers.toStaff(staffDoc)
+                            return@launch
+                        }
+                    }
+
                     // Fallback staff object
                     _staff.value = Staff(
                         id = currentUser.uid,
@@ -56,7 +73,10 @@ class DashboardViewModel @Inject constructor(
                         createdAt = currentUser.metadata?.creationTimestamp ?: 0L
                     )
                 }
+            } catch (e: Exception) {
+                // Keep default or handle error
             }
+        }
     }
 
     val uiState: StateFlow<DashboardUiState> = combine(

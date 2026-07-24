@@ -47,6 +47,21 @@ class ProfileViewModel @Inject constructor(
                     val staff = FirestoreMappers.toStaff(doc)
                     _uiState.value = _uiState.value.copy(staff = staff, isLoading = false)
                 } else {
+                    // Try to find by email as requested
+                    val email = currentUser.email
+                    if (email != null) {
+                        val query = db.collection("staff")
+                            .whereEqualTo("email", email)
+                            .get().await()
+                        
+                        if (query.documents.isNotEmpty()) {
+                            val staffDoc = query.documents.first()
+                            val staff = FirestoreMappers.toStaff(staffDoc)
+                            _uiState.value = _uiState.value.copy(staff = staff, isLoading = false)
+                            return@launch
+                        }
+                    }
+
                     // Fallback to basic auth info if staff profile doesn't exist yet
                     val staff = Staff(
                         id = currentUser.uid,

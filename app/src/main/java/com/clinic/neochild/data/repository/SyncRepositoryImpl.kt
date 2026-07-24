@@ -81,7 +81,7 @@ class SyncRepositoryImpl @Inject constructor(
     private suspend fun uploadEntity(item: SyncQueueEntity) {
         val collection = when (item.entityName) {
             "PATIENT" -> "patients"
-            "VISIT", "VACCINATION" -> "visits"
+            "VACCINATION", "VISIT" -> "vaccinations"
             "WASTE" -> "waste"
             "REMINDER_STATE", "DUE_REMINDER", "COMPLETED_REMINDER", "DISMISSED_REMINDER", "EXTERNAL_REMINDER" -> "reminders"
             "VACCINE" -> "vaccines"
@@ -131,7 +131,7 @@ class SyncRepositoryImpl @Inject constructor(
                         patient
                     }
                 }
-                "VISIT", "VACCINATION" -> database.vaccinationDao().getVaccinationById(entityId)?.toVaccination()
+                "VACCINATION", "VISIT" -> database.vaccinationDao().getVaccinationById(entityId)?.toVaccination()
                 "WASTE" -> database.wasteDao().getWasteById(entityId)?.toDomain()
                 "REMINDER_STATE" -> database.dueReminderDao().getReminderById(entityId.toLongOrNull() ?: -1L)
                 "VACCINE" -> database.vaccineDao().getVaccineById(entityId)

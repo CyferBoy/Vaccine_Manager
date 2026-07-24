@@ -311,56 +311,6 @@ fun AppNavigation(
             WasteScreen(onBack = { navController.popBackStack() })
         }
 
-        composable(Routes.ADD_VACCINE_DEFINITION) {
-            AddVaccineScreen(onBack = { navController.popBackStack() })
-        }
-
-        composable(
-            route = Routes.EDIT_VACCINE_DEFINITION,
-            arguments = listOf(navArgument("vaccineId") { type = NavType.StringType })
-        ) { backStackEntry ->
-            val vaccineId = backStackEntry.arguments?.getString("vaccineId")
-            AddVaccineScreen(
-                vaccineId = vaccineId,
-                onBack = { navController.popBackStack() }
-            )
-        }
-
-        composable(
-            route = Routes.ADD_BATCH,
-            arguments = listOf(
-                navArgument("vaccineId") { type = NavType.StringType },
-                navArgument("brandName") { type = NavType.StringType }
-            )
-        ) { backStackEntry ->
-            val vaccineId = backStackEntry.arguments?.getString("vaccineId") ?: ""
-            val brandName = backStackEntry.arguments?.getString("brandName") ?: ""
-            AddBatchScreen(
-                vaccineId = vaccineId,
-                brandName = brandName,
-                onBack = { navController.popBackStack() }
-            )
-        }
-
-        composable(
-            route = Routes.EDIT_BATCH,
-            arguments = listOf(
-                navArgument("batchId") { type = NavType.StringType },
-                navArgument("vaccineId") { type = NavType.StringType; nullable = true },
-                navArgument("brandName") { type = NavType.StringType; nullable = true }
-            )
-        ) { backStackEntry ->
-            val batchId = backStackEntry.arguments?.getString("batchId")
-            val vaccineId = backStackEntry.arguments?.getString("vaccineId") ?: ""
-            val brandName = backStackEntry.arguments?.getString("brandName") ?: ""
-            AddBatchScreen(
-                batchId = batchId,
-                vaccineId = vaccineId,
-                brandName = brandName,
-                onBack = { navController.popBackStack() }
-            )
-        }
-
         composable(
             route = "add_vaccine_with_details/{patientId}/{vaccineName}",
             arguments = listOf(

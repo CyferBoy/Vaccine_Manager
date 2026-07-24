@@ -148,6 +148,7 @@ class SyncRepositoryImpl @Inject constructor(
                 else -> null
             }
         } catch (e: Exception) {
+            android.util.Log.e("SyncRepository", "Error fetching data for sync: ${item.entityName} ID $entityId", e)
             null
         }
     }

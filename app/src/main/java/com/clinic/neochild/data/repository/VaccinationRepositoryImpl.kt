@@ -44,18 +44,48 @@ class VaccinationRepositoryImpl @Inject constructor(
         withContext(Dispatchers.IO) {
             try {
                 val snapshot = firestore.collection("vaccinations").get().await()
-                val vaccinations = snapshot.documents.mapNotNull { FirestoreMappers.toVaccination(it) }
+                val totalDownloaded = snapshot.documents.size
+                var imported = 0
+                var failedMapping = 0
+                var failedValidation = 0
+
+                val vaccinations = snapshot.documents.mapNotNull { doc ->
+                    val domain = FirestoreMappers.toVaccination(doc)
+                    if (domain == null) {
+                        failedMapping++
+                        return@mapNotNull null
+                    }
+                    
+                    // Basic Validation before Room insert
+                    if (domain.id.isBlank() || domain.patientId.isBlank()) {
+                        android.util.Log.e("VaccinationRepo", "Validation failed for ${domain.id}: patientId=${domain.patientId}")
+                        failedValidation++
+                        return@mapNotNull null
+                    }
+                    
+                    domain
+                }
+
                 database.withTransaction {
                     for (remote in vaccinations) {
                         val local = vaccinationDao.getVaccinationById(remote.id)
                         if (local == null || local.isSynced) {
                             vaccinationDao.insertVaccination(remote.toEntity(isSynced = true))
+                            imported++
                         }
                     }
                 }
-                android.util.Log.d("VaccinationRepo", "Refreshed ${vaccinations.size} vaccinations")
+                
+                android.util.Log.i("VaccinationRepo", """
+                    Sync Complete:
+                    - Total Downloaded: $totalDownloaded
+                    - Successfully Imported: $imported
+                    - Failed Mapping (Schema Issues): $failedMapping
+                    - Failed Validation (Missing Data): $failedValidation
+                """.trimIndent())
+                
             } catch (e: Exception) {
-                android.util.Log.e("VaccinationRepo", "Refresh failed", e)
+                android.util.Log.e("VaccinationRepo", "Cloud Refresh failed", e)
             }
         }
     }

@@ -1,4 +1,11 @@
-- `[x]` Update `AddVaccinationViewModel` with `scheduleFollowUp` logic
-- `[x]` Update `AddVaccinationScreen` to call automatic scheduling and navigate back
-- `[x]` Verification
-    - `[x]` Gradle Build
+- `[ ]` Domain Layer
+    - `[x]` Ensure `ADJUSTMENT` exists in `InventoryEnums.kt`
+    - `[/]` Create/Verify `BackfillInventoryUsageUseCase.kt`
+- `[ ]` Dependency Injection
+    - `[ ]` Register `BackfillInventoryUsageUseCase` in `UseCaseModule.kt`
+- `[ ]` ViewModel Layer
+    - `[ ]` Update `NotificationSettingsViewModel.kt` with backfill logic
+- `[ ]` UI Layer
+    - `[ ]` Update `SettingsScreen.kt` with maintenance button and dialogs
+- `[ ]` Verification
+    - `[ ]` Gradle Build

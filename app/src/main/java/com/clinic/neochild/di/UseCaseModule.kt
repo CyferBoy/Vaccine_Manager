@@ -12,6 +12,8 @@ import com.clinic.neochild.domain.usecase.sync.RefreshDataUseCase
 import com.clinic.neochild.domain.usecase.vaccination.DeleteVaccinationUseCase
 import com.clinic.neochild.domain.usecase.vaccination.GetVaccinationsUseCase
 import com.clinic.neochild.domain.usecase.vaccination.SaveVaccinationUseCase
+import com.clinic.neochild.domain.usecase.inventory.BackfillInventoryUsageUseCase
+import com.clinic.neochild.data.local.dao.VaccineDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -55,4 +57,12 @@ object UseCaseModule {
         inventoryRepository: InventoryRepository,
         reminderRepository: ReminderRepository
     ) = RefreshDataUseCase(patientRepository, vaccinationRepository, wasteRepository, inventoryRepository, reminderRepository)
+
+    @Provides
+    @ViewModelScoped
+    fun provideBackfillInventoryUsageUseCase(
+        vaccinationRepository: VaccinationRepository,
+        inventoryRepository: InventoryRepository,
+        vaccineDao: VaccineDao
+    ) = BackfillInventoryUsageUseCase(vaccinationRepository, inventoryRepository, vaccineDao)
 }

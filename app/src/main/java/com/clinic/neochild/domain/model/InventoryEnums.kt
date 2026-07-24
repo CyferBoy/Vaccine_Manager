@@ -9,7 +9,8 @@ enum class InventoryTransactionType {
     COLD_CHAIN_FAILURE,
     CONTAMINATED,
     OTHER,
-    MANUAL_ADJUSTMENT
+    MANUAL_ADJUSTMENT,
+    ADJUSTMENT
 }
 
 enum class BatchStatus {
